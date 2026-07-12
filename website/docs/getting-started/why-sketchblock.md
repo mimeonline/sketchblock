@@ -1,26 +1,39 @@
 ---
 title: Why Sketchblock
-description: Keep visual engineering decisions connected to the code, context, and history they belong to.
+description: Open Excalidraw files from GitHub, edit them together in the browser, and save the result directly as a commit.
 slug: /getting-started/why-sketchblock
 ---
 
 # Why Sketchblock
 
-Technical teams often build shared understanding on a visual canvas. Architecture reviews, system maps, and design discussions become easier when people can point, sketch, rearrange, and clarify ideas together.
+Technical teams often store architecture diagrams and system maps as `.excalidraw` files beside their code and documentation. Git gives those files a clear home, a reviewable history, and a connection to the project they explain.
 
-The resulting diagram frequently loses its connection to the project. It remains in a separate SaaS workspace, becomes an exported image, or survives as a link that quietly becomes outdated while the code and documentation continue to evolve.
+Updating the diagram interrupts that connection. The file must be downloaded or opened separately, edited in Excalidraw, exported again, placed back into the repository, and committed. A collaborative whiteboard session creates an additional workspace whose latest result still has to return to Git.
 
-Sketchblock keeps visual decisions connected to the engineering work they explain.
+Sketchblock turns that manual round trip into one browser workflow: open from GitHub, edit alone or together, and commit the reviewed `.excalidraw` file back to the project.
 
-## The gap between whiteboards and Git
+## The manual round trip
 
-### Whiteboards drift away from the project
+Without a repository-connected workspace, a small diagram update typically requires these steps:
 
-The conversation happens on a canvas while implementation, documentation, and decisions live in Git. After the meeting, the team has to decide which version is authoritative and how the visual result belongs to the project.
+1. Find the `.excalidraw` file in the repository.
+2. Download or open the file in a separate Excalidraw workspace.
+3. Edit the diagram or move the work into a collaboration session.
+4. Export or download the updated file.
+5. Replace the existing file in the project.
+6. Create a Git commit for the result.
 
-### Git is not a live workshop
+Every handoff creates room for an outdated file, a lost result, or uncertainty about which version belongs to the project.
+
+## The gaps around that workflow
+
+### Git stores the file but does not provide a live canvas
 
 Git gives an Excalidraw file ownership, history, and reviewability. It does not provide a practical room where several people can work on that file together in real time.
+
+### Shared whiteboards do not update the repository file
+
+A live session can produce the newest and most useful version of a diagram. The `.excalidraw` file in Git remains unchanged until someone manually transfers and commits that result.
 
 ### Guests need focused access
 
@@ -32,7 +45,7 @@ Architecture diagrams can contain system boundaries, customer context, and opera
 
 ## What Sketchblock changes
 
-Sketchblock adds a focused collaboration layer around an ordinary `.excalidraw` file:
+Sketchblock connects the repository file, the editor, the live session, and the commit:
 
 1. Select a board from a connected GitHub repository.
 2. Open it as a live workspace.
@@ -40,10 +53,12 @@ Sketchblock adds a focused collaboration layer around an ordinary `.excalidraw` 
 4. Review and refine the diagram together.
 5. Save the agreed result back to the repository as a commit.
 
-The repository remains the durable home of the artifact. The live room provides the temporary space for the conversation.
+The same repository-backed artifact moves through the complete workflow. The repository remains its durable home, and the live room provides the focused space for editing and discussion.
 
 ## The benefits
 
+- **Manual file handling decreases:** downloads, exports, and file replacement leave the normal editing path.
+- **The repository stays current:** the reviewed `.excalidraw` file returns directly as a commit.
 - **Context stays intact:** diagrams remain beside the code, documentation, and decisions they explain.
 - **Access stays focused:** participants work with the shared artifact through defined owner, collaborator, and viewer roles.
 - **Results stay traceable:** the reviewed board returns to Git as a versioned file.

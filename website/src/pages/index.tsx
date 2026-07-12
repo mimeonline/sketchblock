@@ -5,14 +5,14 @@ import Layout from '@theme/Layout';
 import styles from './index.module.css';
 
 const proof = [
-  ['Keep the context', 'The diagram remains beside the code, documentation, and decisions it explains.'],
-  ['Control the room', 'Invite collaborators and viewers to one focused artifact with role-specific access.'],
-  ['Preserve the result', 'Return the reviewed board to Git as an ordinary, versioned .excalidraw file.'],
+  ['Open from Git', 'Select an existing .excalidraw file from a connected GitHub repository and open it in the browser.'],
+  ['Edit together', 'Work on the same diagram in a focused live session with collaborator and viewer roles.'],
+  ['Commit it back', 'Save the reviewed file directly to its repository as a traceable Git commit.'],
 ];
 
 const problems = [
-  ['Whiteboards drift away', 'The conversation happens on a canvas while the code and documentation continue evolving somewhere else.'],
-  ['Git is not a live workshop', 'Version control protects the artifact, but it does not give a team a shared visual working room.'],
+  ['Files take a manual round trip', 'A repository diagram must be downloaded, opened in Excalidraw, exported again, replaced in the project, and committed manually.'],
+  ['Collaboration leaves Git behind', 'A shared whiteboard session creates a useful result, but the repository file does not update with it.'],
   ['Guests need focused access', 'Customers and reviewers should be able to work on one diagram without receiving access to the entire repository.'],
 ];
 
@@ -93,15 +93,15 @@ function WhiteboardToolbar(): ReactNode {
 
 export default function Home(): ReactNode {
   return (
-    <Layout title="Keep visual decisions connected to the code" description="Turn Git-backed Excalidraw files into focused live workspaces and save reviewed results back as commits.">
+    <Layout title="Open Excalidraw from Git. Commit it back." description="Open Excalidraw files from GitHub, edit them together in the browser, and save reviewed results directly as commits.">
       <main>
         <section className={styles.hero}>
           <div className={`container ${styles.heroGrid}`}>
             <div className={styles.heroCopy}>
               <div className={styles.eyebrow}>VISUAL COLLABORATION FOR ENGINEERING TEAMS</div>
-              <h1>Keep visual decisions connected to the code.</h1>
-              <p className={styles.lead}>Architecture discussions often end in a separate whiteboard, an exported image, or a link that quietly becomes outdated. Sketchblock turns Excalidraw files in Git into focused live workspaces and saves the reviewed result back as a commit.</p>
-              <p className={styles.benefitLine}>Collaborate visually. Control access. Preserve the result.</p>
+              <h1>Open Excalidraw from Git. Edit together. Commit it back.</h1>
+              <p className={styles.lead}>Sketchblock opens existing <code>.excalidraw</code> files from a connected GitHub repository directly in the browser. Work on the diagram alone or in a live session, then save the reviewed file back to the project as a commit.</p>
+              <p className={styles.benefitLine}>One repository file. One visual workspace. One traceable history.</p>
               <div className={styles.actions}>
                 <Link className="button button--primary button--lg" to="/docs/getting-started/quickstart">Run the demo</Link>
                 <Link className="button button--secondary button--lg" href="https://github.com/mimeonline/sketchblock">View on GitHub</Link>
@@ -116,8 +116,8 @@ export default function Home(): ReactNode {
           <div className="container">
             <div className={styles.problemIntro}>
               <div className={styles.eyebrow}>THE GAP SKETCHBLOCK CLOSES</div>
-              <h2 id="problem-heading">Your diagrams keep losing their context.</h2>
-              <p>Technical teams think together on a canvas, but the result often becomes detached from the project it is meant to explain. Sketchblock keeps the working session and the durable artifact in one traceable flow.</p>
+              <h2 id="problem-heading">Updating a diagram in Git takes too many manual steps.</h2>
+              <p>A repository-backed Excalidraw file usually travels through downloads, exports, file replacement, and a separate commit. Shared sessions add another place where the latest result can live. Sketchblock connects these steps in one browser workflow.</p>
             </div>
             <div className={styles.problemGrid}>
               {problems.map(([title, text], index) => <article key={title}><span>0{index + 1}</span><h3>{title}</h3><p>{text}</p></article>)}
@@ -133,7 +133,7 @@ export default function Home(): ReactNode {
 
         <section className={styles.workspace}>
           <div className={`container ${styles.workspaceGrid}`}>
-            <div><div className={styles.eyebrow}>FROM FILE TO LIVE ROOM</div><h2>Keep the artifact.<br/>Add the collaboration.</h2></div>
+            <div><div className={styles.eyebrow}>FROM REPOSITORY TO LIVE ROOM AND BACK</div><h2>One file.<br/>One continuous workflow.</h2></div>
             <div className={styles.mockup} aria-label="Sketchblock product preview">
               <div className={styles.mockbar}><i/><i/><i/><span>sketchblock / architecture.excalidraw</span></div>
               <div className={styles.canvas}>
@@ -171,9 +171,9 @@ export default function Home(): ReactNode {
             </div>
             <div className={styles.founderCopy}>
               <div className={styles.eyebrow}>WHY I BUILT SKETCHBLOCK</div>
-              <h2>The important conversations happened around diagrams. The diagrams kept losing their context.</h2>
+              <h2>The diagram belonged in the project. Updating it kept pulling the work out of the project.</h2>
               <p>I’m Michael Meierhoff, a software architect, systems thinker, and independent builder. For more than two decades I have worked with software systems, architecture, and the difficult space between technical detail and shared understanding.</p>
-              <p>Sketchblock grew from a recurring frustration: teams think visually, while the resulting artifact often drifts away from the code, the decision, and its history. This project is my attempt to close that gap with a small, self-hosted tool that keeps visual work inspectable, versioned, and yours.</p>
+              <p>Sketchblock grew from a recurring frustration: editing a repository-backed diagram meant moving the file between Git, Excalidraw, exports, and commits. Live collaboration created another disconnected workspace. Sketchblock turns that round trip into one self-hosted, traceable workflow.</p>
               <div className={styles.founderLinks}>
                 <Link to="/docs/project/about">Read the full story</Link>
                 <Link href="https://methodatlas.meierhoff-systems.de/en">Explore Method Atlas</Link>
@@ -182,7 +182,7 @@ export default function Home(): ReactNode {
           </div>
         </section>
 
-        <section className={styles.finalCta}><div className="container"><h2>Give every visual decision<br/>a clear home and history.</h2><Link className="button button--primary button--lg" to="/docs/getting-started/quickstart">Open the quickstart</Link></div></section>
+        <section className={styles.finalCta}><div className="container"><h2>Open the repository file.<br/>Work together. Commit the result.</h2><Link className="button button--primary button--lg" to="/docs/getting-started/quickstart">Open the quickstart</Link></div></section>
       </main>
     </Layout>
   );

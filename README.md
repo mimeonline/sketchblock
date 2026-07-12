@@ -11,23 +11,23 @@
   <a href="https://mimeonline.github.io/sketchblock/"><img alt="Documentation" src="https://img.shields.io/badge/docs-GitHub%20Pages-0f766e.svg" /></a>
 </p>
 
-Technical teams often discuss architecture on a whiteboard while the resulting diagram lives somewhere else: in a SaaS workspace, an exported image, or a link that becomes outdated as the project evolves.
+An Excalidraw diagram stored in Git usually takes a manual round trip before it can be updated: download the file, open it in Excalidraw, edit it, export it again, replace the repository file, and create a commit. A collaborative whiteboard session adds another place where the latest result can live.
 
-Sketchblock turns Git-backed Excalidraw files into focused live workspaces. Invite collaborators or viewers, work on the diagram together, and save the reviewed result back as a versioned commit—on infrastructure you control.
+Sketchblock connects that workflow. Open an existing `.excalidraw` file from a connected GitHub repository directly in the browser, edit it alone or in a live session, and save the reviewed file back to the project as a versioned commit—on infrastructure you control.
 
 ## 🎯 The problem
 
-- Visual decisions lose their connection to code and documentation.
-- Git preserves diagrams but does not provide a practical live workspace.
+- Updating a repository-backed diagram requires downloads, exports, file replacement, and a separate commit.
+- A collaborative whiteboard can contain a newer result than the `.excalidraw` file in Git.
 - External reviewers need focused access to one artifact without access to the entire repository.
 - Architecture and customer data often require controlled hosting.
 
 ## ✨ What Sketchblock changes
 
-- **Keep the context:** the Excalidraw file remains an ordinary repository artifact beside the project it explains.
-- **Control the room:** invite collaborators or viewers with role-specific links and QR codes.
-- **Work live:** turn a versioned file into a focused realtime session.
-- **Preserve the result:** save the reviewed board back to Git as a traceable commit.
+- **Open from Git:** select an existing `.excalidraw` file from a connected GitHub repository and open it in the browser.
+- **Edit together:** work on the same diagram in a focused realtime session with collaborator and viewer roles.
+- **Commit it back:** save the reviewed file directly to its repository as a traceable commit.
+- **Keep one source of truth:** the diagram remains beside the code, documentation, and decisions it explains.
 - **Own the stack:** run the web app, collaboration server, Postgres, and migrations with Docker Compose.
 
 ## 👥 Who it is for
