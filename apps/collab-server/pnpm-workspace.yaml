@@ -1,0 +1,19 @@
+allowBuilds:
+  '@asyncapi/cli': false
+  '@hyperjump/json-pointer': false
+  '@hyperjump/json-schema': false
+  '@hyperjump/json-schema-core': false
+  '@hyperjump/pact': false
+  '@scarf/scarf': false
+  esbuild: true
+  protobufjs: false
+  puppeteer: false
+  yarn: false
+minimumReleaseAgeExclude:
+  - '@nestjs/common@11.1.28'
+  - '@nestjs/core@11.1.28'
+  - '@nestjs/platform-express@11.1.28'
+  - '@nestjs/platform-socket.io@11.1.28'
+  - '@nestjs/websockets@11.1.28'
+overrides:
+  '@babel/core': ^7.29.7

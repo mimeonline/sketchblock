@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://mimeonline.github.io/sketchblock/sitemap.xml

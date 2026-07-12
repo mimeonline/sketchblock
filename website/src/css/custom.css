@@ -1,0 +1,48 @@
+/**
+ * Any CSS included here will be global. The classic template
+ * bundles Infima by default. Infima is a CSS framework designed to
+ * work well for content-centric websites.
+ */
+
+/* You can override the default Infima variables here. */
+:root {
+  --ifm-color-primary: #0f8b6d;
+  --ifm-color-primary-dark: #0c765d;
+  --ifm-color-primary-darker: #0a6b54;
+  --ifm-color-primary-darkest: #075545;
+  --ifm-color-primary-light: #13a783;
+  --ifm-color-primary-lighter: #1ab58e;
+  --ifm-color-primary-lightest: #34d399;
+  --ifm-font-color-base: #1f2937;
+  --ifm-color-content-secondary: #475569;
+  --ifm-menu-color: #3f4f64;
+  --ifm-toc-link-color: #475569;
+  --ifm-breadcrumb-color-active: #334155;
+  --ifm-color-emphasis-700: #475569;
+  --ifm-code-font-size: 95%;
+  --ifm-font-family-base: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ifm-heading-font-weight: 680;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
+.navbar{box-shadow:none;border-bottom:1px solid var(--ifm-color-emphasis-200)}
+.navbar__title{letter-spacing:-.025em}
+.button{border-radius:10px}
+
+/* For readability concerns, you should choose a lighter palette in dark mode. */
+[data-theme='dark'] {
+  --ifm-color-primary: #25c2a0;
+  --ifm-color-primary-dark: #21af90;
+  --ifm-color-primary-darker: #1fa588;
+  --ifm-color-primary-darkest: #1a8870;
+  --ifm-color-primary-light: #29d5b0;
+  --ifm-color-primary-lighter: #32d8b4;
+  --ifm-color-primary-lightest: #4fddbf;
+  --ifm-font-color-base: #e3e3e3;
+  --ifm-color-content-secondary: #cbd5e1;
+  --ifm-menu-color: #d8dde1;
+  --ifm-toc-link-color: #cbd5e1;
+  --ifm-breadcrumb-color-active: #e2e8f0;
+  --ifm-color-emphasis-700: #cbd5e1;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}

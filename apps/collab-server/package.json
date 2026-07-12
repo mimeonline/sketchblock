@@ -1,0 +1,50 @@
+{
+  "name": "collab-server",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.10.0",
+  "scripts": {
+    "dev": "NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx watch src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "pnpm run build && pnpm run start:prod",
+    "start:prod": "NODE_OPTIONS=--disable-warning=ExperimentalWarning node dist/main.js",
+    "test": "NODE_OPTIONS=--disable-warning=ExperimentalWarning vitest run",
+    "test:watch": "NODE_OPTIONS=--disable-warning=ExperimentalWarning vitest",
+    "check": "pnpm run typecheck && pnpm run test && pnpm run build && pnpm run asyncapi:validate",
+    "db:migrate:local": "cd ../.. && scripts/flyway-local.sh collab migrate",
+    "db:info:local": "cd ../.. && scripts/flyway-local.sh collab info",
+    "asyncapi:validate": "HOME=/tmp NODE_ENV=development SUPPRESS_NO_CONFIG_WARNING=true asyncapi validate ../../docs/tech/asyncapi/sketchblock-collab.asyncapi.yaml --fail-severity error",
+    "asyncapi:docs": "HOME=/tmp NODE_ENV=development SUPPRESS_NO_CONFIG_WARNING=true asyncapi generate fromTemplate ../../docs/tech/asyncapi/sketchblock-collab.asyncapi.yaml @asyncapi/html-template --param singleFile=true sidebarOrganization=byTags --output ../../docs/tech/asyncapi/site --force-write"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.28",
+    "@nestjs/core": "^11.1.28",
+    "@nestjs/platform-express": "^11.1.28",
+    "@nestjs/platform-socket.io": "^11.1.28",
+    "@nestjs/swagger": "^11.4.5",
+    "@nestjs/websockets": "^11.1.28",
+    "dotenv": "^17.2.3",
+    "pg": "^8.22.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "socket.io": "^4.8.1",
+    "yjs": "^13.6.27",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@asyncapi/cli": "^6.0.2",
+    "@asyncapi/html-template": "^3.5.6",
+    "@babel/core": "^7.29.7",
+    "@nestjs/testing": "^11.1.28",
+    "@types/node": "^20",
+    "@types/pg": "^8.20.0",
+    "@types/supertest": "^7.2.0",
+    "supertest": "^7.2.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}

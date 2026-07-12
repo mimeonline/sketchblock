@@ -1,0 +1,473 @@
+asyncapi: 2.6.0
+id: urn:sketchblock:collab-server:socketio
+defaultContentType: application/json
+info:
+  title: Sketchblock Collab Realtime API
+  version: 0.1.0
+  description: |
+    Socket.IO event contract for browser-facing realtime collaboration.
+
+    The HTTP API is documented with OpenAPI at `/docs`. This AsyncAPI document
+    describes bidirectional Socket.IO events used by the collab server.
+  license:
+    name: MIT
+  contact:
+    name: Sketchblock Maintainers
+    url: https://github.com/mimeonline/sketchblock
+    email: maintainers@example.com
+tags:
+  - name: realtime
+    description: Browser-facing Socket.IO collaboration events.
+  - name: sessions
+    description: Session lifecycle, snapshots and runtime state.
+  - name: presence
+    description: Connected client presence events.
+servers:
+  local:
+    url: http://localhost:4513
+    protocol: socket.io
+    description: Local Sketchblock collab server.
+    security:
+      - collabTicket: []
+channels:
+  session:join:
+    subscribe:
+      operationId: receiveSessionJoin
+      summary: Client joins or initializes a collaboration session.
+      message:
+        $ref: '#/components/messages/JoinSession'
+  canvas:update:
+    subscribe:
+      operationId: receiveCanvasUpdate
+      summary: Client submits a full canvas snapshot update.
+      message:
+        $ref: '#/components/messages/CanvasUpdate'
+    publish:
+      operationId: publishCanvasUpdate
+      summary: Server broadcasts a canvas snapshot update to other clients.
+      message:
+        $ref: '#/components/messages/SessionSnapshot'
+  yjs:update:
+    subscribe:
+      operationId: receiveYjsUpdate
+      summary: Client submits an encoded Yjs update.
+      message:
+        $ref: '#/components/messages/YjsUpdateReceived'
+    publish:
+      operationId: publishYjsUpdate
+      summary: Server broadcasts an encoded Yjs update to other clients.
+      message:
+        $ref: '#/components/messages/YjsUpdatePublished'
+  yjs:state:get:
+    subscribe:
+      operationId: receiveYjsStateGet
+      summary: Client requests the current encoded Yjs state by ack.
+      message:
+        $ref: '#/components/messages/YjsStateGetRequest'
+  session:snapshot:get:
+    subscribe:
+      operationId: receiveSessionSnapshotGet
+      summary: Client requests the persisted snapshot by ack.
+      message:
+        $ref: '#/components/messages/SessionSnapshotGetRequest'
+  session:inspect:
+    subscribe:
+      operationId: receiveSessionInspect
+      summary: Client or server inspects session runtime state by ack.
+      message:
+        $ref: '#/components/messages/SessionInspectRequest'
+  session:status:update:
+    subscribe:
+      operationId: receiveSessionStatusUpdate
+      summary: Admin client updates the session lifecycle status.
+      message:
+        $ref: '#/components/messages/SessionStatusUpdate'
+    publish:
+      operationId: publishSessionStatusUpdate
+      summary: Server broadcasts session lifecycle status changes.
+      message:
+        $ref: '#/components/messages/SessionStatusChanged'
+  session:close:
+    subscribe:
+      operationId: receiveSessionClose
+      summary: Admin client closes a session.
+      message:
+        $ref: '#/components/messages/SessionClose'
+  session:closed:
+    publish:
+      operationId: publishSessionClosed
+      summary: Server notifies clients that a session was closed.
+      message:
+        $ref: '#/components/messages/SessionClosed'
+  client:kick:
+    subscribe:
+      operationId: receiveClientKick
+      summary: Admin client removes a connected socket from a session.
+      message:
+        $ref: '#/components/messages/ClientKick'
+  client:kicked:
+    publish:
+      operationId: publishClientKicked
+      summary: Server notifies a target client that it was removed.
+      message:
+        $ref: '#/components/messages/ClientKicked'
+  presence:update:
+    publish:
+      operationId: publishPresenceUpdate
+      summary: Server broadcasts the current session presence list.
+      message:
+        $ref: '#/components/messages/PresenceUpdate'
+components:
+  securitySchemes:
+    collabTicket:
+      type: http
+      scheme: bearer
+      bearerFormat: collab-ticket
+      description: |
+        Browser clients pass the signed collab ticket as Socket.IO handshake
+        auth token. Server-side clients use a server-role collab ticket.
+  messages:
+    JoinSession:
+      messageId: receiveSessionJoinMessage
+      name: JoinSession
+      title: session:join payload
+      payload:
+        $ref: '#/components/schemas/JoinSessionPayload'
+    CanvasUpdate:
+      messageId: receiveCanvasUpdateMessage
+      name: CanvasUpdate
+      title: canvas:update payload
+      payload:
+        $ref: '#/components/schemas/CanvasUpdatePayload'
+    YjsUpdateReceived:
+      messageId: receiveYjsUpdateMessage
+      name: YjsUpdateReceived
+      title: yjs:update payload
+      payload:
+        $ref: '#/components/schemas/YjsUpdatePayload'
+    YjsUpdatePublished:
+      messageId: publishYjsUpdateMessage
+      name: YjsUpdatePublished
+      title: yjs:update broadcast
+      payload:
+        $ref: '#/components/schemas/YjsUpdatePayload'
+    YjsStateGetRequest:
+      messageId: receiveYjsStateGetMessage
+      name: YjsStateGetRequest
+      title: yjs:state:get payload
+      payload:
+        $ref: '#/components/schemas/SessionIdPayload'
+    SessionSnapshotGetRequest:
+      messageId: receiveSessionSnapshotGetMessage
+      name: SessionSnapshotGetRequest
+      title: session:snapshot:get payload
+      payload:
+        $ref: '#/components/schemas/SessionIdPayload'
+    SessionInspectRequest:
+      messageId: receiveSessionInspectMessage
+      name: SessionInspectRequest
+      title: session:inspect payload
+      payload:
+        $ref: '#/components/schemas/SessionIdPayload'
+    SessionStatusUpdate:
+      messageId: receiveSessionStatusUpdateMessage
+      name: SessionStatusUpdate
+      title: session:status:update payload
+      payload:
+        $ref: '#/components/schemas/SessionStatusUpdatePayload'
+    SessionStatusChanged:
+      messageId: publishSessionStatusUpdateMessage
+      name: SessionStatusChanged
+      title: session:status:update broadcast
+      payload:
+        $ref: '#/components/schemas/SessionStatusChangedPayload'
+    SessionClose:
+      messageId: receiveSessionCloseMessage
+      name: SessionClose
+      title: session:close payload
+      payload:
+        $ref: '#/components/schemas/SessionClosePayload'
+    SessionClosed:
+      messageId: publishSessionClosedMessage
+      name: SessionClosed
+      title: session:closed broadcast
+      payload:
+        $ref: '#/components/schemas/SessionClosedPayload'
+    ClientKick:
+      messageId: receiveClientKickMessage
+      name: ClientKick
+      title: client:kick payload
+      payload:
+        $ref: '#/components/schemas/ClientKickPayload'
+    ClientKicked:
+      messageId: publishClientKickedMessage
+      name: ClientKicked
+      title: client:kicked broadcast
+      payload:
+        $ref: '#/components/schemas/ClientKickedPayload'
+    PresenceUpdate:
+      messageId: publishPresenceUpdateMessage
+      name: PresenceUpdate
+      title: presence:update broadcast
+      payload:
+        $ref: '#/components/schemas/PresenceUpdatePayload'
+    SessionSnapshot:
+      messageId: publishCanvasUpdateMessage
+      name: SessionSnapshot
+      title: Session snapshot broadcast
+      payload:
+        $ref: '#/components/schemas/SessionSnapshot'
+  schemas:
+    SessionId:
+      type: string
+      minLength: 3
+      maxLength: 80
+      pattern: '^[a-zA-Z0-9_-]+$'
+      examples:
+        - demo-session
+    UserId:
+      type: string
+      minLength: 1
+      maxLength: 80
+      pattern: '^[a-zA-Z0-9_.@-]+$'
+      examples:
+        - web-api
+    SessionLifecycleStatus:
+      type: string
+      enum:
+        - active
+        - closed
+        - saved
+    JoinSessionPayload:
+      type: object
+      additionalProperties: false
+      required:
+        - sessionId
+        - userId
+      properties:
+        sessionId:
+          $ref: '#/components/schemas/SessionId'
+        userId:
+          $ref: '#/components/schemas/UserId'
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        drawingPath:
+          type: string
+          minLength: 1
+          maxLength: 500
+        initialContent:
+          description: Initial Excalidraw content.
+    CanvasUpdatePayload:
+      type: object
+      additionalProperties: false
+      required:
+        - sessionId
+        - content
+        - updatedBy
+      properties:
+        sessionId:
+          $ref: '#/components/schemas/SessionId'
+        baseRevision:
+          type: integer
+          minimum: 0
+        content:
+          description: Full Excalidraw snapshot content.
+        updatedBy:
+          $ref: '#/components/schemas/UserId'
+    YjsUpdatePayload:
+      type: object
+      additionalProperties: false
+      required:
+        - sessionId
+        - updateBase64
+        - updatedBy
+      properties:
+        sessionId:
+          $ref: '#/components/schemas/SessionId'
+        updateBase64:
+          type: string
+          minLength: 1
+          maxLength: 2000000
+        updatedBy:
+          $ref: '#/components/schemas/UserId'
+    SessionIdPayload:
+      type: object
+      additionalProperties: false
+      required:
+        - sessionId
+      properties:
+        sessionId:
+          $ref: '#/components/schemas/SessionId'
+    SessionStatusUpdatePayload:
+      type: object
+      additionalProperties: false
+      required:
+        - sessionId
+        - status
+        - updatedBy
+      properties:
+        sessionId:
+          $ref: '#/components/schemas/SessionId'
+        status:
+          $ref: '#/components/schemas/SessionLifecycleStatus'
+        updatedBy:
+          $ref: '#/components/schemas/UserId'
+    SessionStatusChangedPayload:
+      type: object
+      additionalProperties: false
+      required:
+        - sessionId
+        - status
+      properties:
+        sessionId:
+          $ref: '#/components/schemas/SessionId'
+        status:
+          $ref: '#/components/schemas/SessionLifecycleStatus'
+        audit:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionAuditEvent'
+    SessionClosePayload:
+      type: object
+      additionalProperties: false
+      required:
+        - sessionId
+        - closedBy
+      properties:
+        sessionId:
+          $ref: '#/components/schemas/SessionId'
+        closedBy:
+          $ref: '#/components/schemas/UserId'
+    SessionClosedPayload:
+      type: object
+      additionalProperties: false
+      required:
+        - sessionId
+        - closedBy
+      properties:
+        sessionId:
+          $ref: '#/components/schemas/SessionId'
+        closedBy:
+          $ref: '#/components/schemas/UserId'
+    ClientKickPayload:
+      type: object
+      additionalProperties: false
+      required:
+        - sessionId
+        - socketId
+        - kickedBy
+      properties:
+        sessionId:
+          $ref: '#/components/schemas/SessionId'
+        socketId:
+          type: string
+          minLength: 1
+          maxLength: 120
+        kickedBy:
+          $ref: '#/components/schemas/UserId'
+    ClientKickedPayload:
+      type: object
+      additionalProperties: false
+      required:
+        - sessionId
+        - socketId
+        - kickedBy
+      properties:
+        sessionId:
+          $ref: '#/components/schemas/SessionId'
+        socketId:
+          type: string
+        kickedBy:
+          $ref: '#/components/schemas/UserId'
+    PresenceUser:
+      type: object
+      additionalProperties: false
+      required:
+        - socketId
+        - userId
+        - displayName
+        - joinedAt
+      properties:
+        socketId:
+          type: string
+        userId:
+          $ref: '#/components/schemas/UserId'
+        displayName:
+          type: string
+        avatarUrl:
+          type:
+            - string
+            - 'null'
+          format: uri
+        role:
+          type: string
+          enum:
+            - owner
+            - collaborator
+            - viewer
+        joinedAt:
+          type: string
+          format: date-time
+    PresenceUpdatePayload:
+      type: object
+      additionalProperties: false
+      required:
+        - sessionId
+        - presence
+      properties:
+        sessionId:
+          $ref: '#/components/schemas/SessionId'
+        presence:
+          type: array
+          items:
+            $ref: '#/components/schemas/PresenceUser'
+    SessionSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        - sessionId
+        - drawingPath
+        - revision
+        - content
+        - updatedAt
+        - updatedBy
+      properties:
+        sessionId:
+          $ref: '#/components/schemas/SessionId'
+        drawingPath:
+          type:
+            - string
+            - 'null'
+        revision:
+          type: integer
+          minimum: 0
+        content:
+          description: Full Excalidraw snapshot content.
+        updatedAt:
+          type: string
+          format: date-time
+        updatedBy:
+          $ref: '#/components/schemas/UserId'
+    SessionAuditEvent:
+      type: object
+      additionalProperties: true
+      required:
+        - id
+        - type
+        - at
+        - actor
+        - message
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        at:
+          type: string
+          format: date-time
+        actor:
+          type: string
+        message:
+          type: string

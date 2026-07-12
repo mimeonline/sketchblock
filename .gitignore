@@ -1,0 +1,50 @@
+# Local work artifacts
+.claude/
+.sketchblock/
+.playwright/
+.playwright-cli/
+.playwright-mcp/
+/*.png
+.pnpm-store/*
+.tmp_pdfenv/*
+.venv-imagegen/*
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs and caches
+.next/
+**/.next/
+dist/
+build/
+coverage/
+.turbo/
+.cache/
+*.tsbuildinfo
+
+# Platform artifacts
+.vercel/
+
+# Environment files
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.production.example
+!.env.compose.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS and editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

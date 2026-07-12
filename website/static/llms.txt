@@ -1,0 +1,13 @@
+# Sketchblock
+
+Sketchblock is a self-hosted visual collaboration workspace for Excalidraw boards stored in GitHub repositories.
+
+## Documentation
+
+- Quickstart: https://mimeonline.github.io/sketchblock/docs/getting-started/quickstart
+- Configuration: https://mimeonline.github.io/sketchblock/docs/operations/configuration
+- Architecture: https://mimeonline.github.io/sketchblock/docs/project/architecture
+- Security: https://mimeonline.github.io/sketchblock/docs/project/security
+- Contributing: https://mimeonline.github.io/sketchblock/docs/project/contributing
+
+Source: https://github.com/mimeonline/sketchblock
