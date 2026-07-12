@@ -33,7 +33,11 @@ const config: Config = {
       },
       blog: false,
       theme: {customCss: './src/css/custom.css'},
-      sitemap: {changefreq: 'weekly', priority: 0.7},
+      sitemap: {
+        changefreq: 'weekly',
+        priority: 0.7,
+        ignorePatterns: ['/404', '/500'],
+      },
     } satisfies Preset.Options,
   ]],
   themeConfig: {

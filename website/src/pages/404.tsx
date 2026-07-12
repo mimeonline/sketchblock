@@ -1,17 +1,21 @@
-import Link from "@docusaurus/Link";
-import Layout from "@theme/Layout";
+import Head from '@docusaurus/Head';
+
+import ErrorState from '../components/ErrorState';
 
 export default function NotFound() {
   return (
-    <Layout title="Page not found" description="The requested Sketchblock page could not be found.">
-      <main className="container margin-vert--xl">
-        <p className="hero__subtitle">404</p>
-        <h1>That board is out of frame.</h1>
-        <p>The page may have moved while Sketchblock was being updated.</p>
-        <Link className="button button--primary" to="/">
-          Return home
-        </Link>
-      </main>
-    </Layout>
+    <>
+      <Head>
+        <meta name="robots" content="noindex, nofollow" />
+      </Head>
+      <ErrorState
+        code="404"
+        eyebrow="LOST IN THE CANVAS"
+        title="That board is out of frame."
+        description="The page may have moved, the link may be incomplete, or the artifact may no longer exist. Start from a known point and keep exploring."
+        primary={{label: 'Return home', to: '/'}}
+        secondary={{label: 'Open the docs', to: '/docs/getting-started/quickstart'}}
+      />
+    </>
   );
 }
