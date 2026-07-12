@@ -58,7 +58,7 @@ For scoped changes, run at least typecheck, lint where available, tests, and bui
 
 ## Git and releases
 
-1. Use Conventional Commits.
+1. Write commit messages in English and use Conventional Commits.
 2. Do not commit secrets or local artifacts.
 3. Do not push, tag, or publish unless explicitly requested.
 4. Releases use SemVer tags in the form `vX.Y.Z` and require an updated `CHANGELOG.md`.
