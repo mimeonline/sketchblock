@@ -11,18 +11,28 @@
   <a href="https://mimeonline.github.io/sketchblock/"><img alt="Documentation" src="https://img.shields.io/badge/docs-GitHub%20Pages-0f766e.svg" /></a>
 </p>
 
-Self-hosted collaborative whiteboards for Git-backed Excalidraw files.
+Technical teams often discuss architecture on a whiteboard while the resulting diagram lives somewhere else: in a SaaS workspace, an exported image, or a link that becomes outdated as the project evolves.
 
-Sketchblock keeps visual artifacts where engineering work already lives: in Git. Open `.excalidraw` files in the browser, collaborate in focused live sessions, and save reviewed results back as commits.
+Sketchblock turns Git-backed Excalidraw files into focused live workspaces. Invite collaborators or viewers, work on the diagram together, and save the reviewed result back as a versioned commit—on infrastructure you control.
 
-## 🎯 Why Sketchblock
+## 🎯 The problem
 
-- **Git-native:** boards remain ordinary Excalidraw files in repositories you control.
-- **Realtime:** invite collaborators or viewers with role-specific links and QR codes.
-- **Self-hosted:** run the web app, collaboration server, Postgres, and migrations with Docker Compose.
-- **Credential-free demo:** try the editor and live collaboration before configuring GitHub.
-- **Multi-repository:** connect several repositories and switch the active work context globally.
-- **Local administration:** manage users, system health, and a persistent audit log.
+- Visual decisions lose their connection to code and documentation.
+- Git preserves diagrams but does not provide a practical live workspace.
+- External reviewers need focused access to one artifact without access to the entire repository.
+- Architecture and customer data often require controlled hosting.
+
+## ✨ What Sketchblock changes
+
+- **Keep the context:** the Excalidraw file remains an ordinary repository artifact beside the project it explains.
+- **Control the room:** invite collaborators or viewers with role-specific links and QR codes.
+- **Work live:** turn a versioned file into a focused realtime session.
+- **Preserve the result:** save the reviewed board back to Git as a traceable commit.
+- **Own the stack:** run the web app, collaboration server, Postgres, and migrations with Docker Compose.
+
+## 👥 Who it is for
+
+Sketchblock is designed for software architects, technical teams, consultants, and open-source maintainers who use diagrams for architecture reviews, system maps, and focused technical workshops.
 
 ## 🚀 Quickstart
 
@@ -101,6 +111,7 @@ pnpm run build
 
 ## 📚 Documentation
 
+- [Why Sketchblock](website/docs/getting-started/why-sketchblock.md)
 - [Quickstart](website/docs/getting-started/quickstart.md)
 - [Connect GitHub](website/docs/getting-started/github.md)
 - [Configuration](website/docs/operations/configuration.md)

@@ -12,7 +12,7 @@ const analyticsScripts: Config['scripts'] = process.env.NODE_ENV === 'production
 
 const config: Config = {
   title: 'Sketchblock',
-  tagline: 'Collaborative whiteboards that stay in Git.',
+  tagline: 'Keep visual decisions connected to the code.',
   favicon: 'img/logo.svg',
   future: {v4: true},
   url: 'https://mimeonline.github.io',
@@ -51,7 +51,7 @@ const config: Config = {
       title: 'Sketchblock',
       logo: {alt: 'Sketchblock logo', src: 'img/logo.svg', srcDark: 'img/logo-dark.svg'},
       items: [
-        {to: '/docs/getting-started/quickstart', label: 'Docs', position: 'left'},
+        {to: '/docs/getting-started/why-sketchblock', label: 'Docs', position: 'left'},
         {to: '/docs/guides/collaboration', label: 'Guides', position: 'left'},
         {href: 'https://github.com/mimeonline/sketchblock', label: 'GitHub', position: 'right'},
       ],
@@ -60,6 +60,7 @@ const config: Config = {
       style: 'dark',
       links: [
         {title: 'Start', items: [
+          {label: 'Why Sketchblock', to: '/docs/getting-started/why-sketchblock'},
           {label: 'Quickstart', to: '/docs/getting-started/quickstart'},
           {label: 'Connect GitHub', to: '/docs/getting-started/github'},
         ]},

@@ -5,9 +5,15 @@ import Layout from '@theme/Layout';
 import styles from './index.module.css';
 
 const proof = [
-  ['Stay in flow', 'Open one focused room, sketch together, and keep the conversation moving.'],
-  ['Keep the artifact', 'The result remains an ordinary .excalidraw file in the repository you control.'],
-  ['Own the stack', 'Run the complete product on your infrastructure with Docker Compose and Postgres.'],
+  ['Keep the context', 'The diagram remains beside the code, documentation, and decisions it explains.'],
+  ['Control the room', 'Invite collaborators and viewers to one focused artifact with role-specific access.'],
+  ['Preserve the result', 'Return the reviewed board to Git as an ordinary, versioned .excalidraw file.'],
+];
+
+const problems = [
+  ['Whiteboards drift away', 'The conversation happens on a canvas while the code and documentation continue evolving somewhere else.'],
+  ['Git is not a live workshop', 'Version control protects the artifact, but it does not give a team a shared visual working room.'],
+  ['Guests need focused access', 'Customers and reviewers should be able to work on one diagram without receiving access to the entire repository.'],
 ];
 
 const flow = [
@@ -87,14 +93,15 @@ function WhiteboardToolbar(): ReactNode {
 
 export default function Home(): ReactNode {
   return (
-    <Layout title="Collaborate live. Commit the result." description="Self-hosted collaboration for Excalidraw files that stay in Git.">
+    <Layout title="Keep visual decisions connected to the code" description="Turn Git-backed Excalidraw files into focused live workspaces and save reviewed results back as commits.">
       <main>
         <section className={styles.hero}>
           <div className={`container ${styles.heroGrid}`}>
             <div className={styles.heroCopy}>
-              <div className={styles.eyebrow}>OPEN SOURCE · SELF-HOSTED · GIT-NATIVE</div>
-              <h1>Collaborate live.<br/>Commit the result.</h1>
-              <p className={styles.lead}>Sketchblock turns Excalidraw files in Git into focused live workspaces—so technical teams can think visually without losing ownership, history, or context.</p>
+              <div className={styles.eyebrow}>VISUAL COLLABORATION FOR ENGINEERING TEAMS</div>
+              <h1>Keep visual decisions connected to the code.</h1>
+              <p className={styles.lead}>Architecture discussions often end in a separate whiteboard, an exported image, or a link that quietly becomes outdated. Sketchblock turns Excalidraw files in Git into focused live workspaces and saves the reviewed result back as a commit.</p>
+              <p className={styles.benefitLine}>Collaborate visually. Control access. Preserve the result.</p>
               <div className={styles.actions}>
                 <Link className="button button--primary button--lg" to="/docs/getting-started/quickstart">Run the demo</Link>
                 <Link className="button button--secondary button--lg" href="https://github.com/mimeonline/sketchblock">View on GitHub</Link>
@@ -102,6 +109,19 @@ export default function Home(): ReactNode {
               <div className={styles.command}><span>$</span> git clone https://github.com/mimeonline/sketchblock.git<br/><span>$</span> ./scripts/start.sh</div>
             </div>
             <HeroVisual />
+          </div>
+        </section>
+
+        <section className={styles.problem} aria-labelledby="problem-heading">
+          <div className="container">
+            <div className={styles.problemIntro}>
+              <div className={styles.eyebrow}>THE GAP SKETCHBLOCK CLOSES</div>
+              <h2 id="problem-heading">Your diagrams keep losing their context.</h2>
+              <p>Technical teams think together on a canvas, but the result often becomes detached from the project it is meant to explain. Sketchblock keeps the working session and the durable artifact in one traceable flow.</p>
+            </div>
+            <div className={styles.problemGrid}>
+              {problems.map(([title, text], index) => <article key={title}><span>0{index + 1}</span><h3>{title}</h3><p>{text}</p></article>)}
+            </div>
           </div>
         </section>
 
@@ -162,7 +182,7 @@ export default function Home(): ReactNode {
           </div>
         </section>
 
-        <section className={styles.finalCta}><div className="container"><h2>Your diagrams already live in Git.<br/>Now your conversations can too.</h2><Link className="button button--primary button--lg" to="/docs/getting-started/quickstart">Open the quickstart</Link></div></section>
+        <section className={styles.finalCta}><div className="container"><h2>Give every visual decision<br/>a clear home and history.</h2><Link className="button button--primary button--lg" to="/docs/getting-started/quickstart">Open the quickstart</Link></div></section>
       </main>
     </Layout>
   );
