@@ -2,6 +2,14 @@ import {themes as prismThemes} from 'prism-react-renderer';
 import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
+const analyticsScripts: Config['scripts'] = process.env.NODE_ENV === 'production'
+  ? [{
+      src: 'https://stats.meierhoff-systems.de/api/script.js',
+      defer: true,
+      'data-site-id': 'f0018399a2b7',
+    }]
+  : [];
+
 const config: Config = {
   title: 'Sketchblock',
   tagline: 'Collaborative whiteboards that stay in Git.',
@@ -13,6 +21,7 @@ const config: Config = {
   projectName: 'sketchblock',
   trailingSlash: false,
   onBrokenLinks: 'throw',
+  scripts: analyticsScripts,
   i18n: {defaultLocale: 'en', locales: ['en']},
   presets: [[
     'classic',
@@ -59,7 +68,7 @@ const config: Config = {
           {label: 'GitHub', href: 'https://github.com/mimeonline/sketchblock'},
           {label: 'Security', to: '/docs/project/security'},
           {label: 'Imprint', href: 'https://meierhoff-systems.de/legal/impressum'},
-          {label: 'Privacy', href: 'https://meierhoff-systems.de/legal/datenschutz'},
+          {label: 'Privacy', to: '/docs/project/privacy'},
         ]},
       ],
       copyright: `© ${new Date().getFullYear()} Sketchblock contributors. Self-hosted and built in the open.`,

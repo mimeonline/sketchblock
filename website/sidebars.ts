@@ -11,6 +11,7 @@ export default {
       'project/architecture',
       'project/development',
       'project/security',
+      'project/privacy',
       'project/contributing',
     ]},
   ],
