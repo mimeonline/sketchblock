@@ -1,7 +1,7 @@
 # Sketchblock
 
 <p align="center">
-  <img src="apps/web/public/sketchblock-login-editor.svg" alt="Sketchblock collaboration workspace" width="920" />
+  <img src="docs/assets/sketchblock-demo-editor.png" alt="Sketchblock demo workspace with a Git-backed Excalidraw board open in the editor" width="920" />
 </p>
 
 <p align="center">
