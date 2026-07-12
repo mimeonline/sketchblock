@@ -1,0 +1,24 @@
+name: Feature request
+description: Propose an improvement to a concrete Sketchblock workflow
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Current workflow
+      description: What are you trying to achieve, and where does the current workflow create friction?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe the result you need rather than only a proposed implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Self-hosting or team context
+      description: Share relevant scale, roles, and Git workflow without including private repository content.

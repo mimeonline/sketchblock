@@ -9,7 +9,7 @@ function readGitTagVersion() {
     const version = execFileSync(
       "git",
       ["describe", "--tags", "--abbrev=0", "--match", "v[0-9]*"],
-      { encoding: "utf8" },
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
     ).trim();
 
     return /^v\d+\.\d+\.\d+$/.test(version) ? version : "local";

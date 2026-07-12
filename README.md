@@ -15,7 +15,7 @@ Self-hosted collaborative whiteboards for Git-backed Excalidraw files.
 
 Sketchblock keeps visual artifacts where engineering work already lives: in Git. Open `.excalidraw` files in the browser, collaborate in focused live sessions, and save reviewed results back as commits.
 
-## Why Sketchblock
+## 🎯 Why Sketchblock
 
 - **Git-native:** boards remain ordinary Excalidraw files in repositories you control.
 - **Realtime:** invite collaborators or viewers with role-specific links and QR codes.
@@ -24,7 +24,7 @@ Sketchblock keeps visual artifacts where engineering work already lives: in Git.
 - **Multi-repository:** connect several repositories and switch the active work context globally.
 - **Local administration:** manage users, system health, and a persistent audit log.
 
-## Quickstart
+## 🚀 Quickstart
 
 Requirements: Docker with Compose v2, Git, `curl`, and `openssl`.
 
@@ -43,7 +43,7 @@ Stop or reset the stack:
 ./scripts/reset.sh
 ```
 
-## Connect GitHub
+## 🔗 Connect GitHub
 
 Create a GitHub OAuth App with this local callback:
 
@@ -53,7 +53,7 @@ http://localhost:4512/api/auth/github/callback
 
 Then set `SKETCHBLOCK_AUTH_MODE=github`, `GITHUB_OAUTH_CLIENT_ID`, and `GITHUB_OAUTH_CLIENT_SECRET` in `.env` and restart the stack.
 
-## Architecture
+## 🏗️ Architecture
 
 ```text
 Next.js web app
@@ -66,7 +66,7 @@ Next.js web app
 
 Flyway migrations under `db/flyway` are the schema source of truth.
 
-## Development
+## 🛠️ Development
 
 ```bash
 cd apps/web
@@ -86,7 +86,7 @@ pnpm install --frozen-lockfile
 pnpm run build
 ```
 
-## Repository layout
+## 🗂️ Repository layout
 
 | Path | Purpose |
 | --- | --- |
@@ -99,16 +99,18 @@ pnpm run build
 | `examples` | Public example boards |
 | `.github/workflows` | CI, GitHub Pages, and versioned container release automation |
 
-## Documentation
+## 📚 Documentation
 
 - [Quickstart](website/docs/getting-started/quickstart.md)
 - [Connect GitHub](website/docs/getting-started/github.md)
 - [Configuration](website/docs/operations/configuration.md)
 - [Architecture](website/docs/project/architecture.md)
+- [Roadmap](ROADMAP.md)
+- [Release process](RELEASING.md)
 - [Security](SECURITY.md)
 - [Contributing](CONTRIBUTING.md)
 
-## License
+## ⚖️ License
 
 Licensed under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for project attribution.
 

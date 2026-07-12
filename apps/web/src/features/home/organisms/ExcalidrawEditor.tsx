@@ -337,7 +337,7 @@ export function ExcalidrawEditor({
             sceneRef.current = {
               type: "excalidraw",
               version: 2,
-              source: "sketchblock-poc",
+              source: "sketchblock",
               elements,
               appState: {
                 ...appState,

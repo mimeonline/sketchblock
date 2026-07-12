@@ -55,8 +55,11 @@ const config: Config = {
         ]},
         {title: 'Project', items: [
           {label: 'About Michael', to: '/docs/project/about'},
+          {label: 'Roadmap', href: 'https://github.com/mimeonline/sketchblock/blob/main/ROADMAP.md'},
           {label: 'GitHub', href: 'https://github.com/mimeonline/sketchblock'},
           {label: 'Security', to: '/docs/project/security'},
+          {label: 'Imprint', href: 'https://meierhoff-systems.de/legal/impressum'},
+          {label: 'Privacy', href: 'https://meierhoff-systems.de/legal/datenschutz'},
         ]},
       ],
       copyright: `© ${new Date().getFullYear()} Sketchblock contributors. Self-hosted and built in the open.`,

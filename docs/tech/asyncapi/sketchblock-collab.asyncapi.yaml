@@ -14,7 +14,7 @@ info:
   contact:
     name: Sketchblock Maintainers
     url: https://github.com/mimeonline/sketchblock
-    email: maintainers@example.com
+    email: sketchblock@meierhoff-systems.de
 tags:
   - name: realtime
     description: Browser-facing Socket.IO collaboration events.

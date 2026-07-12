@@ -1,6 +1,8 @@
 # Contributing to Sketchblock
 
-Sketchblock is preparing its first public release. The contribution and licensing model will be finalized before `v0.1.0`.
+Sketchblock welcomes focused bug reports, documentation improvements, and contributions that strengthen its Git-backed collaboration workflow.
+
+By submitting a contribution, you agree that it is licensed under the [Apache License 2.0](LICENSE) that covers this repository.
 
 ## Before opening a pull request
 
@@ -20,6 +22,8 @@ cd apps/collab-server && pnpm run check
 cd website && pnpm run typecheck && pnpm run build
 docker compose config --quiet
 ```
+
+Release maintainers follow [RELEASING.md](RELEASING.md). Published GitHub Release notes are extracted from the matching `CHANGELOG.md` section.
 
 ## Security
 
