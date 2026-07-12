@@ -40,6 +40,7 @@ const config: Config = {
     image: 'img/social-card.svg',
     metadata: [
       {name: 'keywords', content: 'Excalidraw, Git, GitHub, whiteboard, collaboration, self-hosted'},
+      {name: 'google-site-verification', content: 'su8oOcQN5JEoZRx2HZ48VFWetruE6Flha6FjfsRp5YU'},
     ],
     colorMode: {defaultMode: 'light', respectPrefersColorScheme: true},
     navbar: {
