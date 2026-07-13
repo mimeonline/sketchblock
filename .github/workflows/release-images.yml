@@ -10,6 +10,10 @@ permissions:
   id-token: write
   attestations: write
 
+concurrency:
+  group: public-release-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
   WEB_IMAGE: ghcr.io/${{ github.repository_owner }}/sketchblock-web
@@ -96,4 +100,14 @@ jobs:
           test -s release-notes.md
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "${GITHUB_REF_NAME}" --notes-file release-notes.md --title "Sketchblock ${GITHUB_REF_NAME}"
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release edit "${GITHUB_REF_NAME}" \
+              --notes-file release-notes.md \
+              --title "Sketchblock ${GITHUB_REF_NAME}"
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              --verify-tag \
+              --notes-file release-notes.md \
+              --title "Sketchblock ${GITHUB_REF_NAME}"
+          fi
