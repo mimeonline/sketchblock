@@ -63,3 +63,12 @@ For scoped changes, run at least typecheck, lint where available, tests, and bui
 3. Do not push, tag, or publish unless explicitly requested.
 4. Releases use SemVer tags in the form `vX.Y.Z` and require an updated `CHANGELOG.md`.
 5. Keep the working tree status explicit in the final handoff.
+
+## Subagents and model selection
+
+- Use subagents autonomously for clearly bounded subtasks when this is expected to improve efficiency. Handle small tasks directly when delegation adds more overhead than it saves.
+- Prefer the smallest available model capable of the task: Luna (`gpt-5.6-luna`) for simple mechanical work, Terra (`gpt-5.6-terra`) for ordinary implementation, and Sol (`gpt-5.6-sol`) for more demanding subtasks. Escalate when results are insufficient; check current model availability.
+- Pass only necessary context, keep assignments and results concise, and avoid duplicate work. Optimize total effort including coordination, review, and rework; token counts alone do not prove cost savings.
+- Assign clear ownership and allowed files. Parallelize independent subtasks, avoid overlapping writes, and reuse existing agents when appropriate.
+- The main agent remains responsible for decisions, integration, verification, and result quality. Applicable checks remain mandatory.
+- Create separate user-owned tasks and automations only when explicitly requested. Delegation does not expand the task scope or other permissions.
