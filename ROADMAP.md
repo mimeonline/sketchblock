@@ -25,6 +25,7 @@ This roadmap communicates product direction rather than fixed delivery dates. Pr
 
 ## 🔭 Explore — Visual review, formats, and providers
 
+- Ad-hoc rooms, guest viewers, and an instance workspace enable real-time collaboration without GitHub integration—ideal for ad-hoc teams and local exploration.
 - Visual diffs and review workflows for changed Excalidraw files.
 - GitLab, Gitea, and other source-of-truth adapters.
 - Format adapters for Markdown and other text-, document-, and diagram-based artifacts that benefit from collaborative visual review.

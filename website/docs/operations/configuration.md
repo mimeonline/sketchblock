@@ -18,6 +18,7 @@ Key settings include:
 | `SKETCHBLOCK_ADHOC_TTL_HOURS` | Session lifetime for ad-hoc rooms in hours, default `168` (7 days) |
 | `SKETCHBLOCK_ADHOC_RETENTION_HOURS` | Retention period for ad-hoc room content after session expiry or closure in hours, default `24` |
 | `SKETCHBLOCK_MAX_UPLOAD_BYTES` | Maximum size for uploaded sketches in bytes, default `10000000` (10 MB) |
+| `SKETCHBLOCK_WORKSPACE_MAX_VERSIONS` | Maximum number of versions retained per workspace board, default `50`; older versions are pruned automatically |
 
 Do not commit `.env`.
 
