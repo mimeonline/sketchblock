@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Build release images on native AMD64 and ARM64 runners and merge their manifests, avoiding ARM emulation failures. Existing release tags can be rebuilt through a validated manual workflow dispatch.
+
 ## 0.2.0 - 2026-10-02
 
 ### Security
