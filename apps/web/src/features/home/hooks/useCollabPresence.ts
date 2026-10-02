@@ -11,6 +11,8 @@ type CollabPresenceState = {
   socketId?: string;
   presence: CollabPresenceClient[];
   sessionStatus?: SessionLifecycleStatus;
+  /** Set when the server permanently rejects live edits (e.g. document too large). */
+  syncError?: string;
   snapshot?: CollaborationSessionSnapshot | null;
   yjsStateBase64?: string | null;
   yjsRevision?: number;
@@ -110,9 +112,16 @@ export function useCollabPresence(input: {
       const sendingSocket = socket;
       void sendingSocket.timeout(2500).emitWithAck("yjs:update", {
         sessionId: input.sessionId, updateBase64: encodeYjsUpdate(pending.update), updatedBy: input.clientId,
-      }).then((ack: { ok?: boolean; yjsStateBase64?: string | null }) => {
+      }).then((ack: { ok?: boolean; error?: string; yjsStateBase64?: string | null; retryAfterSeconds?: number }) => {
         if (cancelled) return;
-        if (ack.ok === false) return;
+        if (ack.ok === false) {
+          if (ack.error === "yjs_update_rate_limit_exceeded") {
+            retryTimer = setTimeout(() => { retryTimer = undefined; flushYjs(); }, Math.max(1, ack.retryAfterSeconds ?? 1) * 1000);
+            return;
+          }
+          setState((current) => ({ ...current, syncError: ack.error || "yjs_update_rejected" }));
+          return;
+        }
         retryAttempts = 0;
         if (pendingYjsRef.current?.version === pending.version && pendingYjsRef.current.sessionId === input.sessionId) {
           pendingYjsRef.current = null;

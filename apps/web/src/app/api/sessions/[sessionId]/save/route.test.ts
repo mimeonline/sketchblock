@@ -75,7 +75,13 @@ describe("session save route", () => {
     expect(mocks.saveDrawing.mock.calls[0][1]).toMatchObject({ sha: "fresh-sha" });
   });
 
-  it.each([409, 422])("maps GitHub %s to 409 github_conflict", async (status) => {
+  it("does not report other GitHub validation errors as conflicts", async () => {
+    mocks.saveDrawing.mockRejectedValue(new GitHubApiError(422, "validation failed"));
+    const response = await POST(req(), context);
+    expect(response.status).toBe(400);
+  });
+
+  it.each([409])("maps GitHub %s to 409 github_conflict", async (status) => {
     mocks.saveDrawing.mockRejectedValue(new GitHubApiError(status, "conflict"));
     const response = await POST(req(), context);
     expect(response.status).toBe(409);

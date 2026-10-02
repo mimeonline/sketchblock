@@ -187,6 +187,8 @@
     "sessionDataUnavailable": "Die Session-Daten sind gerade nicht erreichbar. Versuche es erneut oder frage den Owner nach dem aktuellen Status."
   },
   "Workspace": {
+    "liveSyncTooLarge": "Dieses Board ist zu groß für die Live-Synchronisierung. Die letzten Änderungen wurden nicht geteilt; entferne große Bilder oder teile das Board auf.",
+    "liveSyncRejected": "Deine letzten Änderungen konnten nicht synchronisiert werden. Lade die Seite neu, um weiterzuarbeiten.",
     "savesTo": "Speichert in {repository} auf {branch}",
     "ownerSavesHint": "Der Owner speichert dieses Board in GitHub",
     "githubConflict": "Das Board wurde nach dem Start dieser Session in GitHub geändert. Es wurde nichts überschrieben; übernimm deine Änderungen in eine neue Session, um sie zu speichern.",

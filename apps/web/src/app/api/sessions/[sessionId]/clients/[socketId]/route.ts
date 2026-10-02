@@ -34,16 +34,18 @@ export async function DELETE(request: Request, { params }: SessionClientRouteCon
 
   // Removal is an exclusion: resolve the participant behind the socket and block
   // re-entry before disconnecting, so a reconnect cannot win the race.
+  // Owner sockets (e.g. a stale second tab) are only disconnected, never excluded.
   const runtime = await inspectCollabSession(session);
-  const login = runtime.presence?.find((client) => client.socketId === socketId)?.userId;
-  if (login) {
-    const githubUserId = await findParticipantUserIdByLogin(sessionId, login);
+  const target = runtime.presence?.find((client) => client.socketId === socketId);
+  const excludeParticipant = Boolean(target && target.role !== "owner");
+  if (target && excludeParticipant) {
+    const githubUserId = await findParticipantUserIdByLogin(sessionId, target.userId);
     if (githubUserId !== null) {
       await markParticipantRemoved(sessionId, githubUserId, ownerId);
     }
   }
 
-  const collab = await kickCollabClient(sessionId, socketId);
+  const collab = await kickCollabClient(sessionId, socketId, { excludeActor: excludeParticipant });
 
   if (collab.status === "error") {
     return NextResponse.json(

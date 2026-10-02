@@ -100,17 +100,18 @@ export async function POST(request: NextRequest) {
     const input = selectionSchema.parse(await request.json());
     const selectedRepository = await getWritableGitHubRepository(input.githubRepositoryId);
     const result = await scanGitHubRepository(selectedRepository);
-    await saveActiveRepository({
+    // The stored record id may differ from github-<id> when another local user owns that id.
+    const savedRepository = await saveActiveRepository({
       userId: auth.owner.id,
       githubUserId: github.id,
       login: github.login,
       name: github.name,
       avatarUrl: github.avatarUrl,
     }, result.repository);
-    await safeRecordAuditEvent({ actorId: auth.owner.id, actorUsername: auth.owner.username, actorRole: auth.owner.role, action: "repository.connect", targetType: "repository", targetId: result.repository.id, outcome: "success", requestId });
-    await safeRecordAuditEvent({ actorId: auth.owner.id, actorUsername: auth.owner.username, actorRole: auth.owner.role, action: "repository.scan", targetType: "repository", targetId: result.repository.id, outcome: "success", metadata: { drawingCount: result.drawings.length }, requestId });
+    await safeRecordAuditEvent({ actorId: auth.owner.id, actorUsername: auth.owner.username, actorRole: auth.owner.role, action: "repository.connect", targetType: "repository", targetId: savedRepository.id, outcome: "success", requestId });
+    await safeRecordAuditEvent({ actorId: auth.owner.id, actorUsername: auth.owner.username, actorRole: auth.owner.role, action: "repository.scan", targetType: "repository", targetId: savedRepository.id, outcome: "success", metadata: { drawingCount: result.drawings.length }, requestId });
 
-    return withRequestId(NextResponse.json(result), requestId);
+    return withRequestId(NextResponse.json({ ...result, repository: savedRepository }), requestId);
   } catch (error) {
     logServerError("web.repositories.select.failed", error, {
       requestId,

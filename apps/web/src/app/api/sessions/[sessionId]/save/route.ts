@@ -80,7 +80,7 @@ export async function POST(request: Request, { params }: SessionSaveRouteContext
       },
     });
   } catch (error) {
-    if (error instanceof GitHubApiError && (error.status === 409 || error.status === 422)) {
+    if (error instanceof GitHubApiError && error.status === 409) {
       return NextResponse.json(
         {
           error: "The board was changed in GitHub after this session started. Reload the board in a new session or save the session content manually.",

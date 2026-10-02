@@ -183,7 +183,7 @@ export function HomeTemplate({ deploymentEnvironment, view, initialPath = "", us
 
   async function refreshState() {
     const generation = ++refreshGenerationRef.current;
-    const needsSessions = ["dashboard", "drawings", "sessions"].includes(view);
+    const needsSessions = ["dashboard", "drawings", "sessions", "editor"].includes(view);
     try {
       const [repositoryResponse, drawingsResponse, sessionsResponse] = await Promise.all([
         fetch("/api/repositories"),
@@ -2373,6 +2373,12 @@ export function JoinSessionTemplate({
           </div>
         </header>
 
+        {collabPresence.syncError && !sessionEnded ? (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-2 text-sm text-destructive" role="alert">
+            {collabPresence.syncError === "yjs_document_too_large" ? t("liveSyncTooLarge") : t("liveSyncRejected")}
+          </div>
+        ) : null}
+
         {sessionEnded && sessionLoadState.status === "ready" ? (
           <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-950" role="status">
             {t("sessionEndedLive")}
@@ -2699,7 +2705,7 @@ function auditActorLabel(actor: string, locale: string) {
 
 function liveSessionHrefFor(sessions: CollaborationSession[], drawingPath: string) {
   const live = sessions.find(
-    (session) => session.drawingPath === drawingPath && (session.collab?.sessionStatus || session.status) === "active",
+    (session) => session.drawingPath === drawingPath && (session.collab?.sessionStatus || session.status) !== "closed",
   );
   return live ? `/join/${live.id}?owner=1` : null;
 }

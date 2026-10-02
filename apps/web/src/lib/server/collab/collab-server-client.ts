@@ -424,7 +424,11 @@ export async function closeCollabSession(sessionId: string): Promise<CollabSessi
   }
 }
 
-export async function kickCollabClient(sessionId: string, socketId: string): Promise<CollabSessionRuntime> {
+export async function kickCollabClient(
+  sessionId: string,
+  socketId: string,
+  options: { excludeActor?: boolean } = {},
+): Promise<CollabSessionRuntime> {
   const checkedAt = new Date().toISOString();
 
   try {
@@ -433,6 +437,7 @@ export async function kickCollabClient(sessionId: string, socketId: string): Pro
         sessionId,
         socketId,
         kickedBy: "web-api",
+        ...(options.excludeActor ? { excludeActor: true } : {}),
       }) as Promise<AckResponse<{ sessionId?: string; socketId?: string; disconnected?: boolean }>>,
     );
 
