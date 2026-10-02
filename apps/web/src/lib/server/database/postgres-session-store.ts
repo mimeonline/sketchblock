@@ -3,12 +3,16 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import type { QueryResultRow } from "pg";
 
-import type { CollaborationSession, CollaborationSessionSnapshot, SessionLifecycleStatus } from "@/types/sketchblock";
+import type { CollaborationSession, CollaborationSessionSnapshot, SessionLifecycleStatus, SessionSourceKind } from "@/types/sketchblock";
 import { getAppPostgresPool } from "@/lib/server/database/postgres";
 
 type SessionRow = QueryResultRow & {
   id: string;
-  repository_id: string;
+  repository_id: string | null;
+  source_kind?: SessionSourceKind;
+  expires_at?: Date | string | null;
+  title?: string | null;
+  participant_download?: boolean;
   drawing_path: string;
   status: SessionLifecycleStatus;
   created_at: Date | string;
@@ -35,7 +39,7 @@ export async function listPostgresSessions(userId: string | null, repositoryId?:
   }
   if (repositoryId) {
     values.push(repositoryId);
-    conditions.push(`repository_id = $${values.length}`);
+    conditions.push(`(repository_id = $${values.length} OR source_kind <> 'repository')`);
   }
   const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
   const result = await getAppPostgresPool().query<SessionRow>(
@@ -54,6 +58,7 @@ export async function createPostgresSession(
   const now = new Date().toISOString();
   const session: CollaborationSession = {
     id: randomBytes(12).toString("base64url"),
+    sourceKind: "repository",
     repositoryId,
     drawingPath,
     status: "active",
@@ -71,6 +76,79 @@ export async function createPostgresSession(
   );
 
   return session;
+}
+
+function sanitizeAdhocTitle(title: string): string {
+  const cleaned = title.replace(/[^a-zA-Z0-9 _-]/g, "").trim().slice(0, 80).trim();
+  return cleaned || "board";
+}
+
+export async function createPostgresAdhocSession(input: {
+  title: string;
+  ownerId: string | null;
+  expiresAt: string;
+}): Promise<CollaborationSession> {
+  const now = new Date().toISOString();
+  const session: CollaborationSession = {
+    id: randomBytes(12).toString("base64url"),
+    sourceKind: "adhoc",
+    repositoryId: null,
+    title: input.title,
+    expiresAt: input.expiresAt,
+    participantDownload: true,
+    drawingPath: `adhoc/${sanitizeAdhocTitle(input.title)}.excalidraw`,
+    status: "active",
+    createdAt: now,
+    updatedAt: now,
+    baseSha: null,
+  };
+
+  await getAppPostgresPool().query(
+    `
+      INSERT INTO app_sessions (id, source_kind, repository_id, drawing_path, status, created_at, updated_at, created_by_user_id, title, expires_at, participant_download)
+      VALUES ($1, 'adhoc', NULL, $2, 'active', $3, $4, $5, $6, $7, true)
+    `,
+    [session.id, session.drawingPath, now, now, input.ownerId, input.title, input.expiresAt],
+  );
+
+  return session;
+}
+
+export async function setPostgresSessionPurgeAfter(sessionId: string, purgeAfter: string | null): Promise<void> {
+  await getAppPostgresPool().query("UPDATE app_sessions SET purge_after = $2 WHERE id = $1", [sessionId, purgeAfter]);
+}
+
+export async function listPurgeablePostgresAdhocSessions(now: Date, limit: number): Promise<string[]> {
+  const result = await getAppPostgresPool().query<{ id: string }>(
+    `SELECT id FROM app_sessions
+     WHERE source_kind = 'adhoc' AND purge_after IS NOT NULL AND purge_after < $1
+     ORDER BY purge_after ASC LIMIT $2`,
+    [now.toISOString(), limit],
+  );
+  return result.rows.map((row) => row.id);
+}
+
+export async function deletePostgresSessionsByIds(ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const result = await getAppPostgresPool().query("DELETE FROM app_sessions WHERE id = ANY($1::text[])", [ids]);
+  return result.rowCount ?? 0;
+}
+
+export async function setPostgresParticipantDownload(
+  sessionId: string,
+  value: boolean,
+  userId: string | null,
+): Promise<CollaborationSession | null> {
+  const result = userId
+    ? await getAppPostgresPool().query<SessionRow>(
+      "UPDATE app_sessions SET participant_download = $2 WHERE id = $1 AND created_by_user_id = $3 RETURNING *",
+      [sessionId, value, userId],
+    )
+    : await getAppPostgresPool().query<SessionRow>(
+      "UPDATE app_sessions SET participant_download = $2 WHERE id = $1 RETURNING *",
+      [sessionId, value],
+    );
+  return result.rows[0] ? rowToSession(result.rows[0]) : null;
 }
 
 export async function getPostgresSession(sessionId: string): Promise<CollaborationSession | null> {
@@ -198,7 +276,11 @@ export async function upsertPostgresSessionSnapshot(input: {
 function rowToSession(row: SessionRow): CollaborationSession {
   return {
     id: row.id,
+    sourceKind: row.source_kind ?? "repository",
     repositoryId: row.repository_id,
+    title: row.title ?? null,
+    expiresAt: row.expires_at ? toIso(row.expires_at) : null,
+    participantDownload: row.participant_download ?? true,
     drawingPath: row.drawing_path,
     status: row.status,
     createdAt: toIso(row.created_at),

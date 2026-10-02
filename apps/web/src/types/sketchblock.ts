@@ -80,9 +80,15 @@ export type RepositoryInput = {
   branch: string;
 };
 
+export type SessionSourceKind = "repository" | "adhoc" | "workspace";
+
 export type CollaborationSession = {
   id: string;
-  repositoryId: string;
+  sourceKind: SessionSourceKind;
+  repositoryId: string | null;
+  title?: string | null;
+  expiresAt?: string | null;
+  participantDownload?: boolean;
   drawingPath: string;
   status: SessionLifecycleStatus;
   createdAt: string;

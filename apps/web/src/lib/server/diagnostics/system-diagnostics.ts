@@ -8,7 +8,7 @@ import { getAppPostgresPool } from "@/lib/server/database/postgres";
 import { getLastDiagnosticError } from "./error-registry";
 
 const REQUEST_TIMEOUT_MS = 2_000;
-const EXPECTED_APP_SCHEMA_VERSION = 12;
+const EXPECTED_APP_SCHEMA_VERSION = 13;
 
 type MigrationRow = { version: string | null; description: string | null; installed_on: Date | string | null };
 

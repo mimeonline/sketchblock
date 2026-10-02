@@ -10,6 +10,8 @@ import { getOwnedSession, updateSessionBaseSha, updateSessionStatus, upsertSessi
 import { requireOwnedRepositoryById, requireRepositoryById } from "@/lib/server/database/repository-store";
 import { GitHubApiError } from "@/lib/server/github/github-repository-adapter";
 
+import { isRepositorySession } from "@/lib/server/domain/session-lifecycle";
+
 export const runtime = "nodejs";
 
 type SessionSaveRouteContext = {
@@ -35,6 +37,13 @@ export async function POST(request: Request, { params }: SessionSaveRouteContext
 
     if (!session) {
       return NextResponse.json({ error: "Session not found." }, { status: 404 });
+    }
+
+    if (!isRepositorySession(session)) {
+      return NextResponse.json(
+        { error: "Ad-hoc rooms are not saved to GitHub. Download the board instead.", code: "adhoc_not_persisted" },
+        { status: 409 },
+      );
     }
 
     const collabState = await getCollabSessionSnapshot(sessionId);

@@ -18,6 +18,7 @@ const drawing: DrawingFile = {
 };
 
 const activeSession: CollaborationSession = {
+  sourceKind: "repository",
   id: "session-live",
   repositoryId: "repository-1",
   drawingPath: drawing.path,

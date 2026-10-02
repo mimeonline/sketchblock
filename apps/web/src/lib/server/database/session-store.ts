@@ -2,7 +2,12 @@ import "server-only";
 
 import type { CollaborationSession, CollaborationSessionSnapshot } from "@/types/sketchblock";
 import {
+  createPostgresAdhocSession,
   createPostgresSession,
+  deletePostgresSessionsByIds,
+  listPurgeablePostgresAdhocSessions,
+  setPostgresParticipantDownload,
+  setPostgresSessionPurgeAfter,
   deletePostgresSession,
   getPostgresSession,
   getOwnedPostgresSession,
@@ -61,4 +66,32 @@ export async function updateSessionBaseSha(
   userId: string | null,
 ): Promise<CollaborationSession | null> {
   return updatePostgresSessionBaseSha(sessionId, sha, userId);
+}
+
+export async function createAdhocSession(input: {
+  title: string;
+  ownerId: string | null;
+  expiresAt: string;
+}): Promise<CollaborationSession> {
+  return createPostgresAdhocSession(input);
+}
+
+export async function setSessionPurgeAfter(sessionId: string, purgeAfter: string | null): Promise<void> {
+  return setPostgresSessionPurgeAfter(sessionId, purgeAfter);
+}
+
+export async function listPurgeableAdhocSessions(now: Date, limit: number): Promise<string[]> {
+  return listPurgeablePostgresAdhocSessions(now, limit);
+}
+
+export async function deleteSessionsByIds(ids: string[]): Promise<number> {
+  return deletePostgresSessionsByIds(ids);
+}
+
+export async function setParticipantDownload(
+  sessionId: string,
+  value: boolean,
+  userId: string | null,
+): Promise<CollaborationSession | null> {
+  return setPostgresParticipantDownload(sessionId, value, userId);
 }

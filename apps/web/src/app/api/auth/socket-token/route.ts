@@ -7,6 +7,7 @@ import { getValidSessionGrant } from "@/lib/server/auth/session-grant";
 import { getCurrentAuthUser } from "@/lib/server/auth/session";
 import { getOwnedSession, getSession } from "@/lib/server/database/session-store";
 import { isParticipantRemoved, recordSessionParticipant, validateSessionInvite } from "@/lib/server/database/session-invite-store";
+import { isSessionClosed } from "@/lib/server/domain/session-lifecycle";
 
 export const runtime = "nodejs";
 
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
     if (!session) {
       return NextResponse.json({ error: "Session not found." }, { status: 404 });
     }
-    if (session.status === "closed") {
+    if (isSessionClosed(session)) {
       return NextResponse.json({ error: "This session has ended.", code: "session_closed" }, { status: 409 });
     }
 

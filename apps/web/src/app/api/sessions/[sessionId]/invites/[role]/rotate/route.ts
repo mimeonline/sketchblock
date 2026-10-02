@@ -6,6 +6,7 @@ import { rejectCrossOriginRequest } from "@/lib/server/auth/request-security";
 import { rotateSessionInvite } from "@/lib/server/database/session-invite-store";
 import { getOwnedSession } from "@/lib/server/database/session-store";
 import { getRequestId } from "@/lib/server/logging/server-logger";
+import { isSessionClosed } from "@/lib/server/domain/session-lifecycle";
 
 export const runtime = "nodejs";
 
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest, { params }: RotateRouteContext)
     if (!session) {
       return NextResponse.json({ error: "Session not found." }, { status: 404 });
     }
-    if (session.status === "closed") {
+    if (isSessionClosed(session)) {
       return NextResponse.json({ error: "This session has ended.", code: "session_closed" }, { status: 409 });
     }
 

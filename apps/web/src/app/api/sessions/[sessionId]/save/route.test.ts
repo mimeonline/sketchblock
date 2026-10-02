@@ -46,7 +46,7 @@ const req = (origin: string | null = "http://localhost:4512") =>
 describe("session save route", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    mocks.getOwnedSession.mockResolvedValue({ id: "s1", repositoryId: "r1", drawingPath: "b.excalidraw", baseSha: "base-sha" });
+    mocks.getOwnedSession.mockResolvedValue({ id: "s1", sourceKind: "repository", repositoryId: "r1", drawingPath: "b.excalidraw", baseSha: "base-sha" });
     mocks.openDrawing.mockResolvedValue({ sha: "fresh-sha" });
     mocks.saveDrawing.mockResolvedValue({ path: "b.excalidraw", commitSha: "c1", contentSha: "new-sha" });
     mocks.getCollabSessionSnapshot.mockResolvedValue({ snapshot: { content: { elements: [] }, revision: 3 }, materializedContent: null });
@@ -61,6 +61,15 @@ describe("session save route", () => {
     expect(mocks.saveDrawing.mock.calls[0][1]).toMatchObject({ content: { elements: [{ id: "live" }] } });
   });
 
+  it("returns 409 adhoc_not_persisted for ad-hoc sessions without touching GitHub", async () => {
+    mocks.getOwnedSession.mockResolvedValue({ id: "s1", sourceKind: "adhoc", repositoryId: null, drawingPath: "adhoc/b.excalidraw" });
+    const response = await POST(req(), context);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: "adhoc_not_persisted" });
+    expect(mocks.openDrawing).not.toHaveBeenCalled();
+    expect(mocks.saveDrawing).not.toHaveBeenCalled();
+  });
+
   it("saves with the session base sha, not the fresh GitHub sha, and records the new sha", async () => {
     const response = await POST(req(), context);
     expect(response.status).toBe(200);
@@ -70,7 +79,7 @@ describe("session save route", () => {
   });
 
   it("falls back to the fresh sha for legacy sessions", async () => {
-    mocks.getOwnedSession.mockResolvedValue({ id: "s1", repositoryId: "r1", drawingPath: "b.excalidraw", baseSha: null });
+    mocks.getOwnedSession.mockResolvedValue({ id: "s1", sourceKind: "repository", repositoryId: "r1", drawingPath: "b.excalidraw", baseSha: null });
     await POST(req(), context);
     expect(mocks.saveDrawing.mock.calls[0][1]).toMatchObject({ sha: "fresh-sha" });
   });

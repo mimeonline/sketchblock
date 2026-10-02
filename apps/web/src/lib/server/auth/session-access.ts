@@ -12,6 +12,7 @@ import {
 } from "@/lib/server/database/session-invite-store";
 import { getOwnedSession, getSession } from "@/lib/server/database/session-store";
 import type { SessionRole } from "@/types/sketchblock";
+import { isSessionClosed } from "@/lib/server/domain/session-lifecycle";
 
 export type SessionAccess = {
   role: SessionRole;
@@ -28,7 +29,7 @@ export async function authorizeSessionRequest(
 ): Promise<{ access: SessionAccess | null; response: NextResponse | null }> {
   const inviteToken = request.nextUrl.searchParams.get("invite");
   const session = await getSession(sessionId);
-  const sessionClosed = session?.status === "closed";
+  const sessionClosed = session ? isSessionClosed(session) : false;
 
   if (!inviteToken) {
     const owner = await getCurrentOwner();

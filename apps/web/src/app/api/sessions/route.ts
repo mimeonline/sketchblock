@@ -15,6 +15,7 @@ import {
 import { getActiveRepository, requireActiveRepository } from "@/lib/server/database/repository-store";
 import { createSession, deleteSession, listSessions } from "@/lib/server/database/session-store";
 import { ensureSessionInvites, listSessionParticipants } from "@/lib/server/database/session-invite-store";
+import { isSessionClosed } from "@/lib/server/domain/session-lifecycle";
 
 export const runtime = "nodejs";
 
@@ -36,7 +37,7 @@ export async function GET() {
     const [collabServer, collabSessions] = await Promise.all([
       getCollabServerStatus(sessions.length),
       Promise.all(sessions.map(async (session) => {
-        const invites = session.status === "closed" ? null : await ensureSessionInvites(session.id, userId);
+        const invites = isSessionClosed(session) ? null : await ensureSessionInvites(session.id, userId);
         return {
           ...session,
           shareLinks: invites ? inviteLinks(session.id, invites) : undefined,

@@ -7,6 +7,7 @@ import { getValidSessionGrant } from "@/lib/server/auth/session-grant";
 import { getCurrentAuthUser, requirePageAuth } from "@/lib/server/auth/session";
 import { isParticipantRemoved, validateSessionInvite } from "@/lib/server/database/session-invite-store";
 import { getOwnedSession, getSession } from "@/lib/server/database/session-store";
+import { isSessionClosed } from "@/lib/server/domain/session-lifecycle";
 
 type JoinSessionPageProps = {
   params: Promise<{
@@ -30,7 +31,7 @@ export default async function JoinSessionPage({ params, searchParams }: JoinSess
     notFound();
   }
 
-  if (session.status === "closed" && ownerMode !== "1") {
+  if (isSessionClosed(session) && ownerMode !== "1") {
     const owner = await getCurrentOwner();
     if (owner && await getOwnedSession(sessionId, owner.id === "dev-owner" ? null : owner.id)) {
       redirect(`/join/${sessionId}?owner=1`);

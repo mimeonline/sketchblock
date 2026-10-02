@@ -4,6 +4,7 @@ import { createSessionGrantCookie } from "@/lib/server/auth/session-grant";
 import { getAppBaseUrl, getCurrentAuthUser, getLoginPath } from "@/lib/server/auth/session";
 import { recordSessionParticipant, validateSessionInvite } from "@/lib/server/database/session-invite-store";
 import { getSession } from "@/lib/server/database/session-store";
+import { isSessionClosed } from "@/lib/server/domain/session-lifecycle";
 
 export const runtime = "nodejs";
 
@@ -20,7 +21,7 @@ export async function GET(
     getCurrentAuthUser(),
   ]);
 
-  if (session?.status === "closed") {
+  if (session && isSessionClosed(session)) {
     return NextResponse.redirect(new URL(`/join/${sessionId}`, getAppBaseUrl()));
   }
   if (!session || !invite) {

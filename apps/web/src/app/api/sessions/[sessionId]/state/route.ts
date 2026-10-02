@@ -13,6 +13,8 @@ import {
 import { getSession } from "@/lib/server/database/session-store";
 import { requireOwnedRepositoryById, requireRepositoryById } from "@/lib/server/database/repository-store";
 
+import { isRepositorySession } from "@/lib/server/domain/session-lifecycle";
+
 export const runtime = "nodejs";
 
 type SessionStateRouteContext = {
@@ -46,7 +48,7 @@ async function ensureSessionSnapshot(sessionId: string, allowGitHubInitializatio
     };
   }
 
-  if (!allowGitHubInitialization) {
+  if (!allowGitHubInitialization || !isRepositorySession(session)) {
     return {
       session: {
         ...session,
@@ -85,10 +87,11 @@ export async function GET(_request: NextRequest, { params }: SessionStateRouteCo
     }
 
     // Only the owner learns where the board is stored; participants may lack repository access.
-    const repository = auth.access.role === "owner"
+    const stateSession = state.session;
+    const repository = auth.access.role === "owner" && isRepositorySession(stateSession)
       ? await (auth.access.localUserId
-        ? requireOwnedRepositoryById(state.session.repositoryId, auth.access.localUserId)
-        : requireRepositoryById(state.session.repositoryId)
+        ? requireOwnedRepositoryById(stateSession.repositoryId, auth.access.localUserId)
+        : requireRepositoryById(stateSession.repositoryId)
       ).catch(() => null)
       : null;
 
