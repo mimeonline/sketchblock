@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
           await linkInstanceOwnerGitHub(owner.id, user);
         }
       }
-      await setGitHubAccessTokenCookie(accessToken);
+      await setGitHubAccessTokenCookie(accessToken, owner.id);
       await safeRecordAuditEvent({ actorId: owner.id, actorUsername: owner.username, actorRole: owner.role, action: "github.identity.connect", targetType: "github_user", targetId: String(user.id), outcome: "success", requestId });
     } else {
       await setAuthCookie({ ...user, permission: "read" });

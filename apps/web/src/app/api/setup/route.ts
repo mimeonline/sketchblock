@@ -6,6 +6,7 @@ import { safeRecordAuditEvent } from "@/lib/server/audit/audit-service";
 import { getRequestId } from "@/lib/server/logging/server-logger";
 
 import { verifyBootstrapToken } from "@/lib/server/auth/bootstrap";
+import { clearGitHubAccessTokenCookie } from "@/lib/server/auth/session";
 import { hashPassword } from "@/lib/server/auth/password";
 import { setOwnerAuthCookie } from "@/lib/server/auth/owner-session";
 import { consumeAuthAttempt, hasValidRequestOrigin } from "@/lib/server/auth/request-security";
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Sketchblock wurde bereits eingerichtet." }, { status: 409 });
     }
 
+    await clearGitHubAccessTokenCookie();
     await setOwnerAuthCookie(owner.id);
     await safeRecordAuditEvent({ actorId: owner.id, actorUsername: owner.username, actorRole: "instance_owner", action: "instance.setup", targetType: "instance", targetId: "sketchblock", outcome: "success", requestId });
     return NextResponse.json({ ok: true, redirectTo: "/repositories" }, { status: 201 });

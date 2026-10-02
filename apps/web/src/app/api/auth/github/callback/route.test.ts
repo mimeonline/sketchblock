@@ -85,7 +85,7 @@ describe("GitHub OAuth callback route", () => {
       avatarUrl: null,
       permission: "admin",
     });
-    expect(mocks.setGitHubAccessTokenCookie).toHaveBeenCalledWith("oauth-token");
+    expect(mocks.setGitHubAccessTokenCookie).toHaveBeenCalledWith("oauth-token", "dev-owner");
   });
 
   it("keeps linking a persisted production owner in Postgres", async () => {

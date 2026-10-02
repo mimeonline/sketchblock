@@ -4,7 +4,8 @@ import { safeRecordAuditEvent } from "@/lib/server/audit/audit-service";
 import { getRequestId } from "@/lib/server/logging/server-logger";
 
 import { setOwnerAuthCookie } from "@/lib/server/auth/owner-session";
-import { verifyPassword } from "@/lib/server/auth/password";
+import { PasswordHashBusyError, verifyPassword, verifyPasswordAgainstDummy } from "@/lib/server/auth/password";
+import { clearGitHubAccessTokenCookie, clearParticipantAndOAuthCookies } from "@/lib/server/auth/session";
 import {
   clearAuthAttempts,
   consumeAuthAttempt,
@@ -39,7 +40,9 @@ export async function POST(request: NextRequest) {
       );
     }
     const user = await getAppUserByUsername(input.username);
-    const valid = user ? await verifyPassword(input.password, user.passwordHash) : false;
+    const valid = user && user.status === "active"
+      ? await verifyPassword(input.password, user.passwordHash)
+      : await verifyPasswordAgainstDummy(input.password);
     if (!user || user.status !== "active" || !valid) {
       await safeRecordAuditEvent({ actorUsername: attemptedUsername, actorRole: "anonymous", action: "auth.login", targetType: "user", outcome: "failure", requestId });
       return NextResponse.json({ error: "Benutzername oder Passwort ist ungültig." }, { status: 401 });
@@ -47,6 +50,8 @@ export async function POST(request: NextRequest) {
 
     await markAppUserLogin(user.id);
     clearAuthAttempts(request, input.username);
+    await clearGitHubAccessTokenCookie();
+    await clearParticipantAndOAuthCookies();
     await setOwnerAuthCookie(user.id);
     await safeRecordAuditEvent({ actorId: user.id, actorUsername: user.username, actorRole: user.role, action: "auth.login", targetType: "user", targetId: user.id, outcome: "success", requestId });
     return NextResponse.json({
@@ -54,7 +59,13 @@ export async function POST(request: NextRequest) {
       mustChangePassword: user.mustChangePassword,
       redirectTo: user.mustChangePassword ? "/change-password" : "/",
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof PasswordHashBusyError) {
+      return NextResponse.json(
+        { error: "Server ausgelastet. Bitte versuche es gleich erneut." },
+        { status: 429, headers: { "Retry-After": "5" } },
+      );
+    }
     await safeRecordAuditEvent({ actorUsername: attemptedUsername, actorRole: "anonymous", action: "auth.login", targetType: "user", outcome: "failure", requestId });
     return NextResponse.json({ error: "Benutzername oder Passwort ist ungültig." }, { status: 401 });
   }

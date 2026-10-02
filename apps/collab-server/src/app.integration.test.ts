@@ -66,6 +66,7 @@ describe("Collab server HTTP integration", () => {
     process.env.COLLAB_SOCKET_CONNECTS_PER_IP_PER_MINUTE = "2";
     process.env.COLLAB_SOCKET_EVENTS_PER_SOCKET_PER_MINUTE = "2";
     process.env.COLLAB_LOG_LEVEL = "silent";
+    process.env.COLLAB_TRUST_PROXY = "true";
     process.env.COLLAB_DATABASE_URL = "postgresql://test:test@127.0.0.1:1/sketchblock_test";
 
     const moduleRef = await Test.createTestingModule({

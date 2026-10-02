@@ -18,6 +18,17 @@ export function hasValidRequestOrigin(request: NextRequest) {
   }
 }
 
+export function isProxyTrusted() {
+  const value = process.env.SKETCHBLOCK_TRUST_PROXY?.trim().toLowerCase();
+  return value === "true" || value === "1";
+}
+
+export function getClientAddress(request: Pick<NextRequest, "headers">) {
+  if (!isProxyTrusted()) return "direct";
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return forwarded || request.headers.get("x-real-ip")?.trim() || "direct";
+}
+
 export function consumeAuthAttempt(request: NextRequest, subject: string, limit = 10) {
   const now = Date.now();
   if (attempts.size > 10_000) {
@@ -25,8 +36,7 @@ export function consumeAuthAttempt(request: NextRequest, subject: string, limit 
       if (window.resetAt <= now) attempts.delete(storedKey);
     }
   }
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const address = forwarded || request.headers.get("x-real-ip") || "unknown";
+  const address = getClientAddress(request);
   const key = `${address}:${subject.toLowerCase()}`;
   const current = attempts.get(key);
 
@@ -43,7 +53,6 @@ export function consumeAuthAttempt(request: NextRequest, subject: string, limit 
 }
 
 export function clearAuthAttempts(request: NextRequest, subject: string) {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const address = forwarded || request.headers.get("x-real-ip") || "unknown";
+  const address = getClientAddress(request);
   attempts.delete(`${address}:${subject.toLowerCase()}`);
 }

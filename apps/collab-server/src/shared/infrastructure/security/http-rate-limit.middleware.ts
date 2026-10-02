@@ -1,5 +1,7 @@
 import { Inject, Injectable, type NestMiddleware } from "@nestjs/common";
 
+import { CollabConfigService } from "../config/collab-config.service.js";
+import { resolveClientIp } from "./client-ip.js";
 import { CollabRateLimitService } from "./collab-rate-limit.service.js";
 import { StructuredLoggerService } from "../logging/structured-logger.service.js";
 
@@ -23,6 +25,7 @@ export class HttpRateLimitMiddleware implements NestMiddleware {
   constructor(
     @Inject(CollabRateLimitService) private readonly rateLimits: CollabRateLimitService,
     @Inject(StructuredLoggerService) private readonly logger: StructuredLoggerService,
+    @Inject(CollabConfigService) private readonly config: CollabConfigService,
   ) {}
 
   use(request: RequestLike, response: ResponseLike, next: NextFunction) {
@@ -54,19 +57,10 @@ export class HttpRateLimitMiddleware implements NestMiddleware {
   }
 
   private readClientIp(request: RequestLike) {
-    const forwardedFor = this.readHeader(request.headers?.["x-forwarded-for"]);
-    if (forwardedFor) {
-      return forwardedFor.split(",")[0]?.trim() || "unknown";
-    }
-
-    return request.ip || request.socket?.remoteAddress || "unknown";
-  }
-
-  private readHeader(value: HeaderValue) {
-    if (Array.isArray(value)) {
-      return value[0] || null;
-    }
-
-    return value || null;
+    return resolveClientIp({
+      forwardedFor: request.headers?.["x-forwarded-for"],
+      remoteAddress: request.ip || request.socket?.remoteAddress,
+      trustProxy: this.config.trustProxy,
+    });
   }
 }

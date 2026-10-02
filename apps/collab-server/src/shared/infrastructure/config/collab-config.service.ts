@@ -10,6 +10,7 @@ export class CollabConfigService {
   readonly allowedOrigins = this.readOrigins();
   readonly maxSnapshotBytes = this.readNumberEnv("COLLAB_MAX_SNAPSHOT_BYTES", 25_000_000);
   readonly authSecret = process.env.COLLAB_AUTH_SECRET?.trim() || process.env.APP_AUTH_SECRET?.trim() || null;
+  readonly trustProxy = this.readBooleanEnv("COLLAB_TRUST_PROXY");
   readonly logLevel = this.readLogLevel();
   readonly logFormat = this.readLogFormat();
   readonly persistenceDriver = this.readPersistenceDriver();
@@ -21,6 +22,11 @@ export class CollabConfigService {
   readonly socketConnectsPerIpPerMinute = this.readNumberEnv("COLLAB_SOCKET_CONNECTS_PER_IP_PER_MINUTE", 60);
   readonly socketEventsPerSocketPerMinute = this.readNumberEnv("COLLAB_SOCKET_EVENTS_PER_SOCKET_PER_MINUTE", 300);
   readonly yjsUpdatesPerSocketPerMinute = this.readNumberEnv("COLLAB_YJS_UPDATES_PER_SOCKET_PER_MINUTE", 1_800);
+
+  private readBooleanEnv(name: string): boolean {
+    const value = process.env[name]?.trim().toLowerCase();
+    return value === "true" || value === "1";
+  }
 
   private readNumberEnv(name: string, fallback: number): number {
     const value = process.env[name];

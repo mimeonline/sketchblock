@@ -7,13 +7,78 @@ const SCRYPT_P = 1;
 const SCRYPT_KEY_LENGTH = 32;
 const SCRYPT_MAX_MEMORY = 256 * 1024 * 1024;
 
-function deriveKey(password: string, salt: Buffer, length: number, options: { N: number; r: number; p: number; maxmem: number }) {
+const MAX_CONCURRENT_DERIVATIONS = 2;
+const MAX_QUEUED_DERIVATIONS = 32;
+
+export class PasswordHashBusyError extends Error {
+  constructor() {
+    super("Password hashing is busy.");
+    this.name = "PasswordHashBusyError";
+  }
+}
+
+let activeDerivations = 0;
+const waitingDerivations: Array<() => void> = [];
+
+async function acquireSlot() {
+  if (activeDerivations < MAX_CONCURRENT_DERIVATIONS) {
+    activeDerivations += 1;
+    return;
+  }
+  if (waitingDerivations.length >= MAX_QUEUED_DERIVATIONS) throw new PasswordHashBusyError();
+  // The releasing derivation hands its slot over, so activeDerivations stays unchanged.
+  await new Promise<void>((resolve) => waitingDerivations.push(resolve));
+}
+
+function releaseSlot() {
+  const next = waitingDerivations.shift();
+  if (next) next();
+  else activeDerivations -= 1;
+}
+
+function runScrypt(password: string, salt: Buffer, length: number, options: { N: number; r: number; p: number; maxmem: number }) {
   return new Promise<Buffer>((resolve, reject) => {
     scryptCallback(password, salt, length, options, (error, derivedKey) => {
       if (error) reject(error);
       else resolve(derivedKey);
     });
   });
+}
+
+async function deriveKey(password: string, salt: Buffer, length: number, options: { N: number; r: number; p: number; maxmem: number }) {
+  await acquireSlot();
+  try {
+    return await runScrypt(password, salt, length, options);
+  } finally {
+    releaseSlot();
+  }
+}
+
+/** Test hook: lets tests exercise the semaphore with a fake derivation. */
+export const __passwordSemaphoreForTests = {
+  run: async <T>(task: () => Promise<T>) => {
+    await acquireSlot();
+    try {
+      return await task();
+    } finally {
+      releaseSlot();
+    }
+  },
+};
+
+let dummyHashPromise: Promise<string> | null = null;
+
+export async function verifyPasswordAgainstDummy(password: string) {
+  dummyHashPromise ??= hashPassword(randomBytes(16).toString("hex"));
+  let dummyHash: string;
+  try {
+    dummyHash = await dummyHashPromise;
+  } catch (error) {
+    dummyHashPromise = null;
+    throw error;
+  }
+  await verifyPassword(password, dummyHash);
+  return false;
 }
 
 export async function hashPassword(password: string) {

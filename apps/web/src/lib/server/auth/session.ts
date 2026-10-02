@@ -93,10 +93,10 @@ export async function setAuthCookie(user: Omit<AuthUser, "expiresAt">) {
   });
 }
 
-export async function setGitHubAccessTokenCookie(accessToken: string) {
+export async function setGitHubAccessTokenCookie(accessToken: string, userId: string) {
   const cookieStore = await cookies();
 
-  cookieStore.set(GITHUB_ACCESS_COOKIE, encryptSecret(accessToken), {
+  cookieStore.set(GITHUB_ACCESS_COOKIE, encryptSecret(JSON.stringify({ userId, token: accessToken })), {
     httpOnly: true,
     sameSite: "lax",
     secure: getAppBaseUrl().startsWith("https://"),
@@ -105,9 +105,38 @@ export async function setGitHubAccessTokenCookie(accessToken: string) {
   });
 }
 
+export async function clearGitHubAccessTokenCookie() {
+  const cookieStore = await cookies();
+  cookieStore.delete(GITHUB_ACCESS_COOKIE);
+}
+
+export async function clearParticipantAndOAuthCookies() {
+  const cookieStore = await cookies();
+  cookieStore.delete(AUTH_COOKIE);
+  cookieStore.delete(OAUTH_STATE_COOKIE);
+}
+
 export async function getGitHubAccessToken() {
   const cookieStore = await cookies();
-  return decryptSecret(cookieStore.get(GITHUB_ACCESS_COOKIE)?.value);
+  const decrypted = decryptSecret(cookieStore.get(GITHUB_ACCESS_COOKIE)?.value);
+  if (!decrypted) {
+    return null;
+  }
+
+  let stored: { userId?: unknown; token?: unknown };
+  try {
+    stored = JSON.parse(decrypted);
+  } catch {
+    return null; // legacy, unbound cookie
+  }
+  if (!stored || typeof stored.userId !== "string" || typeof stored.token !== "string") {
+    return null;
+  }
+
+  // Lazy import: owner-session imports this module.
+  const { getCurrentOwner } = await import("@/lib/server/auth/owner-session");
+  const owner = await getCurrentOwner();
+  return owner && owner.id === stored.userId ? stored.token : null;
 }
 
 export async function requireGitHubAccessToken() {
