@@ -1,5 +1,6 @@
 import "server-only";
 
+import { randomBytes } from "node:crypto";
 import type { QueryResultRow } from "pg";
 
 import type { CollaborationSession, CollaborationSessionSnapshot, SessionLifecycleStatus } from "@/types/sketchblock";
@@ -50,7 +51,7 @@ export async function createPostgresSession(
 ): Promise<CollaborationSession> {
   const now = new Date().toISOString();
   const session: CollaborationSession = {
-    id: Math.random().toString(36).slice(2, 12),
+    id: randomBytes(12).toString("base64url"),
     repositoryId,
     drawingPath,
     status: "active",
