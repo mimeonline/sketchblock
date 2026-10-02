@@ -3,7 +3,7 @@ id: urn:sketchblock:collab-server:socketio
 defaultContentType: application/json
 info:
   title: Sketchblock Collab Realtime API
-  version: 0.1.0
+  version: 0.2.0
   description: |
     Socket.IO event contract for browser-facing realtime collaboration.
 

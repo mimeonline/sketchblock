@@ -6,6 +6,12 @@ import type { CollaborationSession, DrawingFile } from "@/types/sketchblock";
 import { BoardGallery } from "./BoardGallery";
 import messages from "../../../../messages/de.json";
 
+vi.mock("@excalidraw/excalidraw", () => ({
+  restore: (content: { elements: unknown[] }) => ({ ...content, appState: {}, files: {} }),
+  getNonDeletedElements: (elements: unknown[]) => elements,
+  exportToSvg: vi.fn(async () => document.createElementNS("http://www.w3.org/2000/svg", "svg")),
+}));
+
 function render(ui: React.ReactNode) {
   return rtlRender(<NextIntlClientProvider locale="de" messages={messages}>{ui}</NextIntlClientProvider>);
 }
@@ -90,7 +96,7 @@ describe("BoardGallery", () => {
     render(<BoardGallery drawings={[drawing]} sessions={[{ ...activeSession, collab: undefined }]} />);
 
     expect(screen.queryByText("Live")).not.toBeInTheDocument();
-    expect(screen.getByText("Indiziert")).toBeInTheDocument();
+    expect(screen.getByText("Gefunden")).toBeInTheDocument();
   });
 
   it("defers rendering for very large boards", async () => {
@@ -117,7 +123,22 @@ describe("BoardGallery", () => {
     });
 
     expect(screen.getByText("Großes Board")).toBeInTheDocument();
-    expect(screen.getByText("Im Editor ansehen")).toBeInTheDocument();
+    const loadPreview = screen.getByRole("button", { name: "Vorschau laden" });
+    expect(loadPreview.closest("a")).toBeNull();
+    expect(screen.getByText("Zum Schutz der Ladezeit auf Wunsch laden")).toBeInTheDocument();
+
+    await act(async () => {
+      loadPreview.click();
+    });
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+    expect(screen.queryByText("Großes Board")).not.toBeInTheDocument();
+    expect(screen.queryByText("Vorschau wird vorbereitet")).not.toBeInTheDocument();
+    expect(document.querySelector("svg[aria-hidden='true']")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "System map im Editor öffnen" })).toHaveAttribute(
+      "href", `/editor?path=${encodeURIComponent(drawing.path)}`,
+    );
   });
 
   it("supports a standalone gallery without a self-link or board limit", () => {

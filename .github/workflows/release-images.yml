@@ -3,6 +3,12 @@ name: public-release
 on:
   push:
     tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      public_tag:
+        description: Existing release tag to build (vX.Y.Z)
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -11,26 +17,60 @@ permissions:
   attestations: write
 
 concurrency:
-  group: public-release-${{ github.ref }}
-  cancel-in-progress: true
+  group: public-release-${{ inputs.public_tag || github.ref_name }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
 
 env:
   REGISTRY: ghcr.io
   WEB_IMAGE: ghcr.io/${{ github.repository_owner }}/sketchblock-web
   COLLAB_IMAGE: ghcr.io/${{ github.repository_owner }}/sketchblock-collab-server
+  RELEASE_TAG: ${{ inputs.public_tag || github.ref_name }}
 
 jobs:
-  verify:
+  prepare:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      commit: ${{ steps.release.outputs.commit }}
+    steps:
+      - name: Validate release tag
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.public_tag || github.ref_name }}
+          fetch-depth: 0
+      - name: Verify existing tag commit and license gate
+        id: release
+        run: |
+          commit=$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")
+          test "$(git rev-parse HEAD)" = "$commit"
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            test "$GITHUB_REF" = "refs/tags/$RELEASE_TAG"
+            test "$GITHUB_SHA" = "$commit"
+          fi
+          test -f LICENSE
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+
+  verify:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       matrix:
         app: [apps/web, apps/collab-server, website]
     steps:
       - uses: actions/checkout@v6
-      - name: Validate release tag and license gate
-        run: |
-          [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          test -f LICENSE
+        with:
+          ref: ${{ inputs.public_tag || github.ref_name }}
+      - name: Verify selected commit
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - uses: pnpm/action-setup@v6
         with: {version: 11.10.0}
       - uses: actions/setup-node@v6
@@ -44,11 +84,20 @@ jobs:
         run: pnpm run check
 
   images:
-    needs: verify
-    runs-on: ubuntu-latest
+    needs: [prepare, verify]
+    runs-on: ${{ matrix.target.runner }}
+    timeout-minutes: 45
     strategy:
+      fail-fast: false
       matrix:
-        include:
+        target:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+            artifact: linux-amd64
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            artifact: linux-arm64
+        app:
           - name: web
             image: sketchblock-web
             context: apps/web
@@ -57,6 +106,12 @@ jobs:
             context: apps/collab-server
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.public_tag || github.ref_name }}
+      - name: Verify selected commit
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - uses: docker/setup-buildx-action@v4
       - uses: docker/login-action@v4
         with:
@@ -66,48 +121,137 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          context: git
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.app.image }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{version}},value=${{ env.RELEASE_TAG }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ env.RELEASE_TAG }}
             type=sha,prefix=sha-
             type=raw,value=latest
+          labels: |
+            org.opencontainers.image.revision=${{ needs.prepare.outputs.commit }}
       - id: build
         uses: docker/build-push-action@v7
         with:
-          context: ${{ matrix.context }}
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
+          context: ${{ matrix.app.context }}
+          platforms: ${{ matrix.target.platform }}
+          outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/${{ matrix.app.image }},push-by-digest=true,name-canonical=true,push=true
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: SKETCHBLOCK_VERSION=${{ github.ref_name }}
+          build-args: SKETCHBLOCK_VERSION=${{ env.RELEASE_TAG }}
           sbom: true
           provenance: mode=max
+      - name: Export image digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          [[ "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.app.name }}-${{ matrix.target.artifact }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  manifests:
+    needs: [prepare, images]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: web
+            image: sketchblock-web
+          - name: collab-server
+            image: sketchblock-collab-server
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.public_tag || github.ref_name }}
+      - name: Verify selected commit
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+      - uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-${{ matrix.name }}-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          context: git
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ env.RELEASE_TAG }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ env.RELEASE_TAG }}
+            type=sha,prefix=sha-
+            type=raw,value=latest
+      - name: Merge and publish platform manifests
+        id: manifest
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          METADATA_JSON: ${{ steps.meta.outputs.json }}
+        run: |
+          shopt -s nullglob
+          digests=(*)
+          test "${#digests[@]}" -eq 2
+          sources=()
+          for digest in "${digests[@]}"; do
+            [[ "$digest" =~ ^[a-f0-9]{64}$ ]]
+            sources+=("$IMAGE@sha256:$digest")
+          done
+          mapfile -t tags < <(jq -r '.tags[]' <<< "$METADATA_JSON")
+          tag_args=()
+          for tag in "${tags[@]}"; do tag_args+=(--tag "$tag"); done
+          test "${#tags[@]}" -gt 0
+          docker buildx imagetools create "${tag_args[@]}" "${sources[@]}"
+          digest=$(docker buildx imagetools inspect "${tags[0]}" --format '{{json .Manifest}}' | jq -er '.digest')
+          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+          docker buildx imagetools inspect "$IMAGE@$digest" --raw > manifest.json
+          jq -e '[.manifests[].platform | select(.os == "linux") | .architecture] | sort == ["amd64", "arm64"]' manifest.json
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
       - uses: actions/attest-build-provenance@v4
         with:
           subject-name: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
-          subject-digest: ${{ steps.build.outputs.digest }}
+          subject-digest: ${{ steps.manifest.outputs.digest }}
           push-to-registry: true
 
   release:
-    needs: images
+    needs: [prepare, manifests]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.public_tag || github.ref_name }}
+      - name: Verify selected commit
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       - name: Extract release notes from changelog
         run: |
-          scripts/changelog-section.sh "${GITHUB_REF_NAME}" > release-notes.md
+          scripts/changelog-section.sh "$RELEASE_TAG" > release-notes.md
           test -s release-notes.md
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-            gh release edit "${GITHUB_REF_NAME}" \
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" \
               --notes-file release-notes.md \
-              --title "Sketchblock ${GITHUB_REF_NAME}"
+              --title "Sketchblock $RELEASE_TAG"
           else
-            gh release create "${GITHUB_REF_NAME}" \
+            gh release create "$RELEASE_TAG" \
               --verify-tag \
               --notes-file release-notes.md \
-              --title "Sketchblock ${GITHUB_REF_NAME}"
+              --title "Sketchblock $RELEASE_TAG"
           fi

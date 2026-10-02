@@ -12,6 +12,10 @@ Key settings include:
 | `APP_AUTH_SECRET` | Signs app sessions and collaboration tickets. In production: at least 32 random characters, no `change-me` placeholders |
 | `COLLAB_AUTH_SECRET` | Optional separate secret for collaboration tickets. Must be identical for the web app and the collaboration server; falls back to `APP_AUTH_SECRET` |
 | `COLLAB_ALLOW_INSECURE_NO_AUTH` | Local experiments only: lets the collaboration server start without a secret. Ignored in production |
+| `COLLAB_ALLOWED_ORIGINS` | Browser origins allowed to connect to the collaboration server |
+| `COLLAB_MAX_YJS_DOCUMENT_BYTES` | Maximum encoded live document size, default `25000000` bytes |
+| `COLLAB_EXPOSE_API_DOCS` | Enables the collaboration API docs UI, default `false` |
+| `SKETCHBLOCK_BIND_ADDRESS` | Compose published bind address, default `127.0.0.1` |
 | `POSTGRES_PASSWORD` | Local Postgres password |
 | `GITHUB_OAUTH_CLIENT_ID` | Required in GitHub mode |
 | `GITHUB_OAUTH_CLIENT_SECRET` | Required in GitHub mode |
@@ -26,11 +30,11 @@ Do not commit `.env`.
 
 Every signed value (sign-in cookies, owner cookies, OAuth state, session grants, collaboration tickets) is bound to its purpose, so one kind of token never validates as another. The collaboration server refuses to start without a secret, and in production it rejects secrets shorter than 32 characters or containing `change-me`; the web app applies the same rule when `SKETCHBLOCK_DEPLOYMENT_ENV` resolves to production. Generate a value with `openssl rand -base64 48`.
 
-Upgrading to this version invalidates existing sign-in cookies once, so everyone has to sign in again.
+Upgrading from 0.1 to 0.2 invalidates existing sign-in cookies once, so everyone has to sign in again.
 
 ## Single-instance operation
 
-Run exactly one web and one collaboration-server instance per deployment. Session presence, live Yjs documents, Socket.IO rooms, rate limits, and generated first-run setup code live in process memory and are not persisted or replicated across instances.
+Run exactly one web and one collaboration-server instance per deployment. Active Yjs documents, session presence, Socket.IO rooms, rate limits, and generated first-run setup code live in process memory and are not replicated across instances. With the Postgres persistence driver, collaboration state is persisted and loaded when needed. Idle documents are released after pending state is persisted; this does not provide shared live state across replicas.
 
 For horizontal scaling, you would need sticky sessions on the load balancer, a Socket.IO adapter (such as Redis), and a mechanism to ensure a single owner per live document. These features are not yet implemented.
 
@@ -41,3 +45,5 @@ Behind a reverse proxy, set both `SKETCHBLOCK_TRUST_PROXY=true` (web) and `COLLA
 ## Port binding
 
 By default, ports bind to `127.0.0.1` (loopback only). Set `SKETCHBLOCK_BIND_ADDRESS=0.0.0.0` to expose them on all interfaces, but only when the deployment is behind a TLS-terminating reverse proxy.
+
+The collaboration document limit and API docs flag are collaboration-server settings. The supplied Compose file does not forward these two optional variables; add them explicitly to the `collab-server` service environment when overriding their defaults. Keep `/metrics` access limited to clients with a server ticket and expose API docs only in trusted environments.

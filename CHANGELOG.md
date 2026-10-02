@@ -9,6 +9,13 @@
 - Instance workspace: every local user has a private workspace for creating boards and managing versions without GitHub integration.
 - Configuration for ad-hoc room lifetime, retention, and upload size limits (`SKETCHBLOCK_ADHOC_TTL_HOURS`, `SKETCHBLOCK_ADHOC_RETENTION_HOURS`, `SKETCHBLOCK_MAX_UPLOAD_BYTES`).
 
+### Changed
+
+- Large board previews can be loaded on demand while the gallery keeps its automatic rendering limit. Board status filters use the same translated labels as badges; the file list has striped rows and accessible full-path tooltips.
+- Build release images on native AMD64 and ARM64 runners and merge their manifests, avoiding ARM emulation failures. Existing release tags can be rebuilt through a validated manual workflow dispatch.
+
+## 0.2.0 - 2026-10-02
+
 ### Security
 
 - Ending a session now ends access: invitations are revoked, connected clients are disconnected, and socket tickets, joins, state writes and Yjs updates for ended sessions are rejected.
@@ -33,6 +40,9 @@
 - Starting a session is rolled back when the collaboration server cannot register it.
 - Text is re-measured with loaded fonts in live sessions.
 - Idle live documents are released from memory; oversized Yjs documents are rejected (`COLLAB_MAX_YJS_DOCUMENT_BYTES`).
+- Participant removal immediately disconnects the removed account and rejects later socket updates.
+- Concurrent first updates share one live document; eviction preserves updates arriving during persistence.
+- Reconnecting clients merge session state with pending edits, and metadata loading no longer interrupts the live socket.
 
 ### Changed
 
@@ -42,6 +52,8 @@
 - Session history shows readable actors; board titles are consistent across views.
 - Documented single-instance operation.
 - Database migrations V10 to V12 (per-user repository records, session base SHA, participant removal).
+- Expanded authentication, repository ownership, session lifecycle, realtime, and persistence regression coverage.
+- A missing GitHub connection now offers a direct reconnect action while keeping the selected repository; repository scans show boards as Found instead of Indexed.
 
 ## 0.1.0 - 2026-07-12
 

@@ -105,6 +105,7 @@ const initialSaveState: EditorSaveState = {
 };
 
 const DASHBOARD_PRESENCE_REFRESH_MS = 3_000;
+const GITHUB_RECONNECT_HREF = "/api/auth/github/start?intent=owner_connect&returnTo=%2F";
 
 type NoticeTone = "info" | "success" | "warning" | "error";
 type Notice = { tone: NoticeTone; message: string };
@@ -226,7 +227,8 @@ export function HomeTemplate({ deploymentEnvironment, view, initialPath = "", us
       const nextDrawings = drawingPayload.drawings || [];
       setSelectedPath((current) => current || resolveBoardPath(nextDrawings, ""));
 
-      const refreshError = repositoryPayload.error || drawingPayload.error || sessionPayload.error;
+      const githubReconnectRequired = repositoryPayload.githubConnected === false && nextRepositories.length > 0;
+      const refreshError = repositoryPayload.error || (githubReconnectRequired ? undefined : drawingPayload.error) || sessionPayload.error;
       setNotice(
         refreshError
           ? { tone: "error", message: refreshError }
@@ -591,6 +593,8 @@ export function HomeTemplate({ deploymentEnvironment, view, initialPath = "", us
     }
   }
 
+  const githubReconnectRequired = loaded && !demoMode && !githubConnected && Boolean(activeRepository);
+
   return (
     <div className="min-h-screen bg-muted/35 text-foreground">
       <div className="flex min-h-screen">
@@ -625,6 +629,19 @@ export function HomeTemplate({ deploymentEnvironment, view, initialPath = "", us
                 : ""
             }
           /> : null}
+
+          {githubReconnectRequired && view !== "dashboard" ? (
+            <section className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-warning/30 bg-warning/10 px-4 py-4" aria-labelledby="github-reconnect-heading">
+              <div>
+                <h2 className="font-semibold" id="github-reconnect-heading">{t("githubReconnectTitle")}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{t("githubReconnectDescription")}</p>
+              </div>
+              <a className={cn(buttonVariants({ size: "sm" }), "gap-2")} href={GITHUB_RECONNECT_HREF}>
+                <GitBranch data-icon="inline-start" />
+                {t("reconnectGitHub")}
+              </a>
+            </section>
+          ) : null}
 
           {notice.tone !== "info" ? (
             <div
@@ -902,9 +919,11 @@ function DashboardView({
   const primaryDrawing = activeSession
     ? drawings.find((item) => item.path === activeSession.drawingPath) || drawings[0] || null
     : drawings[0] || null;
-  const primaryHref = primaryDrawing
-    ? `/editor?path=${encodeURIComponent(primaryDrawing.path)}`
-    : "/repositories";
+  const primaryHref = !githubConnected
+    ? GITHUB_RECONNECT_HREF
+    : primaryDrawing
+      ? `/editor?path=${encodeURIComponent(primaryDrawing.path)}`
+      : "/repositories";
 
   return (
     <div className="grid gap-8">
@@ -913,15 +932,19 @@ function DashboardView({
         <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
           <div className="max-w-2xl">
             <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-primary-foreground/70">
-              {activeSession ? <Radio className="size-4" aria-hidden="true" /> : <Sparkles className="size-4" aria-hidden="true" />}
-              {activeSession ? t("liveNow") : t("continueWork")}
+              {activeSession && githubConnected ? <Radio className="size-4" aria-hidden="true" /> : <Sparkles className="size-4" aria-hidden="true" />}
+              {!githubConnected ? t("connectionRequired") : activeSession ? t("liveNow") : t("continueWork")}
             </div>
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              {primaryDrawing ? drawingDisplayName(primaryDrawing.path) : t("repositoryConnected")}
+              {!githubConnected
+                ? t("githubReconnectTitle")
+                : primaryDrawing ? drawingDisplayName(primaryDrawing.path) : t("repositoryConnected")}
             </h2>
             <p className="mt-2 max-w-xl text-sm leading-6 text-primary-foreground/75">
-              {primaryDrawing
-                ? activeSession
+              {!githubConnected
+                ? t("githubReconnectDescription")
+                : primaryDrawing
+                  ? activeSession
                   ? t("peopleWorking", { count: activeSession.collab?.presenceCount || 0 })
                   : t("openFirstBoard")
                 : t("scanMakesVisible")}
@@ -934,7 +957,7 @@ function DashboardView({
             )}
             href={primaryHref}
           >
-            {primaryDrawing ? t("openBoard") : t("checkRepository")}
+            {!githubConnected ? t("reconnectGitHub") : primaryDrawing ? t("openBoard") : t("checkRepository")}
             <ArrowRight data-icon="inline-end" />
           </Link>
         </div>
@@ -944,10 +967,13 @@ function DashboardView({
         activeSessions={activeSessions.length}
         boardCount={drawings.length}
         collabServerStatus={collabServerStatus}
+        githubConnected={githubConnected}
         repository={repository}
       />
 
-      <BoardGallery drawings={drawings} sessions={sessions} provider={repository?.provider} />
+      {githubConnected || repository?.provider === "instance" ? (
+        <BoardGallery drawings={drawings} sessions={sessions} provider={repository?.provider} />
+      ) : null}
     </div>
   );
 }
@@ -1028,16 +1054,18 @@ function WorkspacePulse({
   boardCount,
   activeSessions,
   collabServerStatus,
+  githubConnected,
 }: {
   repository: RepositoryRecord;
   boardCount: number;
   activeSessions: number;
   collabServerStatus: CollabServerStatus | null;
+  githubConnected: boolean;
 }) {
   const t = useTranslations("Workspace");
   const items = [
     { label: "Repository", value: repository.name, note: repository.branch, href: "/repositories" },
-    { label: "Boards", value: String(boardCount), note: t("activeRepository"), href: "/drawings" },
+    { label: "Boards", value: githubConnected ? String(boardCount) : "–", note: githubConnected ? t("activeRepository") : t("connectionRequired"), href: "/drawings" },
     { label: t("liveSessions"), value: String(activeSessions), note: t("currentlyActive"), href: "/sessions" },
     {
       label: t("collaboration"),
@@ -1195,7 +1223,7 @@ function RepositoryView({
                     {!isActive ? (
                       <Button size="sm" onClick={() => onRepositorySwitch(item.id)}>{t("activate")}</Button>
                     ) : null}
-                    <Button size="sm" variant="outline" onClick={() => handleScanRepository(item)} disabled={Boolean(scanningId)}>
+                    <Button size="sm" variant="outline" onClick={() => handleScanRepository(item)} disabled={!githubConnected || Boolean(scanningId)}>
                       <RefreshCcw className={cn(scanningId === item.id && "animate-spin")} data-icon="inline-start" />
                       {t("scan")}
                     </Button>
@@ -1257,14 +1285,14 @@ function RepositoryView({
             ) : (
               <a
                 className={cn(buttonVariants(), "gap-2")}
-                href="/api/auth/github/start?intent=owner_connect&returnTo=%2Frepositories"
+                href={GITHUB_RECONNECT_HREF}
               >
                 <GitBranch data-icon="inline-start" />
-                {t("connectGitHub")}
+                {repository ? t("reconnectGitHub") : t("connectGitHub")}
               </a>
             )}
             {repository ? (
-              <Button type="button" variant="outline" onClick={() => handleScanRepository(repository)} disabled={Boolean(scanningId)}>
+              <Button type="button" variant="outline" onClick={() => handleScanRepository(repository)} disabled={!githubConnected || Boolean(scanningId)}>
                 <RefreshCcw className={cn(scanningId === repository.id && "animate-spin")} data-icon="inline-start" />
                 {scanningId === repository.id ? t("scanRunning") : t("scanAgain")}
               </Button>
@@ -1276,18 +1304,20 @@ function RepositoryView({
       <aside className="grid gap-4 border-t pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0" aria-label={t("connectionStatus")}>
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{t("connectionStatus")}</div>
-          <h2 className="mt-2 text-lg font-semibold">{repository ? t("repositoryReadyStatus") : t("setupOpen")}</h2>
+          <h2 className="mt-2 text-lg font-semibold">{!githubConnected && repository ? t("githubReconnectTitle") : repository ? t("repositoryReadyStatus") : t("setupOpen")}</h2>
           <p className="mt-1 text-sm leading-6 text-muted-foreground">
-            {repository
+            {!githubConnected && repository
+              ? t("githubReconnectDescription")
+              : repository
               ? t("boardsFound", { count: drawings.length })
               : t("connectThenChoose")}
           </p>
         </div>
         <div className="grid gap-3 text-sm">
           <InfoRow label="GitHub" value={githubConnected ? t("connected") : t("notConnected")} />
-          <InfoRow label="Repository" value={repository ? <StatusBadge value={repository.status} /> : t("notSelected")} />
+          <InfoRow label="Repository" value={repository ? (githubConnected ? <StatusBadge value={repository.status} /> : t("connectionRequired")) : t("notSelected")} />
           <InfoRow label={t("visibility")} value={repository ? (repository.private ? t("private") : t("public")) : "–"} />
-          <InfoRow label={t("foundBoards")} value={String(drawings.length)} />
+          <InfoRow label={t("foundBoards")} value={githubConnected ? String(drawings.length) : "–"} />
         </div>
         <Accordion>
           <AccordionItem value="repository-diagnostics" className="border-b-0">
@@ -1305,7 +1335,7 @@ function RepositoryView({
   );
 }
 
-function DrawingsView({
+export function DrawingsView({
   drawings,
   sessions,
   selectedPath,
@@ -1317,6 +1347,7 @@ function DrawingsView({
   provider?: string;
 }) {
   const t = useTranslations("Workspace");
+  const tStatus = useTranslations("Common.status");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const statuses = useMemo(
@@ -1378,7 +1409,7 @@ function DrawingsView({
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
-        <Select items={[{ value: "all", label: t("allStatuses") }, ...statuses.map((status) => ({ value: status, label: drawingStatusLabel(status) }))]} value={statusFilter} onValueChange={(value) => setStatusFilter(value ?? "all")}>
+        <Select items={[{ value: "all", label: t("allStatuses") }, ...statuses.map((status) => ({ value: status, label: tStatus(status) }))]} value={statusFilter} onValueChange={(value) => setStatusFilter(value ?? "all")}>
           <SelectTrigger className="w-full sm:w-44" aria-label={t("allStatuses")}>
             <SelectValue />
           </SelectTrigger>
@@ -1387,7 +1418,7 @@ function DrawingsView({
               <SelectItem value="all">{t("allStatuses")}</SelectItem>
               {statuses.map((status) => (
                 <SelectItem key={status} value={status}>
-                  {drawingStatusLabel(status)}
+                  {tStatus(status)}
                 </SelectItem>
               ))}
             </SelectGroup>
@@ -1989,7 +2020,7 @@ function SettingsView({
   );
 }
 
-function DrawingTable({
+export function DrawingTable({
   drawings,
   selectedPath,
   showActions,
@@ -2000,10 +2031,10 @@ function DrawingTable({
 }) {
   const t = useTranslations("Workspace");
   return (
-    <div className="overflow-hidden rounded-xl border bg-background">
+    <div className="overflow-hidden rounded-xl border bg-white dark:bg-card">
         <Table>
-          <TableHeader>
-            <TableRow>
+          <TableHeader className="bg-slate-200 dark:bg-muted">
+            <TableRow className="hover:bg-slate-200 dark:hover:bg-muted">
               <TableHead>{t("path")}</TableHead>
               <TableHead className="hidden md:table-cell">{t("lastCommit")}</TableHead>
               <TableHead className="hidden lg:table-cell">Base SHA</TableHead>
@@ -2019,9 +2050,17 @@ function DrawingTable({
                 </TableCell>
               </TableRow>
             ) : (
-              drawings.map((drawingItem) => (
-                <TableRow key={drawingItem.path} className={selectedPath === drawingItem.path ? "bg-primary/5" : ""}>
-                  <TableCell className="max-w-[420px] truncate font-mono text-xs">{drawingItem.path}</TableCell>
+              drawings.map((drawingItem, index) => (
+                <TableRow
+                  key={drawingItem.path}
+                  aria-selected={selectedPath === drawingItem.path}
+                  className={cn(
+                    "hover:bg-slate-100 dark:hover:bg-muted/70",
+                    index % 2 === 0 ? "bg-white dark:bg-card" : "bg-slate-50 dark:bg-muted/30",
+                    selectedPath === drawingItem.path && "bg-primary/10 hover:bg-primary/15 dark:bg-primary/15 dark:hover:bg-primary/20",
+                  )}
+                >
+                  <TableCell className="max-w-[420px] font-mono text-xs"><TruncatedValue text={drawingItem.path} focusable className="focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-ring" /></TableCell>
                   <TableCell className="hidden md:table-cell">{drawingItem.lastCommit}</TableCell>
                   <TableCell className="hidden font-mono text-xs lg:table-cell">{drawingItem.sha.slice(0, 7)}</TableCell>
                   <TableCell><StatusBadge value={drawingItem.status} /></TableCell>
@@ -2748,14 +2787,16 @@ function TruncatedValue({
   text,
   tooltip,
   className,
+  focusable = false,
 }: {
   text: string;
   tooltip?: string;
   className?: string;
+  focusable?: boolean;
 }) {
   return (
     <Tooltip>
-      <TooltipTrigger render={<span className={cn("block min-w-0 cursor-default truncate", className)} />}>
+      <TooltipTrigger render={<span tabIndex={focusable ? 0 : undefined} className={cn("block min-w-0 cursor-default truncate", className)} />}>
         {text}
       </TooltipTrigger>
       <TooltipContent className="break-all font-mono text-xs">{tooltip || text}</TooltipContent>
@@ -2784,18 +2825,6 @@ function InfoRow({
 
 function drawingDisplayName(path: string) {
   return drawingTitle(path);
-}
-
-function drawingStatusLabel(status: DrawingFile["status"]) {
-  const labels: Record<DrawingFile["status"], string> = {
-    indexed: "Indexed",
-    saved: "Saved",
-    dirty: "Unsaved",
-    stale: "Outdated",
-    conflict: "Conflict",
-  };
-
-  return labels[status] || status;
 }
 
 function sessionLifecycleLabel(status: SessionLifecycleStatus) {
