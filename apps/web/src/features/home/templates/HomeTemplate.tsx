@@ -2367,10 +2367,10 @@ export function JoinSessionTemplate({
             <h1 className="mt-1 break-words text-xl font-bold">{session?.drawingPath ? drawingDisplayName(session.drawingPath) : t("sessionLoading")}</h1>
             <p className="text-sm text-muted-foreground">
               {demoMode ? t("demoWorkspace") : t("roleSession", { role: sessionRoleLabel(sessionRole) })}
-              {saveTarget || !isOwner ? " · " : null}
+              {saveTarget || (!isOwner && session?.sourceKind === "repository") ? " · " : null}
               {saveTarget ? (
                 <span title={saveTarget.path}>{t("savesTo", { repository: saveTarget.repository, branch: saveTarget.branch })}</span>
-              ) : !isOwner ? (
+              ) : !isOwner && session?.sourceKind === "repository" ? (
                 <span>{t("ownerSavesHint")}</span>
               ) : null}
             </p>

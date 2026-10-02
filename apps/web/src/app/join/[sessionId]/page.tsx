@@ -1,5 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
+import { drawingTitle } from "@/lib/drawing-title";
+
 import { JoinSessionTemplate } from "@/features/home/templates/HomeTemplate";
 import { GuestJoinForm } from "@/features/join/organisms/GuestJoinForm";
 import { SessionEndedNotice } from "@/features/join/organisms/SessionEndedNotice";
@@ -100,7 +102,7 @@ export default async function JoinSessionPage({ params, searchParams }: JoinSess
       );
     }
     if (validatedInvite.role === "viewer" && session.allowAnonymousViewers) {
-      return <GuestJoinForm sessionId={sessionId} inviteToken={invite} boardTitle={session.title ?? undefined} />;
+      return <GuestJoinForm sessionId={sessionId} inviteToken={invite} boardTitle={session.title ? drawingTitle(session.title) : undefined} />;
     }
   }
 
