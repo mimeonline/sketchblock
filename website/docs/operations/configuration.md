@@ -15,6 +15,9 @@ Key settings include:
 | `POSTGRES_PASSWORD` | Local Postgres password |
 | `GITHUB_OAUTH_CLIENT_ID` | Required in GitHub mode |
 | `GITHUB_OAUTH_CLIENT_SECRET` | Required in GitHub mode |
+| `SKETCHBLOCK_ADHOC_TTL_HOURS` | Session lifetime for ad-hoc rooms in hours, default `168` (7 days) |
+| `SKETCHBLOCK_ADHOC_RETENTION_HOURS` | Retention period for ad-hoc room content after session expiry or closure in hours, default `24` |
+| `SKETCHBLOCK_MAX_UPLOAD_BYTES` | Maximum size for uploaded sketches in bytes, default `10000000` (10 MB) |
 
 Do not commit `.env`.
 

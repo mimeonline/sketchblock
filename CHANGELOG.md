@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- Ad-hoc rooms: upload an Excalidraw file or image with embedded scene to start a temporary live session without GitHub; participants download results as Excalidraw, PNG, or SVG.
+- Configuration for ad-hoc room lifetime, retention, and upload size limits (`SKETCHBLOCK_ADHOC_TTL_HOURS`, `SKETCHBLOCK_ADHOC_RETENTION_HOURS`, `SKETCHBLOCK_MAX_UPLOAD_BYTES`).
+
 ### Security
 
 - Ending a session now ends access: invitations are revoked, connected clients are disconnected, and socket tickets, joins, state writes and Yjs updates for ended sessions are rejected.
