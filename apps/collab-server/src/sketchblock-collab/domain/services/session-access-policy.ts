@@ -30,6 +30,15 @@ export class SessionAccessPolicy {
     return !auth || auth.role === "server" || auth.role === "owner";
   }
 
+  /** Audit trails expose actor logins; only the owner and the web server may read them. */
+  static canReadAudit(auth: SessionAuthContext, authRequired: boolean) {
+    if (!auth) {
+      return !authRequired;
+    }
+
+    return auth.role === "server" || auth.role === "owner";
+  }
+
   /** Only the web server and the session owner may seed initial board content. */
   static canSeedContent(auth: SessionAuthContext, authRequired: boolean) {
     if (!auth) {

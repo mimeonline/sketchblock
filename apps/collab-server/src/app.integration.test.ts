@@ -1,11 +1,13 @@
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { Test } from "@nestjs/testing";
+import { createHmac } from "node:crypto";
 import request from "supertest";
 
 import { AppModule } from "./app.module.js";
 import { SessionStorePort } from "./sketchblock-collab/application/ports/session-store.port.js";
 import { CollabConfigService } from "./shared/infrastructure/config/collab-config.service.js";
 import { configureHttpBodyParser } from "./shared/infrastructure/http/configure-http-body-parser.js";
+import { configureOpenApi } from "./shared/infrastructure/http/configure-open-api.js";
 import { SnapshotConflict } from "./sketchblock-collab/application/dtos/snapshot-conflict.js";
 
 describe("Collab server HTTP integration", () => {
@@ -98,14 +100,16 @@ describe("Collab server HTTP integration", () => {
         });
       });
 
+    const publicHealth = await request(app.getHttpServer()).get("/").set("x-forwarded-for", "198.51.100.5").expect(200);
+    expect(Object.keys(publicHealth.body).sort()).toEqual(["service", "status", "transport"]);
+  });
+
+  it("keeps metrics closed when collab auth is not configured", async () => {
     await request(app.getHttpServer())
       .get("/metrics")
       .set("x-forwarded-for", "198.51.100.2")
-      .expect(200)
-      .expect(({ body }) => {
-        expect(body.sessions.maxActiveSessions).toBeGreaterThan(0);
-        expect(body.limits.httpRequestsPerIpPerMinute).toBe(2);
-      });
+      .expect(503)
+      .expect(({ body }) => expect(body.error).toBe("collab_auth_not_configured"));
   });
 
   it("keeps internal diagnostics closed when collab auth is not configured", async () => {
@@ -180,5 +184,50 @@ describe("Collab server HTTP integration", () => {
     } finally {
       upsert.mockRestore();
     }
+  });
+});
+
+function signTicket(role: "server" | "collaborator", secret: string) {
+  const permission = role === "server" ? "admin" : "write";
+  const payload = Buffer.from(JSON.stringify({ kind: "collab-ticket", sessionId: role === "server" ? "*" : "s", clientId: role, actor: role, displayName: role, role, permission, expiresAt: Date.now() + 60_000 })).toString("base64url");
+  return `${payload}.${createHmac("sha256", secret).update(payload).digest("base64url")}`;
+}
+
+describe("Collab server HTTP integration with auth", () => {
+  let app: NestExpressApplication;
+  const secret = "metrics-test-secret";
+
+  beforeAll(async () => {
+    process.env.COLLAB_AUTH_SECRET = secret;
+    process.env.COLLAB_HTTP_REQUESTS_PER_IP_PER_MINUTE = "100";
+    process.env.COLLAB_LOG_LEVEL = "silent";
+    process.env.COLLAB_DATABASE_URL = "postgresql://test:test@127.0.0.1:1/sketchblock_test";
+    delete process.env.COLLAB_EXPOSE_API_DOCS;
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(SessionStorePort)
+      .useValue({ async countSessions() { return 0; }, async getSession() { return null; } })
+      .compile();
+    app = moduleRef.createNestApplication<NestExpressApplication>({ bodyParser: false });
+    configureOpenApi(app, app.get(CollabConfigService).exposeApiDocs);
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app?.close();
+    process.env.COLLAB_AUTH_SECRET = "";
+  });
+
+  it("requires a server admin ticket for metrics", async () => {
+    await request(app.getHttpServer()).get("/metrics").expect(401);
+    await request(app.getHttpServer()).get("/metrics").set("Authorization", `Bearer ${signTicket("collaborator", secret)}`).expect(403);
+    await request(app.getHttpServer())
+      .get("/metrics")
+      .set("Authorization", `Bearer ${signTicket("server", secret)}`)
+      .expect(200)
+      .expect(({ body }) => expect(body.sessions.maxActiveSessions).toBeGreaterThan(0));
+  });
+
+  it("does not mount API docs by default", async () => {
+    await request(app.getHttpServer()).get("/docs").expect(404);
   });
 });

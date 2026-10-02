@@ -22,6 +22,7 @@ import { SessionsController } from "./infrastructure/http/sessions.controller.js
 import { PostgresSessionStore } from "./infrastructure/persistence/postgres-session.store.js";
 import { PostgresDatabaseDiagnosticsAdapter } from "./infrastructure/persistence/postgres-database-diagnostics.adapter.js";
 import { YjsDocumentRegistry } from "./infrastructure/persistence/yjs-document.registry.js";
+import { DocumentEvictionScheduler } from "./infrastructure/realtime/document-eviction.scheduler.js";
 import { PresenceRegistry } from "./infrastructure/realtime/presence.registry.js";
 import { RealtimeGateway } from "./infrastructure/realtime/realtime.gateway.js";
 import { SocketSessionConnections } from "./infrastructure/realtime/socket-session-connections.js";
@@ -39,6 +40,7 @@ import { SocketSessionConnections } from "./infrastructure/realtime/socket-sessi
     RegisterSessionUseCase,
     RemoveClientUseCase,
     RealtimeGateway,
+    DocumentEvictionScheduler,
     SocketSessionConnections,
     {
       provide: SessionConnectionsPort,

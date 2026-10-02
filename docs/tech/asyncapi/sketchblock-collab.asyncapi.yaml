@@ -295,6 +295,7 @@ components:
         updatedBy:
           $ref: '#/components/schemas/UserId'
     YjsUpdatePayload:
+      description: The ack fails with yjs_document_too_large when the merged document would exceed COLLAB_MAX_YJS_DOCUMENT_BYTES.
       type: object
       additionalProperties: false
       required:
@@ -345,6 +346,7 @@ components:
           $ref: '#/components/schemas/SessionLifecycleStatus'
         audit:
           type: array
+          description: Audit trail; empty unless the ticket role is owner or server (also applies to session:join and session:snapshot:get acks).
           items:
             $ref: '#/components/schemas/SessionAuditEvent'
     SessionClosePayload:

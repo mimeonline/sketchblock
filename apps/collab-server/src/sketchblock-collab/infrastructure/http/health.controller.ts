@@ -46,9 +46,12 @@ export class HealthController {
   }
 
   @Get("metrics")
-  @ApiOperation({ summary: "Read collab server runtime metrics." })
+  @ApiBearerAuth("collab-ticket")
+  @ApiOperation({ summary: "Read collab server runtime metrics (server admin ticket required)." })
   @ApiResponse({ status: 200, description: "Collab server runtime metrics." })
-  async getMetrics() {
+  @ApiResponse({ status: 401, description: "Valid server ticket required." })
+  async getMetrics(@Req() request: CollabHttpRequest) {
+    this.requireServerAdmin(request);
     const persistedSessions = await this.sessions.countSessions();
 
     return {
@@ -85,6 +88,15 @@ export class HealthController {
   @ApiResponse({ status: 200, description: "Secret-free database diagnostics." })
   @ApiResponse({ status: 401, description: "Valid server ticket required." })
   async getInternalDiagnostics(@Req() request: CollabHttpRequest) {
+    this.requireServerAdmin(request);
+    return {
+      ok: true,
+      service: "sketchblock-collab-server",
+      database: await this.databaseDiagnostics.execute(),
+    };
+  }
+
+  private requireServerAdmin(request: CollabHttpRequest) {
     if (!this.config.authSecret) {
       throw new ServiceUnavailableException({ error: "collab_auth_not_configured" });
     }
@@ -95,10 +107,5 @@ export class HealthController {
     if (result.payload.role !== "server" || result.payload.permission !== "admin") {
       throw new ForbiddenException({ error: "server_admin_ticket_required" });
     }
-    return {
-      ok: true,
-      service: "sketchblock-collab-server",
-      database: await this.databaseDiagnostics.execute(),
-    };
   }
 }

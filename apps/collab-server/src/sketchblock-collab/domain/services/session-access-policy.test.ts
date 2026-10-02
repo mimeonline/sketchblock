@@ -18,4 +18,13 @@ describe("SessionAccessPolicy", () => {
     expect(SessionAccessPolicy.canEdit(auth, "session-1", true)).toBe(false);
     expect(SessionAccessPolicy.canAdmin(auth, "session-1", true)).toBe(false);
   });
+
+  it("limits audit trail reads to owner, server or disabled auth", () => {
+    expect(SessionAccessPolicy.canReadAudit(null, false)).toBe(true);
+    expect(SessionAccessPolicy.canReadAudit(null, true)).toBe(false);
+    expect(SessionAccessPolicy.canReadAudit({ sessionId: "*", role: "server" }, true)).toBe(true);
+    expect(SessionAccessPolicy.canReadAudit({ sessionId: "s", role: "owner" }, true)).toBe(true);
+    expect(SessionAccessPolicy.canReadAudit({ sessionId: "s", role: "collaborator" }, true)).toBe(false);
+    expect(SessionAccessPolicy.canReadAudit({ sessionId: "s", role: "viewer" }, true)).toBe(false);
+  });
 });

@@ -114,7 +114,7 @@ export class SessionsController {
       revision: session.snapshot?.revision || 0,
       yjsStateBase64: session.yjsStateBase64 || null,
       yjsRevision: session.yjsRevision || 0,
-      audit: session.audit || [],
+      audit: SessionAccessPolicy.canReadAudit(auth, Boolean(this.config.authSecret)) ? session.audit || [] : [],
     };
   }
 
@@ -184,6 +184,7 @@ export class SessionsController {
     return {
       ok: true,
       ...state,
+      audit: SessionAccessPolicy.canReadAudit(auth, Boolean(this.config.authSecret)) ? state.audit : [],
     };
   }
 

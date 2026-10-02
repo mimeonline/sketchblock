@@ -1,4 +1,5 @@
 import { Inject } from "@nestjs/common";
+import { YjsDocumentTooLarge } from "../../application/dtos/yjs-document-too-large.js";
 import { SnapshotConflict } from "../../application/dtos/snapshot-conflict.js";
 import {
   Ack as SocketAck,
@@ -42,6 +43,7 @@ import { CollabRateLimitService } from "../../../shared/infrastructure/security/
 import { resolveClientIp } from "../../../shared/infrastructure/security/client-ip.js";
 import { CollabTicketVerifier, type CollabTicketPayload } from "../auth/collab-ticket.verifier.js";
 import { SessionStorePort } from "../../application/ports/session-store.port.js";
+import { DocumentEvictionScheduler } from "./document-eviction.scheduler.js";
 import { SocketSessionConnections, sessionRoomName } from "./socket-session-connections.js";
 
 type AckCallback = (response: unknown) => void;
@@ -93,6 +95,8 @@ export class RealtimeGateway
     private readonly upsertSessionSnapshot: UpsertSessionSnapshotUseCase,
     @Inject(SocketSessionConnections)
     private readonly connections: SocketSessionConnections,
+    @Inject(DocumentEvictionScheduler)
+    private readonly evictions: DocumentEvictionScheduler,
   ) {}
 
   afterInit(server: Server) {
@@ -199,6 +203,7 @@ export class RealtimeGateway
     }
     await socket.join(roomName(payload.sessionId));
     this.presence.addPresence(payload.sessionId, presenceUser);
+    this.evictions.cancel(payload.sessionId);
 
     const presence = this.presence.getPresence(payload.sessionId);
     socket.to(roomName(payload.sessionId)).emit("presence:update", {
@@ -221,7 +226,7 @@ export class RealtimeGateway
       revision: session.snapshot?.revision || 0,
       yjsStateBase64: session.yjsStateBase64 || null,
       yjsRevision: session.yjsRevision || 0,
-      audit: session.audit || [],
+      audit: this.canReadAudit(socket) ? session.audit || [] : [],
       presence,
     });
   }
@@ -345,12 +350,13 @@ export class RealtimeGateway
     try {
       update = await this.applyYjsUpdate.execute({ ...payload, updatedBy });
     } catch (error) {
+      const code = error instanceof YjsDocumentTooLarge ? "yjs_document_too_large" : "invalid_yjs_update";
       this.logSocketEvent("yjs.update.failed", socket, {
         sessionId: payload.sessionId,
-        error: "invalid_yjs_update",
+        error: code,
         reason: error instanceof Error ? error.message : "unknown",
       });
-      ack?.({ ok: false, error: "invalid_yjs_update" });
+      ack?.({ ok: false, error: code });
       return;
     }
 
@@ -440,7 +446,7 @@ export class RealtimeGateway
       snapshot: state.snapshot,
       revision: state.snapshotRevision,
       status: state.status,
-      audit: state.audit,
+      audit: this.canReadAudit(socket) ? state.audit : [],
     });
   }
 
@@ -522,11 +528,14 @@ export class RealtimeGateway
       return;
     }
 
-    this.server.to(roomName(result.data.sessionId)).emit("session:status:update", {
-      sessionId: result.data.sessionId,
-      status: result.data.status,
-      audit: updated.session.audit,
-    });
+    for (const roomSocket of await this.server.in(roomName(result.data.sessionId)).fetchSockets()) {
+      const roomAuth = (roomSocket.data as AuthenticatedSocket["data"]).auth || null;
+      roomSocket.emit("session:status:update", {
+        sessionId: result.data.sessionId,
+        status: result.data.status,
+        audit: SessionAccessPolicy.canReadAudit(roomAuth, Boolean(this.config.authSecret)) ? updated.session.audit : [],
+      });
+    }
     this.logSocketEvent("session.status.update.succeeded", socket, {
       sessionId: result.data.sessionId,
       status: result.data.status,
@@ -622,6 +631,7 @@ export class RealtimeGateway
         sessionId,
         presence: this.presence.getPresence(sessionId),
       });
+      this.evictions.scheduleIfEmpty(sessionId);
       this.logSocketEvent("client.kick.succeeded", socket, {
         sessionId,
         targetSocketId: socketId,
@@ -653,6 +663,7 @@ export class RealtimeGateway
       sessionId,
       presence: this.presence.getPresence(sessionId),
     });
+    this.evictions.scheduleIfEmpty(sessionId);
     this.logSocketEvent("client.kick.succeeded", socket, {
       sessionId,
       targetSocketId: socketId,
@@ -665,6 +676,9 @@ export class RealtimeGateway
 
   handleDisconnect(socket: AuthenticatedSocket) {
     const changedSessions = this.presence.removePresence(socket.id);
+    for (const sessionId of changedSessions) {
+      this.evictions.scheduleIfEmpty(sessionId);
+    }
     this.logSocketEvent("socket.disconnected", socket, {
       changedSessions,
     });
@@ -675,6 +689,7 @@ export class RealtimeGateway
     this.presence.removePresence(socket.id);
 
     for (const sessionId of sessionIds) {
+      this.evictions.scheduleIfEmpty(sessionId);
       socket.to(roomName(sessionId)).emit("presence:update", {
         sessionId,
         presence: this.presence.getPresence(sessionId),
@@ -685,11 +700,19 @@ export class RealtimeGateway
     });
   }
 
+  private canReadAudit(socket: AuthenticatedSocket) {
+    return SessionAccessPolicy.canReadAudit(this.socketAuth(socket), Boolean(this.config.authSecret));
+  }
+
   private hasJoined(socket: AuthenticatedSocket, sessionId: string) {
     return socket.rooms.has(roomName(sessionId));
   }
 
-  private joinPayloadForRole(payload: JoinSessionPayload, auth: CollabTicketPayload | null): JoinSessionPayload {
+  private joinPayloadForRole(rawPayload: JoinSessionPayload, auth: CollabTicketPayload | null): JoinSessionPayload {
+    // Audit entries use the authenticated identity instead of the client-chosen id.
+    const payload = auth && auth.role !== "server"
+      ? { ...rawPayload, userId: auth.actor, displayName: auth.displayName }
+      : rawPayload;
     // Only the web server and the owner may seed initial board content or the drawing path.
     if (SessionAccessPolicy.canSeedContent(auth, Boolean(this.config.authSecret))) {
       return payload;

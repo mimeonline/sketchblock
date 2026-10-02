@@ -3,6 +3,8 @@ import * as Y from "yjs";
 
 import { SessionStorePort } from "../../application/ports/session-store.port.js";
 import { YjsDocumentRegistryPort } from "../../application/ports/yjs-document-registry.port.js";
+import { YjsDocumentTooLarge } from "../../application/dtos/yjs-document-too-large.js";
+import { CollabConfigService } from "../../../shared/infrastructure/config/collab-config.service.js";
 import { StructuredLoggerService } from "../../../shared/infrastructure/logging/structured-logger.service.js";
 
 const PERSISTENCE_DEBOUNCE_MS = 250;
@@ -25,6 +27,7 @@ export class YjsDocumentRegistry extends YjsDocumentRegistryPort {
   constructor(
     @Inject(SessionStorePort) private readonly store: SessionStorePort,
     @Inject(StructuredLoggerService) private readonly logger: StructuredLoggerService,
+    @Inject(CollabConfigService) private readonly config: Pick<CollabConfigService, "maxYjsDocumentBytes">,
   ) {
     super();
   }
@@ -57,6 +60,10 @@ export class YjsDocumentRegistry extends YjsDocumentRegistryPort {
   async applyUpdate(input: { sessionId: string; updateBase64: string; updatedBy: string }) {
     const doc = await this.getDocument(input.sessionId);
     const update = Buffer.from(input.updateBase64, "base64");
+    const projectedBytes = Y.mergeUpdates([Y.encodeStateAsUpdate(doc), update]).byteLength;
+    if (projectedBytes > this.config.maxYjsDocumentBytes) {
+      throw new YjsDocumentTooLarge(projectedBytes, this.config.maxYjsDocumentBytes);
+    }
     Y.applyUpdate(doc, update, input.updatedBy);
 
     const stateBase64 = this.encodeState(doc);

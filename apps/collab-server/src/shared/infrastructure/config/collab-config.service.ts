@@ -9,6 +9,8 @@ export class CollabConfigService {
   readonly port = this.readNumberEnv("COLLAB_SERVER_PORT", 4513);
   readonly allowedOrigins = this.readOrigins();
   readonly maxSnapshotBytes = this.readNumberEnv("COLLAB_MAX_SNAPSHOT_BYTES", 25_000_000);
+  readonly maxYjsDocumentBytes = this.readNumberEnv("COLLAB_MAX_YJS_DOCUMENT_BYTES", 25_000_000);
+  readonly exposeApiDocs = this.readBooleanEnv("COLLAB_EXPOSE_API_DOCS");
   readonly authSecret = process.env.COLLAB_AUTH_SECRET?.trim() || process.env.APP_AUTH_SECRET?.trim() || null;
   readonly trustProxy = this.readBooleanEnv("COLLAB_TRUST_PROXY");
   readonly logLevel = this.readLogLevel();
