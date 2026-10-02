@@ -602,7 +602,8 @@ export function HomeTemplate({ deploymentEnvironment, view, initialPath = "", us
             user={user}
             realtimeReachable={view === "sessions" ? collabServerStatus?.reachable : undefined}
           />
-          {demoMode ? (
+          {/* The editor subtitle already names the demo workspace; keep the canvas high on the page. */}
+          {demoMode && view !== "editor" ? (
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-info/25 bg-info/8 px-3 py-2 text-sm text-info-foreground">
               <div>
                 <p className="font-medium">{t("demoWorkspace")}</p>
