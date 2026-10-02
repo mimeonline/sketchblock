@@ -2055,6 +2055,7 @@ export function JoinSessionTemplate({
   identity: { login: string; displayName: string };
 }) {
   const t = useTranslations("Workspace");
+  const tAdhoc = useTranslations("Adhoc");
   const tJoin = useTranslations("Join");
   const sessionRole = normalizeSessionRole(role);
   const clientId = useSyncExternalStore(subscribeToClientId, getClientIdSnapshot, getServerClientIdSnapshot);
@@ -2325,6 +2326,7 @@ export function JoinSessionTemplate({
 
   const editor = (
     <ExcalidrawEditor
+      hint={session?.sourceKind === "adhoc" ? tAdhoc("editorHint") : undefined}
       className="h-[max(520px,calc(100dvh-11rem))]"
       demoMode={demoMode}
       mode={isOwner ? "owner" : "guest"}
@@ -2706,7 +2708,8 @@ function sessionRoleLabel(role: SessionRole) {
 
 function auditActorLabel(actor: string, locale: string) {
   const german = locale.startsWith("de");
-  if (actor === "github") return german ? "GitHub-Import" : "GitHub import";
+  // "github" marks the initial content, from GitHub or an uploaded file.
+  if (actor === "github") return german ? "Ausgangsstand" : "Initial board";
   if (actor === "web-api" || actor === "server") return "Sketchblock";
   // Legacy entries stored anonymous browser client ids instead of identities.
   if (actor.startsWith("client-")) return german ? "Teilnehmer" : "Participant";

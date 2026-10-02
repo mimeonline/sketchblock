@@ -277,4 +277,12 @@ describe("validateBoardUpload", () => {
     const result = validateBoardUpload(JSON.stringify(board));
     expect(result.elements[0].id).toHaveLength(120);
   });
+
+  it("keeps all element properties needed to render the board", () => {
+    const board = validateBoardUpload(JSON.stringify({
+      type: "excalidraw",
+      elements: [{ id: "t1", type: "text", x: 10, y: 20, text: "Hello", fontSize: 28, version: 3 }],
+    }));
+    expect(board.elements[0]).toMatchObject({ id: "t1", type: "text", x: 10, y: 20, text: "Hello", fontSize: 28, version: 3 });
+  });
 });

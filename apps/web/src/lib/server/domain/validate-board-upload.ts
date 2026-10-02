@@ -79,7 +79,8 @@ const boardSchema = z.object({
   version: z.number().optional(),
   source: z.string().optional(),
   elements: z.array(
-    z.object({
+    // Keep all Excalidraw element properties; only identity fields are checked here.
+    z.looseObject({
       id: z.string().max(120),
       type: z.string(),
     })

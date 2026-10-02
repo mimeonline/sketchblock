@@ -47,6 +47,8 @@ type ExcalidrawEditorProps = {
   demoMode?: boolean;
   saveLabel?: string;
   toolbarContent?: ReactNode;
+  /** Overrides the default sync/save hint above the canvas. */
+  hint?: string;
   onDirty?: () => void;
   onSceneChange?: (content: unknown) => void;
   onSave?: (content: unknown) => Promise<void>;
@@ -120,6 +122,7 @@ export function ExcalidrawEditor({
   demoMode = false,
   saveLabel,
   toolbarContent,
+  hint,
   onDirty,
   onSceneChange,
   onSave,
@@ -382,9 +385,9 @@ export function ExcalidrawEditor({
         <div className="min-w-0 flex-1 basis-40" aria-live="polite">
           {saveError ? <span role="alert" className="text-destructive">{t("saveFailed")}</span> : (
             <span className="leading-5">
-              {mode === "owner"
+              {hint ?? (mode === "owner"
                 ? demoMode ? t(onSceneChange ? "demoLiveHint" : "demoLocalHint") : t(onSceneChange ? "ownerLiveHint" : "ownerLocalHint")
-                : t(readOnly ? "viewerHint" : demoMode ? "demoCollaboratorHint" : "collaboratorHint")}
+                : t(readOnly ? "viewerHint" : demoMode ? "demoCollaboratorHint" : "collaboratorHint"))}
             </span>
           )}
         </div>
