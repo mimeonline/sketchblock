@@ -37,6 +37,7 @@ export async function getActiveRepository(userId: string): Promise<RepositoryRec
         ON selection.repository_id = repository.id
       WHERE selection.user_id = $1
         AND selection.is_active = true
+        AND repository.connected_by_user_id = $1
       LIMIT 1
     `,
     [userId],
@@ -107,6 +108,28 @@ export async function saveActiveRepository(
   try {
     await client.query("BEGIN");
     await upsertUser(client, user);
+    const existing = await client.query<{ id: string } & QueryResultRow>(
+      "SELECT id FROM app_repositories WHERE connected_by_user_id = $1 AND github_repository_id = $2 FOR UPDATE",
+      [user.userId, repository.githubRepositoryId],
+    );
+    const existingId: string | null = existing.rows[0]?.id ?? null;
+    let defaultIdOwner: string | null = null;
+    if (!existingId) {
+      const defaultRow = await client.query<{ connected_by_user_id: string } & QueryResultRow>(
+        "SELECT connected_by_user_id FROM app_repositories WHERE id = $1",
+        [`github-${repository.githubRepositoryId}`],
+      );
+      defaultIdOwner = defaultRow.rows[0]?.connected_by_user_id ?? null;
+    }
+    repository = {
+      ...repository,
+      id: selectRepositoryRecordId({
+        githubRepositoryId: repository.githubRepositoryId,
+        userId: user.userId,
+        existingId,
+        defaultIdOwnerUserId: defaultIdOwner,
+      }),
+    };
     await upsertRepository(client, user.userId, repository);
     await client.query(
       "UPDATE app_user_repositories SET is_active = false WHERE user_id = $1",
@@ -201,13 +224,14 @@ export async function disconnectOwnedRepository(userId: string, repositoryId: st
         `
           UPDATE app_user_repositories
           SET is_active = true, selected_at = now()
-          WHERE repository_id = (
-            SELECT repository_id
-            FROM app_user_repositories
-            WHERE user_id = $1
-            ORDER BY selected_at DESC
-            LIMIT 1
-          )
+          WHERE user_id = $1
+            AND repository_id = (
+              SELECT repository_id
+              FROM app_user_repositories
+              WHERE user_id = $1
+              ORDER BY selected_at DESC
+              LIMIT 1
+            )
         `,
         [userId],
       );
@@ -253,6 +277,22 @@ export async function updateOwnedRepositoryScan(
   return rowToRepository(result.rows[0]);
 }
 
+export function selectRepositoryRecordId(input: {
+  githubRepositoryId: number;
+  userId: string;
+  existingId: string | null;
+  defaultIdOwnerUserId: string | null;
+}): string {
+  if (input.existingId) {
+    return input.existingId;
+  }
+  const defaultId = `github-${input.githubRepositoryId}`;
+  if (!input.defaultIdOwnerUserId || input.defaultIdOwnerUserId === input.userId) {
+    return defaultId;
+  }
+  return `${defaultId}-${input.userId.replace(/-/g, "").slice(0, 8)}`;
+}
+
 async function upsertUser(client: PoolClient, user: RepositoryUserIdentity) {
   await client.query(
     `
@@ -288,8 +328,8 @@ async function upsertRepository(client: PoolClient, userId: string, repository: 
           last_scan_at = EXCLUDED.last_scan_at,
           drawing_count = EXCLUDED.drawing_count,
           error = EXCLUDED.error,
-          connected_by_user_id = EXCLUDED.connected_by_user_id,
           updated_at = now()
+      WHERE app_repositories.connected_by_user_id = EXCLUDED.connected_by_user_id
     `,
     [
       repository.id,
