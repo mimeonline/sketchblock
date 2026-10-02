@@ -116,4 +116,21 @@ describe("useExcalidrawYjs", () => {
 
     expect(onSendUpdate).toHaveBeenCalledTimes(1);
   });
+
+  it("merges a reconnect checkpoint while preserving unacknowledged local elements", () => {
+    const updateScene = vi.fn();
+    const api = { updateScene } as unknown as ExcalidrawImperativeAPI;
+    const emptyState = encodeState(() => {});
+    const remoteElement = { ...element, id: "remote-element" };
+    const remoteState = encodeState((doc) => doc.getMap("elements").set(remoteElement.id, remoteElement));
+    const hook = renderHook(({ state }) => useExcalidrawYjs({
+      sessionId: "reconnect", clientId: "local", enabled: true, readOnly: false, canSeed: false,
+      api, initialStateBase64: state, onSendUpdate: vi.fn(),
+    }), { initialProps: { state: emptyState } });
+    act(() => hook.result.current.applyLocalScene([element] as never[]));
+    hook.rerender({ state: remoteState });
+    const lastScene = updateScene.mock.calls.at(-1)![0];
+    expect(lastScene.elements.map((item: { id: string }) => item.id).sort()).toEqual(["element-1", "remote-element"]);
+    hook.unmount();
+  });
 });

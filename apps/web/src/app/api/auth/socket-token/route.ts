@@ -3,8 +3,9 @@ import { z } from "zod";
 
 import { createCollabTicket } from "@/lib/server/auth/collab-ticket";
 import { getCurrentOwner } from "@/lib/server/auth/owner-session";
+import { getValidSessionGrant } from "@/lib/server/auth/session-grant";
 import { getCurrentAuthUser } from "@/lib/server/auth/session";
-import { getSession } from "@/lib/server/database/session-store";
+import { getOwnedSession, getSession } from "@/lib/server/database/session-store";
 import { recordSessionParticipant, validateSessionInvite } from "@/lib/server/database/session-invite-store";
 
 export const runtime = "nodejs";
@@ -30,6 +31,13 @@ export async function POST(request: NextRequest) {
       if (!owner) {
         return NextResponse.json({ error: "Instance Owner login required." }, { status: 401 });
       }
+      if (owner.mustChangePassword) {
+        return NextResponse.json({ error: "Password change required.", code: "password_change_required" }, { status: 423 });
+      }
+      const ownedSession = await getOwnedSession(body.sessionId, owner.id === "dev-owner" ? null : owner.id);
+      if (!ownedSession) {
+        return NextResponse.json({ error: "Session not found for the authenticated user." }, { status: 404 });
+      }
       return NextResponse.json({
         token: createCollabTicket({
           sessionId: body.sessionId,
@@ -43,16 +51,18 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const [authUser, invite] = await Promise.all([
-      getCurrentAuthUser(),
-      body.inviteToken ? validateSessionInvite(body.sessionId, body.inviteToken) : Promise.resolve(null),
-    ]);
-    if (!authUser || !invite) {
+    const authUser = await getCurrentAuthUser();
+    const access = authUser
+      ? body.inviteToken
+        ? await validateSessionInvite(body.sessionId, body.inviteToken)
+        : await getValidSessionGrant(body.sessionId, authUser.id)
+      : null;
+    if (!authUser || !access) {
       return NextResponse.json({ error: "Valid session invitation and GitHub login required." }, { status: 401 });
     }
     await recordSessionParticipant({
       sessionId: body.sessionId,
-      role: invite.role,
+      role: access.role,
       githubUserId: authUser.id,
       githubLogin: authUser.login,
       displayName: authUser.name || authUser.login,
@@ -66,7 +76,7 @@ export async function POST(request: NextRequest) {
         actor: authUser.login,
         displayName: authUser.name || authUser.login,
         avatarUrl: authUser.avatarUrl,
-        role: invite.role,
+        role: access.role,
         permission: "read",
       }),
     });

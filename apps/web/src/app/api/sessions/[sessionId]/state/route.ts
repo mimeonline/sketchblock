@@ -4,6 +4,7 @@ import { z } from "zod";
 import { openDrawing } from "@/lib/server/application/drawing-use-cases";
 import { authorizeSessionRequest } from "@/lib/server/auth/session-access";
 import {
+  CollabSnapshotConflictError,
   getCollabSessionSnapshot,
   registerCollabSession,
   upsertCollabSessionSnapshot,
@@ -22,6 +23,7 @@ type SessionStateRouteContext = {
 const snapshotSchema = z.object({
   clientId: z.string().min(1),
   content: z.unknown(),
+  baseRevision: z.number().int().nonnegative().optional(),
 });
 
 async function ensureSessionSnapshot(sessionId: string, allowGitHubInitialization: boolean, localUserId?: string | null) {
@@ -112,10 +114,17 @@ export async function PATCH(request: NextRequest, { params }: SessionStateRouteC
       drawingPath: session.drawingPath,
       content: body.content,
       updatedBy: auth.access.actor,
+      baseRevision: body.baseRevision,
     });
 
     return NextResponse.json({ session, snapshot });
   } catch (error) {
+    if (error instanceof CollabSnapshotConflictError) {
+      return NextResponse.json(
+        { error: "snapshot_conflict", code: "snapshot_conflict", snapshot: error.snapshot },
+        { status: 409 },
+      );
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 400 },

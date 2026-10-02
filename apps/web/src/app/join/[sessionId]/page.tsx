@@ -1,10 +1,11 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { JoinSessionTemplate } from "@/features/home/templates/HomeTemplate";
-import { requireOwnerPageAuth } from "@/lib/server/auth/owner-session";
-import { requirePageAuth } from "@/lib/server/auth/session";
-import { recordSessionParticipant, validateSessionInvite } from "@/lib/server/database/session-invite-store";
-import { getSession } from "@/lib/server/database/session-store";
+import { getCurrentOwner, requireOwnerPageAuth } from "@/lib/server/auth/owner-session";
+import { getValidSessionGrant } from "@/lib/server/auth/session-grant";
+import { getCurrentAuthUser, requirePageAuth } from "@/lib/server/auth/session";
+import { validateSessionInvite } from "@/lib/server/database/session-invite-store";
+import { getOwnedSession, getSession } from "@/lib/server/database/session-store";
 
 type JoinSessionPageProps = {
   params: Promise<{
@@ -20,10 +21,18 @@ export default async function JoinSessionPage({ params, searchParams }: JoinSess
   const { sessionId } = await params;
   const { invite, owner: ownerMode } = await searchParams;
   const session = await getSession(sessionId);
-  if (!session) notFound();
+  if (!session) {
+    const owner = await getCurrentOwner();
+    if (owner) {
+      redirect("/sessions");
+    }
+    notFound();
+  }
 
   if (ownerMode === "1") {
     const owner = await requireOwnerPageAuth(`/join/${sessionId}?owner=1`);
+    const ownedSession = await getOwnedSession(sessionId, owner.id === "dev-owner" ? null : owner.id);
+    if (!ownedSession) notFound();
     return (
       <JoinSessionTemplate
         identity={{ login: owner.githubLogin || owner.username, displayName: owner.githubName || owner.username }}
@@ -33,26 +42,29 @@ export default async function JoinSessionPage({ params, searchParams }: JoinSess
     );
   }
 
-  const validatedInvite = invite ? await validateSessionInvite(sessionId, invite) : null;
+  if (!invite) {
+    const user = await getCurrentAuthUser();
+    const grant = user ? await getValidSessionGrant(sessionId, user.id) : null;
+    if (user && grant) {
+      return (
+        <JoinSessionTemplate
+          identity={{ login: user.login, displayName: user.name || user.login }}
+          sessionId={sessionId}
+          role={grant.role}
+        />
+      );
+    }
+    const owner = await getCurrentOwner();
+    if (owner && await getOwnedSession(sessionId, owner.id === "dev-owner" ? null : owner.id)) {
+      redirect(`/join/${sessionId}?owner=1`);
+    }
+    notFound();
+  }
+
+  const validatedInvite = await validateSessionInvite(sessionId, invite);
   if (!validatedInvite) notFound();
 
-  const returnTo = `/join/${sessionId}?invite=${encodeURIComponent(invite || "")}`;
-  const user = await requirePageAuth(returnTo, "read");
-  await recordSessionParticipant({
-    sessionId,
-    role: validatedInvite.role,
-    githubUserId: user.id,
-    githubLogin: user.login,
-    displayName: user.name || user.login,
-    avatarUrl: user.avatarUrl,
-  });
-
-  return (
-    <JoinSessionTemplate
-      identity={{ login: user.login, displayName: user.name || user.login }}
-      inviteToken={invite}
-      sessionId={sessionId}
-      role={validatedInvite.role}
-    />
-  );
+  const returnTo = `/join/${sessionId}?invite=${encodeURIComponent(invite)}`;
+  await requirePageAuth(returnTo, "read");
+  redirect(`/api/sessions/${sessionId}/claim?invite=${encodeURIComponent(invite)}`);
 }

@@ -113,4 +113,23 @@ describe("GitHub OAuth callback route", () => {
     });
     expect(mocks.setAuthCookie).not.toHaveBeenCalled();
   });
+
+  it("preserves the complete invite URL after participant login", async () => {
+    const returnTo = "/join/session-123?invite=collaborator-token";
+    mocks.consumeOAuthStateCookie.mockResolvedValue({
+      state: "valid-state",
+      returnTo,
+      intent: "participant",
+      expiresAt: Date.now() + 60_000,
+    });
+
+    const response = await GET(
+      new NextRequest("http://localhost:4512/api/auth/github/callback?code=valid-code&state=valid-state"),
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:4512/join/session-123?invite=collaborator-token",
+    );
+  });
 });

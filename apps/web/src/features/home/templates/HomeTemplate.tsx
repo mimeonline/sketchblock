@@ -72,9 +72,11 @@ import { RepositorySwitcher } from "@/features/home/molecules/RepositorySwitcher
 import { LocaleSwitcher } from "@/features/home/molecules/LocaleSwitcher";
 import { BoardGallery } from "@/features/home/organisms/BoardGallery";
 import { ExcalidrawEditor } from "@/features/home/organisms/ExcalidrawEditor";
+import { EditorView } from "@/features/home/organisms/EditorView";
 import { RepositoryPickerDialog } from "@/features/home/organisms/RepositoryPickerDialog";
 import { SessionShareDialog } from "@/features/home/organisms/SessionShareDialog";
 import type { HomeView } from "@/features/home/types/home-view";
+import { resolveBoardPath } from "@/features/home/templates/board-selection";
 import { UserAdministrationPanel } from "@/features/users/organisms/UserAdministrationPanel";
 import { SystemStatusPanel } from "@/features/system/organisms/SystemStatusPanel";
 import { cn } from "@/lib/utils";
@@ -116,12 +118,13 @@ export type SessionUser = {
 };
 
 type HomeTemplateProps = {
+  deploymentEnvironment: "local" | "production";
   view: HomeView;
   initialPath?: string;
   user: SessionUser;
 };
 
-export function HomeTemplate({ view, initialPath = "", user }: HomeTemplateProps) {
+export function HomeTemplate({ deploymentEnvironment, view, initialPath = "", user }: HomeTemplateProps) {
   const tView = useTranslations("Views");
   const t = useTranslations("Workspace");
   const [repositories, setRepositories] = useState<RepositoryRecord[]>([]);
@@ -141,10 +144,11 @@ export function HomeTemplate({ view, initialPath = "", user }: HomeTemplateProps
   const [demoMode, setDemoMode] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [editorReloadKey, setEditorReloadKey] = useState(0);
+  const refreshGenerationRef = useRef(0);
 
   const activeRepository = repositories.find((repository) => repository.id === activeRepositoryId) || repositories[0] || null;
   const selectedDrawing = useMemo(
-    () => drawings.find((item) => item.path === selectedPath) || drawings[0] || null,
+    () => drawings.find((item) => item.path === selectedPath) || null,
     [drawings, selectedPath],
   );
   const selectedDrawingPath = selectedDrawing?.path || "";
@@ -171,15 +175,17 @@ export function HomeTemplate({ view, initialPath = "", user }: HomeTemplateProps
   }, [saveState, selectedDrawingSha, t, view]);
   const labels = {
     title: tView(`${view}.title`),
-    subtitle: tView(`${view}.subtitle`),
+    subtitle: view === "editor" && demoMode ? t("demoEditorSubtitle") : tView(`${view}.subtitle`),
   };
 
   async function refreshState() {
+    const generation = ++refreshGenerationRef.current;
+    const needsSessions = ["dashboard", "drawings", "sessions"].includes(view);
     try {
       const [repositoryResponse, drawingsResponse, sessionsResponse] = await Promise.all([
         fetch("/api/repositories"),
         fetch("/api/drawings"),
-        fetch("/api/sessions"),
+        needsSessions ? fetch("/api/sessions") : Promise.resolve(null),
       ]);
       const repositoryPayload = (await repositoryResponse.json()) as {
         repositories?: RepositoryRecord[];
@@ -193,12 +199,13 @@ export function HomeTemplate({ view, initialPath = "", user }: HomeTemplateProps
         drawings?: DrawingFile[];
         error?: string;
       };
-      const sessionPayload = (await sessionsResponse.json()) as {
+      const sessionPayload = (sessionsResponse ? await sessionsResponse.json() : {}) as {
         sessions?: CollaborationSession[];
         collabServer?: CollabServerStatus;
         error?: string;
       };
 
+      if (generation !== refreshGenerationRef.current) return;
       const nextRepositories = repositoryPayload.repositories || [];
       setRepositories(nextRepositories);
       setActiveRepositoryId(repositoryPayload.activeRepository?.id || drawingPayload.repository?.id || "");
@@ -209,9 +216,7 @@ export function HomeTemplate({ view, initialPath = "", user }: HomeTemplateProps
       setDemoMode(Boolean(repositoryPayload.demoMode));
 
       const nextDrawings = drawingPayload.drawings || [];
-      if (!selectedPath && nextDrawings[0]) {
-        setSelectedPath(nextDrawings[0].path);
-      }
+      setSelectedPath((current) => current || resolveBoardPath(nextDrawings, ""));
 
       const refreshError = repositoryPayload.error || drawingPayload.error || sessionPayload.error;
       setNotice(
@@ -220,12 +225,13 @@ export function HomeTemplate({ view, initialPath = "", user }: HomeTemplateProps
           : { tone: "info", message: t("synchronized") },
       );
     } catch {
+      if (generation !== refreshGenerationRef.current) return;
       setNotice({
         tone: "error",
         message: t("loadFailed"),
       });
     } finally {
-      setLoaded(true);
+      if (generation === refreshGenerationRef.current) setLoaded(true);
     }
   }
 
@@ -287,19 +293,21 @@ export function HomeTemplate({ view, initialPath = "", user }: HomeTemplateProps
   }, [view]);
 
   useEffect(() => {
+    const controller = new AbortController();
     async function loadDrawing() {
-      if (view !== "editor" || !selectedDrawingPath) {
+      if (view !== "editor" || !selectedDrawingPath || switchingRepository) {
         return;
       }
 
       setDrawing(null);
       setSaveState({
         status: "loading",
-        message: t("boardLoading"),
+        message: t(demoMode ? "demoBoardLoading" : "boardLoading"),
       });
       try {
-        const response = await fetch(`/api/drawings/open?path=${encodeURIComponent(selectedDrawingPath)}`);
+        const response = await fetch(`/api/drawings/open?path=${encodeURIComponent(selectedDrawingPath)}`, { signal: controller.signal });
         const payload = (await response.json()) as { drawing?: DrawingContent; error?: string };
+        if (controller.signal.aborted) return;
 
         if (!response.ok || !payload.drawing) {
           throw new Error(payload.error || t("boardOpenFailed"));
@@ -310,9 +318,10 @@ export function HomeTemplate({ view, initialPath = "", user }: HomeTemplateProps
           status: "saved",
           baseSha: payload.drawing.sha,
           remoteSha: payload.drawing.sha,
-          message: t("boardLoaded"),
+          message: t(demoMode ? "demoBoardLoaded" : "boardLoaded"),
         });
       } catch (error) {
+        if (controller.signal.aborted) return;
         const message = error instanceof Error ? error.message : t("boardOpenFailed");
         setNotice({ tone: "error", message });
         setDrawing(null);
@@ -324,7 +333,8 @@ export function HomeTemplate({ view, initialPath = "", user }: HomeTemplateProps
     }
 
     void loadDrawing();
-  }, [editorReloadKey, selectedDrawingPath, t, view]);
+    return () => controller.abort();
+  }, [activeRepository?.id, activeRepository?.branch, demoMode, editorReloadKey, selectedDrawingPath, switchingRepository, t, view]);
 
   async function handleRepositoryConfigured(repository: RepositoryRecord, nextDrawings: DrawingFile[]) {
     setRepositories((current) => [repository, ...current.filter((item) => item.id !== repository.id)]);
@@ -359,6 +369,7 @@ export function HomeTemplate({ view, initialPath = "", user }: HomeTemplateProps
   }
 
   async function handleRepositorySwitch(repositoryId: string) {
+    if (effectiveSaveState.status === "saving") return;
     if (repositoryId === activeRepository?.id) {
       return;
     }
@@ -370,6 +381,9 @@ export function HomeTemplate({ view, initialPath = "", user }: HomeTemplateProps
     }
 
     setSwitchingRepository(true);
+    refreshGenerationRef.current += 1;
+    setDrawing(null);
+    setSaveState(initialSaveState);
     try {
       const response = await fetch(`/api/repositories/${encodeURIComponent(repositoryId)}`, { method: "PATCH" });
       const payload = (await response.json()) as { repository?: RepositoryRecord; error?: string };
@@ -491,9 +505,9 @@ export function HomeTemplate({ view, initialPath = "", user }: HomeTemplateProps
   }
 
   async function handleSave(content: unknown) {
-    if (!selectedDrawing || !drawing) {
+    if (switchingRepository || !selectedDrawing || !drawing || drawing.path !== selectedDrawing.path) {
       setNotice({ tone: "warning", message: t("boardChooseFirst") });
-      return;
+      throw new Error(t("boardChooseFirst"));
     }
 
     if (effectiveSaveState.status === "stale") {
@@ -501,15 +515,16 @@ export function HomeTemplate({ view, initialPath = "", user }: HomeTemplateProps
         tone: "warning",
         message: t("boardStale"),
       });
-      return;
+      throw new Error(t("boardStale"));
     }
 
     const baseSha = effectiveSaveState.baseSha || drawing.sha || selectedDrawing.sha;
     setSaveState((current) => ({
       ...current,
       status: "saving",
-      message: t("boardSaving"),
+      message: t(demoMode ? "demoBoardSaving" : "boardSaving"),
     }));
+    let failureStatus: "stale" | "error" = "error";
     try {
       const response = await fetch("/api/drawings/save", {
         method: "POST",
@@ -528,16 +543,11 @@ export function HomeTemplate({ view, initialPath = "", user }: HomeTemplateProps
 
       if (!response.ok || !payload.result) {
         const message = payload.error || t("boardSaveFailed");
-        setNotice({ tone: "error", message });
-        setSaveState((current) => ({
-          ...current,
-          status: response.status === 409 ? "stale" : "conflict",
-          message,
-        }));
-        return;
+        failureStatus = response.status === 409 ? "stale" : "error";
+        throw new Error(message);
       }
 
-      setNotice({ tone: "success", message: t("boardSavedCommit", { commit: payload.result.commitSha.slice(0, 7) }) });
+      setNotice({ tone: "success", message: demoMode ? t("demoBoardSaved") : t("boardSavedCommit", { commit: payload.result.commitSha.slice(0, 7) }) });
       setDrawing({
         path: drawing.path,
         sha: payload.result.contentSha,
@@ -555,7 +565,7 @@ export function HomeTemplate({ view, initialPath = "", user }: HomeTemplateProps
         baseSha: payload.result.contentSha,
         remoteSha: payload.result.contentSha,
         commitSha: payload.result.commitSha,
-        message: t("boardSaved"),
+        message: t(demoMode ? "demoBoardSaved" : "boardSaved"),
       });
       await refreshState();
     } catch (error) {
@@ -563,16 +573,17 @@ export function HomeTemplate({ view, initialPath = "", user }: HomeTemplateProps
       setNotice({ tone: "error", message });
       setSaveState((current) => ({
         ...current,
-        status: "conflict",
+        status: failureStatus,
         message,
       }));
+      throw error;
     }
   }
 
   return (
     <div className="min-h-screen bg-muted/35 text-foreground">
       <div className="flex min-h-screen">
-        <AppSidebar role={user.role} />
+        <AppSidebar deploymentEnvironment={deploymentEnvironment} role={user.role} />
 
         <main className="min-w-0 flex-1 px-4 pb-24 pt-5 sm:px-5 md:pb-7 md:pt-6 lg:px-8">
           <Header
@@ -580,13 +591,13 @@ export function HomeTemplate({ view, initialPath = "", user }: HomeTemplateProps
             subtitle={labels.subtitle}
             activeRepository={activeRepository}
             repositories={repositories}
-            switchingRepository={switchingRepository}
+            switchingRepository={switchingRepository || effectiveSaveState.status === "saving"}
             onRepositorySwitch={handleRepositorySwitch}
             user={user}
             realtimeReachable={view === "sessions" ? collabServerStatus?.reachable : undefined}
           />
           {demoMode ? (
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-info/25 bg-info/8 px-4 py-3 text-sm text-info-foreground">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-info/25 bg-info/8 px-3 py-2 text-sm text-info-foreground">
               <div>
                 <p className="font-medium">{t("demoWorkspace")}</p>
                 <p className="mt-0.5 text-xs opacity-80">{t("demoDescription")}</p>
@@ -594,14 +605,14 @@ export function HomeTemplate({ view, initialPath = "", user }: HomeTemplateProps
               <Link className={cn(buttonVariants({ variant: "outline", size: "sm" }), "bg-background")} href="/settings">{t("openSettings")}</Link>
             </div>
           ) : null}
-          <ScopeBanner
+          {view !== "editor" ? <ScopeBanner
             repository={activeRepository}
             selectedPath={
-              view === "dashboard" || view === "drawings" || view === "sessions" || view === "editor"
+              view === "dashboard" || view === "drawings" || view === "sessions"
                 ? selectedDrawing?.path || selectedPath
                 : ""
             }
-          />
+          /> : null}
 
           {notice.tone !== "info" ? (
             <div
@@ -639,10 +650,11 @@ export function HomeTemplate({ view, initialPath = "", user }: HomeTemplateProps
           )}
           {view === "sessions" && (
             <SessionsView
+              key={`${activeRepository?.id}:${activeRepository?.branch}`}
               drawings={drawings}
               sessions={sessions}
               collabServerStatus={collabServerStatus}
-              selectedPath={selectedDrawing?.path || ""}
+              selectedPath={selectedPath}
               onStartSession={handleStartSession}
               onDeleteSession={handleDeleteSession}
               onUpdateSessionStatus={handleUpdateSessionStatus}
@@ -652,8 +664,10 @@ export function HomeTemplate({ view, initialPath = "", user }: HomeTemplateProps
           {view === "users" && <UsersView />}
           {view === "system" && <SystemStatusPanel />}
           {view === "settings" && <SettingsView githubConnected={githubConnected} repository={activeRepository} collabServerStatus={collabServerStatus} demoMode={demoMode} />}
-          {view === "editor" && (
+          {view === "editor" && !loaded ? <div className="grid min-h-64 place-items-center rounded-xl border bg-background" role="status" aria-busy="true">{t("loading")}</div> : null}
+          {view === "editor" && loaded && (
             <EditorView
+              demoMode={demoMode}
               drawing={drawing}
               repository={activeRepository}
               selectedDrawing={selectedDrawing}
@@ -719,9 +733,9 @@ function Header({
     : t("configureRepository");
 
   return (
-    <header className="mb-5 flex flex-wrap items-start justify-between gap-4 border-b border-border/70 pb-5">
+    <header className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-3">
       <div className="max-w-3xl">
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
+        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">{subtitle}</p>
       </div>
       <div className="flex w-full min-w-0 flex-wrap items-center gap-3 sm:w-auto">
@@ -731,7 +745,7 @@ function Header({
               className={cn("size-2 rounded-full", realtimeReachable ? "bg-success" : "bg-muted-foreground")}
               aria-hidden="true"
             />
-            {realtimeReachable ? t("realtimeConnected") : t("realtimeUnavailable")}
+            {realtimeReachable ? t("serviceReachable") : t("realtimeUnavailable")}
           </span>
         ) : null}
         {activeRepository ? (
@@ -1343,7 +1357,7 @@ function DrawingsView({
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
-        <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value ?? "all")}>
+        <Select items={[{ value: "all", label: t("allStatuses") }, ...statuses.map((status) => ({ value: status, label: drawingStatusLabel(status) }))]} value={statusFilter} onValueChange={(value) => setStatusFilter(value ?? "all")}>
           <SelectTrigger className="w-full sm:w-44" aria-label={t("allStatuses")}>
             <SelectValue />
           </SelectTrigger>
@@ -1432,17 +1446,11 @@ function SessionsView({
 }) {
   const t = useTranslations("Workspace");
   const [path, setPath] = useState(selectedPath || drawings[0]?.path || "");
+  const validPath = resolveBoardPath(drawings, path);
   const activeSession = sessions.find(
     (session) => (session.collab?.sessionStatus || session.status) === "active",
   );
   const earlierSessions = sessions.filter((session) => session.id !== activeSession?.id);
-
-  useEffect(() => {
-    if (!path && drawings[0]?.path) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setPath(drawings[0].path);
-    }
-  }, [drawings, path]);
 
   return (
     <div className="grid min-w-0 gap-8">
@@ -1466,7 +1474,7 @@ function SessionsView({
               <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
                 <label className="grid min-w-0 gap-2 text-sm font-medium" htmlFor="session-board">
                   {t("selectBoard")}
-                  <Select value={path} onValueChange={(value) => setPath(String(value))}>
+                  <Select items={drawings.map((drawing) => ({ value: drawing.path, label: drawingDisplayName(drawing.path) }))} value={validPath || null} onValueChange={(value) => value && setPath(value)}>
                     <SelectTrigger id="session-board" className="w-full">
                       <SelectValue placeholder={t("selectBoard")} />
                     </SelectTrigger>
@@ -1481,7 +1489,7 @@ function SessionsView({
                     </SelectContent>
                   </Select>
                 </label>
-                <Button type="button" onClick={() => void onStartSession(path)} disabled={!path}>
+                <Button type="button" onClick={() => void onStartSession(validPath)} disabled={!validPath}>
                   <Play data-icon="inline-start" />
                   {t("startSession")}
                 </Button>
@@ -1837,123 +1845,6 @@ function SessionClientList({
   );
 }
 
-function EditorView({
-  drawing,
-  repository,
-  selectedDrawing,
-  saveState,
-  onReload,
-  onDirty,
-  onSave,
-}: {
-  drawing: DrawingContent | null;
-  repository: RepositoryRecord | null;
-  selectedDrawing: DrawingFile | null;
-  saveState: EditorSaveState;
-  onReload: () => void;
-  onDirty: () => void;
-  onSave: (content: unknown) => Promise<void>;
-}) {
-  const t = useTranslations("Workspace");
-  if (!selectedDrawing) {
-    return (
-      <div className="grid min-h-64 place-items-center rounded-xl border border-dashed bg-background/70 px-5 py-10 text-center">
-        <div className="grid max-w-md justify-items-center gap-3">
-          <FilePenLine className="size-9 text-muted-foreground" aria-hidden="true" />
-          <div>
-            <h2 className="text-lg font-semibold">{t("chooseBoardTitle")}</h2>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              {t("chooseBoardDescription")}
-            </p>
-          </div>
-          <Link className={cn(buttonVariants(), "gap-2")} href="/drawings">
-            {t("toBoards")}
-            <ArrowRight data-icon="inline-end" />
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (!drawing) {
-    if (saveState.status === "error" || saveState.status === "conflict") {
-      return (
-        <div className="grid min-h-64 place-items-center rounded-xl border border-destructive/25 bg-destructive/5 px-5 py-10 text-center">
-          <div className="grid max-w-md justify-items-center gap-3" role="alert">
-            <RefreshCcw className="size-7 text-destructive" aria-hidden="true" />
-            <div>
-              <h2 className="font-semibold">{t("boardLoadFailed")}</h2>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                {translateSaveMessage(saveState.message || t("checkConnection"))}
-              </p>
-            </div>
-            <Button type="button" variant="outline" onClick={onReload}>
-              <RefreshCcw data-icon="inline-start" />
-              {t("reload")}
-            </Button>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="grid min-h-64 place-items-center rounded-xl border bg-background px-5 py-10 text-center" aria-busy="true">
-        <div className="grid justify-items-center gap-3" role="status" aria-live="polite">
-          <RefreshCcw className="size-6 animate-spin text-primary" aria-hidden="true" />
-          <div className="font-medium">{t("loadingBoard")}</div>
-          <p className="text-sm text-muted-foreground">{t("preparingCanvas")}</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_300px]">
-      <ExcalidrawEditor
-        key={selectedDrawing.path}
-        initialContent={drawing.content}
-        saveDisabled={saveState.status === "stale" || saveState.status === "conflict" || saveState.status === "error"}
-        onDirty={() => {
-          if (saveState.status !== "saving") {
-            onDirty();
-          }
-        }}
-        onSave={onSave}
-      />
-      <aside className="grid content-start gap-5 border-t pt-5 2xl:border-l 2xl:border-t-0 2xl:pl-5 2xl:pt-0" aria-label={t("saveStatus")}>
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{t("saveVersion")}</div>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <StatusBadge value={saveState.status} />
-            {saveState.status === "saved" ? <span className="text-xs text-success-foreground">{t("githubCurrent")}</span> : null}
-          </div>
-          {saveState.message ? <p className="mt-3 text-sm leading-6 text-muted-foreground">{translateSaveMessage(saveState.message)}</p> : null}
-          {saveState.status === "stale" || saveState.status === "conflict" || saveState.status === "error" ? (
-            <Button className="mt-4" type="button" variant="outline" onClick={onReload}>
-              <RefreshCcw data-icon="inline-start" />
-              {t("reloadRemote")}
-            </Button>
-          ) : null}
-        </div>
-        <div className="grid gap-3 text-sm">
-          <InfoRow label="Branch" value={repository?.branch || "–"} mono />
-          <InfoRow label={t("target")} value={t("commitPush")} />
-          {saveState.commitSha ? <InfoRow label={t("lastCommit")} value={saveState.commitSha.slice(0, 7)} mono /> : null}
-        </div>
-        <Accordion>
-          <AccordionItem value="git-details" className="border-b-0">
-            <AccordionTrigger className="border-t pt-4 hover:no-underline">{t("gitDetails")}</AccordionTrigger>
-            <AccordionContent className="grid gap-3 pt-2">
-              <InfoRow label="Board" value={selectedDrawing.path} mono />
-              <InfoRow label="Base SHA" value={saveState.baseSha || selectedDrawing.sha} mono />
-              <InfoRow label="Remote SHA" value={saveState.remoteSha || selectedDrawing.sha} mono />
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      </aside>
-    </div>
-  );
-}
 
 function UsersView() {
   return <UserAdministrationPanel />;
@@ -2180,6 +2071,7 @@ export function JoinSessionTemplate({
   });
   const isOwner = sessionRole === "owner";
   const isViewer = sessionRole === "viewer";
+  const demoMode = session?.repositoryId === "demo-repository";
   const cursorColor = useMemo(() => cursorColorFor(clientId), [clientId]);
   const remoteCursors = useMemo(() => Object.values(collabPresence.cursors), [collabPresence.cursors]);
   const cursorThrottleRef = useRef(0);
@@ -2253,6 +2145,11 @@ export function JoinSessionTemplate({
     }
 
     setSnapshot(nextSnapshot);
+    // Binary assets travel with checkpoints even while Yjs owns the elements.
+    setRemoteScene({ content: nextSnapshot.content, revision: nextSnapshot.revision });
+    // A connected Yjs document merges concurrent edits; a persisted snapshot must
+    // never replace that live document or cancel its unacknowledged local update.
+    if (sessionLoadState.status === "ready") return;
     if (nextSnapshot.updatedBy === clientId) {
       return;
     }
@@ -2268,14 +2165,15 @@ export function JoinSessionTemplate({
     window.setTimeout(() => {
       isApplyingRemoteSnapshotRef.current = false;
     }, 600);
-  }, [clientId, collabPresence.snapshot]);
+  }, [clientId, collabPresence.snapshot, sessionLoadState.status]);
 
   async function pushSessionSnapshot(content: unknown) {
     let nextSnapshot: CollaborationSessionSnapshot | null = null;
 
     try {
       nextSnapshot = await collabPresence.pushSnapshot(content);
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.message === "snapshot_conflict") throw error;
       const inviteQuery = inviteToken ? `?invite=${encodeURIComponent(inviteToken)}` : "";
       const response = await fetch(`/api/sessions/${sessionId}/state${inviteQuery}`, {
         method: "PATCH",
@@ -2283,6 +2181,7 @@ export function JoinSessionTemplate({
         body: JSON.stringify({
           clientId,
           content,
+          baseRevision: snapshotRevisionRef.current,
         }),
       });
       const payload = (await response.json()) as {
@@ -2313,7 +2212,9 @@ export function JoinSessionTemplate({
     }
 
     pushTimeoutRef.current = window.setTimeout(() => {
-      void pushSessionSnapshot(content);
+      void pushSessionSnapshot(content).catch(() => {
+        setClientActionNotice({ tone: "error", message: t("sessionSyncFailed") });
+      });
     }, 1500);
   }
 
@@ -2323,7 +2224,7 @@ export function JoinSessionTemplate({
 
       setSessionSaveState({
         status: "saving",
-        message: snapshotResult
+        message: demoMode ? t("demoBoardSaving") : snapshotResult
           ? t("savingRevision", { revision: snapshotResult.revision })
           : t("savingSession"),
       });
@@ -2343,13 +2244,14 @@ export function JoinSessionTemplate({
       setSessionSaveState({
         status: "saved",
         result: payload.result,
-        message: t("revisionSaved", { revision: payload.result.snapshotRevision, commit: payload.result.commitSha.slice(0, 7) }),
+        message: demoMode ? t("demoBoardSaved") : t("revisionSaved", { revision: payload.result.snapshotRevision, commit: payload.result.commitSha.slice(0, 7) }),
       });
     } catch (error) {
       setSessionSaveState({
         status: "error",
         message: error instanceof Error ? error.message : t("sessionSaveFailed"),
       });
+      throw error;
     }
   }
 
@@ -2381,8 +2283,8 @@ export function JoinSessionTemplate({
 
   const editor = (
     <ExcalidrawEditor
-      className="min-h-[55dvh] sm:min-h-[620px] xl:min-h-[calc(100dvh-7rem)]"
-      canvasClassName="min-h-[48dvh] sm:min-h-[560px] xl:min-h-[calc(100dvh-11rem)]"
+      className="h-[max(520px,calc(100dvh-11rem))]"
+      demoMode={demoMode}
       mode={isOwner ? "owner" : "guest"}
       initialContent={drawing?.content}
       remoteContent={remoteScene?.content}
@@ -2395,7 +2297,7 @@ export function JoinSessionTemplate({
       yjsSync={{
         sessionId,
         clientId,
-        enabled: collabPresence.status === "connected",
+        enabled: sessionLoadState.status === "ready",
         canSeed: isOwner,
         initialStateBase64: collabPresence.yjsStateBase64,
         remoteUpdate: collabPresence.remoteYjsUpdate,
@@ -2408,18 +2310,17 @@ export function JoinSessionTemplate({
     <div className="min-h-screen bg-muted/35 px-3 py-3 text-foreground sm:px-4">
       <main className={cn("mx-auto grid gap-3", isOwner ? "max-w-[1720px]" : "max-w-none")}>
         <header className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-background px-4 py-3 shadow-sm">
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{t("liveCollaboration")}</p>
-            <h1 className="mt-1 text-xl font-bold">{t("roleSession", { role: sessionRoleLabel(sessionRole) })}</h1>
+            <h1 className="mt-1 break-words text-xl font-bold">{session?.drawingPath ? drawingDisplayName(session.drawingPath) : t("sessionLoading")}</h1>
             <p className="text-sm text-muted-foreground">
-              {sessionRole === "owner" ? tJoin("ownerDescription") : sessionRole === "viewer" ? tJoin("viewerDescription") : tJoin("collaboratorDescription")}
+              {demoMode ? t("demoWorkspace") : t("roleSession", { role: sessionRoleLabel(sessionRole) })}
             </p>
           </div>
           <div className="flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2 text-sm">
-            <StatusBadge value={sessionLoadState.status} />
+            <StatusBadge value={collabPresence.status === "connected" ? "online" : collabPresence.status === "error" ? "error" : "offline"} />
             <StatusBadge value={sessionRole} />
-            <span className="max-w-56 truncate font-mono text-xs" title={sessionId}>{sessionId}</span>
-            <span className="max-w-44 truncate font-mono text-xs text-muted-foreground" title={`@${identity.login}`}>@{identity.login}</span>
+            <span className="max-w-44 truncate text-xs text-muted-foreground" title={identity.displayName}>{identity.displayName}</span>
           </div>
         </header>
 
@@ -2464,11 +2365,8 @@ export function JoinSessionTemplate({
         ) : (
           <div className="grid gap-3">
             <GuestSessionBar
-              clientId={clientId}
               collabPresence={collabPresence}
               role={sessionRole}
-              session={session}
-              snapshot={snapshot}
             />
             {editor}
           </div>
@@ -2479,33 +2377,22 @@ export function JoinSessionTemplate({
 }
 
 function GuestSessionBar({
-  clientId,
   collabPresence,
   role,
-  session,
-  snapshot,
 }: {
-  clientId: string;
   collabPresence: ReturnType<typeof useCollabPresence>;
   role: SessionRole;
-  session: CollaborationSession | null;
-  snapshot: CollaborationSessionSnapshot | null;
 }) {
   const t = useTranslations("Workspace");
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-background px-3 py-2 text-sm shadow-sm">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <StatusBadge value={role} />
-        <StatusBadge value={collabPresence.status === "connected" ? "online" : collabPresence.status === "error" ? "error" : "offline"} />
-        <span className="truncate font-mono text-xs text-muted-foreground">{session?.id || t("loading")}</span>
-        <span className="hidden max-w-[520px] truncate font-mono text-xs text-muted-foreground md:inline">
-          {session?.drawingPath || "-"}
-        </span>
+        <UsersRound className="size-4 text-muted-foreground" aria-hidden="true" />
+        <span className="font-medium">{t("connectedPeople")}</span>
       </div>
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span>Revision {snapshot?.revision ?? "-"}</span>
         <span>{role === "viewer" ? t("readOnly") : t("editSession")}</span>
-        <span>{collabPresence.presence.length} online</span>
+        <span>{t("onlinePeople", { count: collabPresence.status === "connected" ? collabPresence.presence.length : 0 })}</span>
         {collabPresence.presence.slice(0, 5).map((client) => (
           <span
             key={client.socketId}
@@ -2516,13 +2403,12 @@ function GuestSessionBar({
               <img alt="" className="size-4 shrink-0 rounded-full" src={client.avatarUrl} />
             ) : null}
             <TruncatedValue
-              text={`${client.displayName} @${client.userId}`}
+              text={client.displayName}
               tooltip={`${client.displayName} (@${client.userId})`}
             />
             {client.role ? <span className="shrink-0"><StatusBadge value={client.role} /></span> : null}
           </span>
         ))}
-        <TruncatedValue className="max-w-[220px] font-mono" text={collabPresence.socketId || clientId} />
       </div>
     </div>
   );
@@ -2862,10 +2748,6 @@ function sessionAuditMessage(event: SessionAuditEvent) {
     case "session_closed":
       return "Session closed.";
   }
-}
-
-function translateSaveMessage(message: string) {
-  return message;
 }
 
 function formatBytes(value?: number) {

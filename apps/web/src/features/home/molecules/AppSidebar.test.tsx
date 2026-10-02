@@ -14,10 +14,10 @@ describe("AppSidebar", () => {
     cleanup();
   });
 
-  function renderSidebar(role: "instance_owner" | "user") {
+  function renderSidebar(role: "instance_owner" | "user", deploymentEnvironment: "local" | "production" = "local") {
     return render(
       <NextIntlClientProvider locale="de" messages={messages}>
-        <AppSidebar role={role} />
+        <AppSidebar deploymentEnvironment={deploymentEnvironment} role={role} />
       </NextIntlClientProvider>,
     );
   }
@@ -38,5 +38,12 @@ describe("AppSidebar", () => {
     expect(screen.queryByRole("link", { name: "Benutzer" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "System" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "Repository" })).not.toHaveLength(0);
+  });
+
+  it("kennzeichnet eine Produktionsumgebung eindeutig", () => {
+    renderSidebar("instance_owner", "production");
+
+    expect(screen.getByText("Produktivinstanz")).toBeInTheDocument();
+    expect(screen.queryByText("Lokale Instanz")).not.toBeInTheDocument();
   });
 });

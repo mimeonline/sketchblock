@@ -20,6 +20,12 @@ type AckResponse<T extends object = object> = T & {
 const DEFAULT_COLLAB_SERVER_URL = "http://localhost:4513";
 const REQUEST_TIMEOUT_MS = 2000;
 
+export class CollabSnapshotConflictError extends Error {
+  constructor(readonly snapshot: CollaborationSessionSnapshot | null) {
+    super("snapshot_conflict");
+  }
+}
+
 export function getCollabServerUrl() {
   return process.env.COLLAB_SERVER_URL || process.env.NEXT_PUBLIC_COLLAB_SERVER_URL || DEFAULT_COLLAB_SERVER_URL;
 }
@@ -91,7 +97,11 @@ async function collabHttpRequest<T extends object>(path: string, init?: RequestI
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
 
-  return (await response.json()) as AckResponse<T>;
+  const payload = (await response.json()) as AckResponse<T> & { snapshot?: CollaborationSessionSnapshot | null };
+  if (response.status === 409) {
+    throw new CollabSnapshotConflictError(payload.snapshot || null);
+  }
+  return payload;
 }
 
 export async function getCollabServerStatus(sessionCount = 0): Promise<CollabServerStatus> {
@@ -306,18 +316,23 @@ export async function upsertCollabSessionSnapshot(input: {
   drawingPath: string;
   content: unknown;
   updatedBy: string;
+  baseRevision?: number;
 }): Promise<CollaborationSessionSnapshot> {
-  const ack = await collabHttpRequest<{ snapshot?: CollaborationSessionSnapshot }>(
+  const ack = await collabHttpRequest<{ snapshot?: CollaborationSessionSnapshot | null }>(
     `/sessions/${encodeURIComponent(input.sessionId)}/state`,
     {
       method: "PATCH",
       body: JSON.stringify({
-      content: input.content,
-      updatedBy: input.updatedBy,
+        content: input.content,
+        updatedBy: input.updatedBy,
+        baseRevision: input.baseRevision,
       }),
     },
   );
 
+  if (ack.error === "snapshot_conflict") {
+    throw new CollabSnapshotConflictError(ack.snapshot || null);
+  }
   if (ack.ok === false || !ack.snapshot) {
     throw new Error(ack.error || "Collab snapshot update failed.");
   }

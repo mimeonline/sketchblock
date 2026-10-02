@@ -1,4 +1,7 @@
 import { Injectable } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
+import * as Y from "yjs";
+import { SnapshotConflict } from "../../application/dtos/snapshot-conflict.js";
 import type { Pool, PoolClient, QueryResultRow } from "pg";
 
 import type {
@@ -51,8 +54,13 @@ export class PostgresSessionStore extends SessionStorePort {
     this.pool = createCollabPostgresPool(config);
   }
 
+  async onModuleDestroy() {
+    await this.pool.end();
+  }
+
   async getOrCreateSession(input: JoinSessionPayload): Promise<StoredSession> {
     return this.withTransaction(async (client) => {
+      await this.lockSession(client, input.sessionId);
       const existing = await this.getSessionWithClient(client, input.sessionId);
       const now = new Date().toISOString();
 
@@ -143,7 +151,12 @@ export class PostgresSessionStore extends SessionStorePort {
 
   async upsertSnapshot(input: CanvasUpdatePayload, drawingPath: string | null): Promise<SessionSnapshot> {
     return this.withTransaction(async (client) => {
+      await this.lockSession(client, input.sessionId);
       const current = await this.getSessionWithClient(client, input.sessionId);
+      // Legacy writers without a revision retain serialized last-write-wins behavior.
+      if (input.baseRevision !== undefined && input.baseRevision !== (current?.snapshot?.revision ?? 0)) {
+        throw new SnapshotConflict(current?.snapshot ?? null);
+      }
       const now = new Date().toISOString();
       const revision = (current?.snapshot?.revision || 0) + 1;
 
@@ -209,6 +222,7 @@ export class PostgresSessionStore extends SessionStorePort {
 
   async upsertYjsState(input: { sessionId: string; stateBase64: string; updatedBy: string }): Promise<StoredSession> {
     return this.withTransaction(async (client) => {
+      await this.lockSession(client, input.sessionId);
       const current = await this.getSessionWithClient(client, input.sessionId);
       const now = new Date().toISOString();
       const revision = (current?.yjsRevision || 0) + 1;
@@ -248,7 +262,12 @@ export class PostgresSessionStore extends SessionStorePort {
           current?.snapshot ? JSON.stringify(current.snapshot.content) : null,
           current?.snapshot?.updatedAt || null,
           current?.snapshot?.updatedBy || null,
-          input.stateBase64,
+          current?.yjsStateBase64
+            ? Buffer.from(Y.mergeUpdates([
+                Buffer.from(current.yjsStateBase64, "base64"),
+                Buffer.from(input.stateBase64, "base64"),
+              ])).toString("base64")
+            : input.stateBase64,
           revision,
           input.updatedBy,
         ],
@@ -273,6 +292,7 @@ export class PostgresSessionStore extends SessionStorePort {
     message?: string;
   }): Promise<StoredSession | null> {
     return this.withTransaction(async (client) => {
+      await this.lockSession(client, input.sessionId);
       const current = await this.getSessionWithClient(client, input.sessionId);
       if (!current) {
         return null;
@@ -297,6 +317,7 @@ export class PostgresSessionStore extends SessionStorePort {
 
   async appendSessionAudit(sessionId: string, event: Omit<SessionAuditEvent, "id" | "at">): Promise<StoredSession | null> {
     return this.withTransaction(async (client) => {
+      await this.lockSession(client, sessionId);
       const current = await this.getSessionWithClient(client, sessionId);
       if (!current) {
         return null;
@@ -324,6 +345,7 @@ export class PostgresSessionStore extends SessionStorePort {
 
   async deleteSession(sessionId: string): Promise<StoredSession | null> {
     return this.withTransaction(async (client) => {
+      await this.lockSession(client, sessionId);
       const current = await this.getSessionWithClient(client, sessionId);
       if (!current) {
         return null;
@@ -387,7 +409,7 @@ export class PostgresSessionStore extends SessionStorePort {
         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
       `,
       [
-        `${Date.now()}-${currentLength + 1}`,
+        randomUUID(),
         sessionId,
         event.type,
         at,
@@ -442,6 +464,11 @@ export class PostgresSessionStore extends SessionStorePort {
     } finally {
       client.release();
     }
+  }
+
+  private async lockSession(client: PoolClient, sessionId: string) {
+    // Covers both existing rows and concurrent creation of an absent session.
+    await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [sessionId]);
   }
 
   private async withTransaction<T>(callback: (client: PoolClient) => Promise<T>): Promise<T> {

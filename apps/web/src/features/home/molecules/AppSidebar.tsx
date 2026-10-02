@@ -124,7 +124,13 @@ function MobileNavLink({
   );
 }
 
-export function AppSidebar({ role }: { role: "instance_owner" | "user" }) {
+export function AppSidebar({
+  deploymentEnvironment,
+  role,
+}: {
+  deploymentEnvironment: "local" | "production";
+  role: "instance_owner" | "user";
+}) {
   const pathname = usePathname();
   const t = useTranslations("Navigation");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -142,6 +148,10 @@ export function AppSidebar({ role }: { role: "instance_owner" | "user" }) {
     (item) => !["users", "system"].includes(item.view) || role === "instance_owner",
   );
   const managementActive = visibleManagementItems.some((item) => isItemActive(pathname, item));
+  const instanceLabel = t(deploymentEnvironment === "production" ? "productionInstance" : "localInstance");
+  const healthLabel = health
+    ? t(health.status === "operational" ? "healthOperational" : health.status === "degraded" ? "healthDegraded" : "healthUnknown")
+    : t("healthChecking");
 
   useEffect(() => {
     if (role !== "instance_owner") return;
@@ -150,9 +160,9 @@ export function AppSidebar({ role }: { role: "instance_owner" | "user" }) {
       try {
         const response = await fetch("/api/admin/health", { cache: "no-store" });
         const payload = (await response.json()) as { health?: { status: "operational" | "degraded" | "unknown"; label: string } };
-        if (active && response.ok && payload.health) setHealth(payload.health);
+        if (active) setHealth(response.ok && payload.health ? payload.health : { status: "unknown", label: "" });
       } catch {
-        if (active) setHealth({ status: "unknown", label: "Systemstatus unbekannt" });
+        if (active) setHealth({ status: "unknown", label: "" });
       }
     }
     void loadHealth();
@@ -171,8 +181,8 @@ export function AppSidebar({ role }: { role: "instance_owner" | "user" }) {
           href="/"
         >
           <SketchblockLogo className="size-9 shrink-0" />
-          <div className="hidden min-w-0 items-center gap-2 lg:flex">
-            <span className="truncate text-sm font-semibold tracking-[-0.01em]">Sketchblock</span>
+          <div className="hidden min-w-0 flex-col items-start gap-1 lg:flex">
+            <span className="text-base font-semibold tracking-[-0.035em]">Sketchblock</span>
             <PocMarker />
           </div>
         </Link>
@@ -202,10 +212,10 @@ export function AppSidebar({ role }: { role: "instance_owner" | "user" }) {
             <Link
               href="/system"
               className="mb-2 flex min-h-10 items-center justify-center gap-3 rounded-xl px-3 text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring lg:justify-start"
-              title={health?.label || t("healthChecking")}
+              title={healthLabel}
             >
               <span className={cn("size-2 shrink-0 rounded-full", health?.status === "operational" ? "bg-success" : health?.status === "degraded" ? "bg-destructive" : "bg-sidebar-foreground/35")} />
-              <span className="sr-only min-w-0 truncate text-xs lg:not-sr-only lg:inline">{health?.label || t("healthChecking")}</span>
+              <span className="sr-only min-w-0 truncate text-xs lg:not-sr-only lg:inline">{healthLabel}</span>
             </Link>
           ) : null}
           <form action="/api/auth/logout" method="post">
@@ -229,7 +239,7 @@ export function AppSidebar({ role }: { role: "instance_owner" | "user" }) {
           >
             <span className="size-1.5 shrink-0 rounded-full bg-sidebar-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--sidebar-primary)_14%,transparent)]" />
             <Tag className="size-3.5 shrink-0 lg:hidden" />
-            <span className="hidden min-w-0 truncate text-xs lg:inline">{t("localInstance")}</span>
+            <span className="hidden min-w-0 truncate text-xs lg:inline">{instanceLabel}</span>
             <span className="hidden font-mono text-[0.6875rem] text-sidebar-foreground/65 lg:inline">
               {appVersion}
             </span>
@@ -328,7 +338,7 @@ export function AppSidebar({ role }: { role: "instance_owner" | "user" }) {
             </form>
             <div className="mt-2 flex items-center gap-2 px-3 py-2 text-xs text-sidebar-foreground/45">
               <span className="size-1.5 rounded-full bg-sidebar-primary" />
-              <span>{t("localInstance")}</span>
+              <span>{instanceLabel}</span>
               <span className="font-mono text-sidebar-foreground/60">{appVersion}</span>
             </div>
           </div>

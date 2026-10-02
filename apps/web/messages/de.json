@@ -1,5 +1,8 @@
 {
   "Navigation": {
+    "healthOperational": "System betriebsbereit",
+    "healthDegraded": "System benötigt Aufmerksamkeit",
+    "healthUnknown": "Systemstatus unbekannt",
     "overview": "Übersicht",
     "start": "Start",
     "boards": "Boards",
@@ -15,6 +18,7 @@
     "signOut": "Abmelden",
     "healthChecking": "Systemstatus wird geprüft",
     "localInstance": "Lokale Instanz",
+    "productionInstance": "Produktivinstanz",
     "more": "Mehr",
     "mobileNavigation": "Mobile Hauptnavigation",
     "manageWorkspace": "Arbeitsbereich verwalten",
@@ -164,6 +168,15 @@
     "description": "Deine visuellen Arbeitsflächen im aktiven Repository. Live-Boards stehen zuerst.", "none": "Noch keine Boards", "scanHint": "Scanne dein Repository, damit deine Excalidraw-Boards hier als Vorschau erscheinen.", "configureRepository": "Repository einrichten", "extensionHint": "Sketchblock erkennt Dateien mit der Endung .excalidraw.", "all": "Alle Boards", "shown": "{visible} von {total} Boards werden angezeigt.", "allHint": " Unter Alle Boards findest du die vollständige Ansicht.", "previewLoading": "Vorschau wird vorbereitet", "previewsLoading": "Board-Vorschauen werden geladen", "large": "Großes Board", "empty": "Leeres Board", "unavailable": "Vorschau nicht verfügbar", "open": "Board direkt öffnen", "openEditor": "{title} im Editor öffnen", "largeHint": "Im Editor ansehen", "emptyHint": "Erste Idee festhalten", "oneWorking": "1 Person arbeitet gerade", "manyWorking": "{count} Personen arbeiten gerade", "workingNames": "Arbeiten gerade: {names}"
   },
   "Editor": {
+    "fitBoard": "Board einpassen",
+    "fullscreenBoard": "Board im Vollbild",
+    "saveDemo": "Demo speichern",
+    "demoLocalHint": "Speichere deine Änderungen in diesem lokalen Demo-Arbeitsbereich.",
+    "demoLiveHint": "Änderungen werden mit dieser Demo-Session synchronisiert. Der Owner speichert den Demo-Stand lokal.",
+    "demoCollaboratorHint": "Arbeite in dieser Demo-Session mit. Der Owner speichert den Demo-Stand.",
+    "guestName": "Gast",
+    "saveFailed": "Speichern fehlgeschlagen. Versuche es erneut.",
+    "savingHint": "Deine Änderungen werden gespeichert …",
     "loadingBoard": "Board wird geladen …",
     "ownerLiveHint": "Änderungen werden live in die Session synchronisiert. Der GitHub-Save bleibt beim Owner.", "ownerLocalHint": "Deine Änderungen bleiben lokal, bis du sie nach GitHub speicherst.", "viewerHint": "Viewer-Session: Dieses Board ist schreibgeschützt.", "collaboratorHint": "Collaborator-Session: Der Owner übernimmt das Speichern nach GitHub.", "enterFullscreen": "Vollbild öffnen", "leaveFullscreen": "Vollbild verlassen", "saving": "Wird gespeichert …", "saveGitHub": "Auf GitHub speichern"
   },
@@ -174,6 +187,15 @@
     "sessionDataUnavailable": "Die Session-Daten sind gerade nicht erreichbar. Versuche es erneut oder frage den Owner nach dem aktuellen Status."
   },
   "Workspace": {
+    "onlinePeople": "{count} online",
+    "demoBoardLoaded": "Demo-Board geladen.",
+    "demoBoardLoading": "Lokales Demo-Board wird geladen…",
+    "demoEditorSubtitle": "Zeichnen, Zusammenarbeit ausprobieren und im lokalen Demo-Arbeitsbereich speichern.",
+    "demoBoardSaving": "Demo-Board wird lokal gespeichert …",
+    "demoBoardSaved": "Demo-Board lokal gespeichert.",
+    "demoSaveTarget": "Lokaler Demo-Arbeitsbereich",
+    "collaborateBoard": "Gemeinsam an diesem Board arbeiten",
+    "serviceReachable": "Zusammenarbeitsdienst erreichbar",
     "connectRepository": "Verbinde GitHub und wähle ein Repository, um Sketchblock einzurichten.", "synchronized": "Arbeitsbereich synchronisiert.", "loadFailed": "Der Arbeitsbereich konnte nicht vollständig geladen werden. Prüfe die Verbindung und versuche es erneut.",
     "boardLoading": "Das Board wird aus GitHub geladen.", "boardOpenFailed": "Das Board konnte nicht geöffnet werden.", "boardLoaded": "Aktueller Stand aus GitHub geladen.", "boardSaveFailed": "Das Board konnte nicht gespeichert werden.", "boardChooseFirst": "Wähle zuerst ein Board aus.", "boardStale": "Der Stand auf GitHub hat sich geändert. Lade das Board vor dem Speichern neu.", "boardDirty": "Lokale Änderungen sind noch nicht gespeichert.", "boardSaving": "Änderungen werden nach GitHub gespeichert.", "boardSaved": "Auf GitHub gespeichert.", "boardSavedCommit": "Gespeichert und nach GitHub übertragen · Commit {commit}.",
     "repositoryScanFailed": "Das Repository konnte nicht gescannt werden.", "repositoryReady": "Repository {repository} ist bereit.", "repositoryEmpty": "Repository {repository} wurde ausgewählt, enthält aber noch keine .excalidraw-Datei.", "repositoryScanned": "{repository} wurde gescannt · {count} Boards gefunden.", "repositorySwitchConfirm": "Beim Repository-Wechsel gehen lokale, noch nicht gespeicherte Änderungen verloren. Trotzdem wechseln?", "repositoryActivateFailed": "Das Repository konnte nicht aktiviert werden.", "repositorySwitched": "Arbeitsrepository gewechselt: {repository}.", "repositoryDisconnectConfirm": "{repository} wirklich von Sketchblock trennen?", "repositoryDisconnectFailed": "Das Repository konnte nicht getrennt werden.", "repositoryDisconnected": "{repository} wurde getrennt.",

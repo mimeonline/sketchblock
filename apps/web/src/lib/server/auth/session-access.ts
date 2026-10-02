@@ -3,6 +3,7 @@ import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentOwner } from "@/lib/server/auth/owner-session";
+import { getValidSessionGrant } from "@/lib/server/auth/session-grant";
 import { getCurrentAuthUser } from "@/lib/server/auth/session";
 import {
   recordSessionParticipant,
@@ -28,26 +29,53 @@ export async function authorizeSessionRequest(
 
   if (!inviteToken) {
     const owner = await getCurrentOwner();
-    if (!owner) {
+    let ownerPasswordChangeRequired = false;
+    if (owner) {
+      const ownedSession = await getOwnedSession(sessionId, owner.id === "dev-owner" ? null : owner.id);
+      ownerPasswordChangeRequired = Boolean(ownedSession && owner.mustChangePassword);
+      if (ownedSession && !ownerPasswordChangeRequired) return {
+        access: {
+          role: "owner",
+          actor: owner.githubLogin || owner.username,
+          displayName: owner.githubName || owner.username,
+          permission: "admin",
+          localUserId: owner.id === "dev-owner" ? null : owner.id,
+        },
+        response: null,
+      };
+      if (required === "owner") {
+        return {
+          access: null,
+          response: ownerPasswordChangeRequired
+            ? NextResponse.json({ error: "Password change required.", code: "password_change_required" }, { status: 423 })
+            : NextResponse.json({ error: "Session not found for the authenticated user." }, { status: 404 }),
+        };
+      }
+    }
+
+    const user = await getCurrentAuthUser();
+    const grant = user ? await getValidSessionGrant(sessionId, user.id) : null;
+    if (!user || !grant) {
       return {
         access: null,
-        response: NextResponse.json({ error: "Instance Owner login required." }, { status: 401 }),
+        response: ownerPasswordChangeRequired
+          ? NextResponse.json({ error: "Password change required.", code: "password_change_required" }, { status: 423 })
+          : NextResponse.json({ error: "Valid session access required." }, { status: 401 }),
       };
     }
-    const ownedSession = await getOwnedSession(sessionId, owner.id === "dev-owner" ? null : owner.id);
-    if (!ownedSession) {
+    if (required === "owner" || (required === "edit" && grant.role !== "collaborator")) {
       return {
         access: null,
-        response: NextResponse.json({ error: "Session not found for the authenticated user." }, { status: 404 }),
+        response: NextResponse.json({ error: "Session role does not allow this action." }, { status: 403 }),
       };
     }
+
     return {
       access: {
-        role: "owner",
-        actor: owner.githubLogin || owner.username,
-        displayName: owner.githubName || owner.username,
-        permission: "admin",
-        localUserId: owner.id === "dev-owner" ? null : owner.id,
+        role: grant.role,
+        actor: user.login,
+        displayName: user.name || user.login,
+        permission: "read",
       },
       response: null,
     };

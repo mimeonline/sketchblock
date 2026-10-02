@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
+import * as Y from "yjs";
 
 import type { CollabCursor, CollaborationSessionSnapshot, CollabPresenceClient, SessionAuditEvent, SessionLifecycleStatus, SessionRole } from "@/types/sketchblock";
 
@@ -23,6 +24,14 @@ type CollabPresenceState = {
 };
 
 const DEFAULT_LOCAL_COLLAB_SERVER_URL = "http://localhost:4513";
+
+function decodeYjsUpdate(value: string) {
+  return Uint8Array.from(window.atob(value), (character) => character.charCodeAt(0));
+}
+
+function encodeYjsUpdate(update: Uint8Array) {
+  return window.btoa(Array.from(update, (byte) => String.fromCharCode(byte)).join(""));
+}
 
 function isLocalHostname(hostname: string) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
@@ -69,6 +78,8 @@ export function useCollabPresence(input: {
   const socketRef = useRef<Socket | null>(null);
   const snapshotRevisionRef = useRef(0);
   const yjsUpdateSequenceRef = useRef(0);
+  const pendingYjsRef = useRef<{ sessionId: string; update: Uint8Array; version: number } | null>(null);
+  const flushYjsRef = useRef<() => void>(() => {});
   const collabServerUrl = useMemo(() => resolveBrowserCollabServerUrl(), []);
 
   const displayName = useMemo(
@@ -83,6 +94,37 @@ export function useCollabPresence(input: {
 
     let cancelled = false;
     let socket: Socket | null = null;
+    let yjsInFlight = false;
+    let joined = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let retryAttempts = 0;
+    function flushYjs() {
+      const pending = pendingYjsRef.current;
+      if (cancelled || !joined || yjsInFlight || !socket?.connected || !pending || pending.sessionId !== input.sessionId) return;
+      yjsInFlight = true;
+      const sendingSocket = socket;
+      void sendingSocket.timeout(2500).emitWithAck("yjs:update", {
+        sessionId: input.sessionId, updateBase64: encodeYjsUpdate(pending.update), updatedBy: input.clientId,
+      }).then((ack: { ok?: boolean; yjsStateBase64?: string | null }) => {
+        if (cancelled) return;
+        if (ack.ok === false) return;
+        retryAttempts = 0;
+        if (pendingYjsRef.current?.version === pending.version && pendingYjsRef.current.sessionId === input.sessionId) {
+          pendingYjsRef.current = null;
+        }
+        setState((current) => ({ ...current, yjsStateBase64: ack.yjsStateBase64 ?? current.yjsStateBase64 }));
+      }).catch(() => {
+        // Retain one merged update until acknowledged; Yjs replay is idempotent.
+        if (!cancelled && retryAttempts < 8) {
+          retryAttempts += 1;
+          retryTimer = setTimeout(() => { retryTimer = undefined; flushYjs(); }, Math.min(500 * 2 ** retryAttempts, 10_000));
+        }
+      }).finally(() => {
+        yjsInFlight = false;
+        if (!cancelled && !retryTimer && pendingYjsRef.current?.version !== pending.version) flushYjs();
+      });
+    }
+    flushYjsRef.current = flushYjs;
 
     async function connect() {
       try {
@@ -159,6 +201,10 @@ export function useCollabPresence(input: {
                 audit: ack?.audit || [],
               });
               snapshotRevisionRef.current = ack?.snapshot?.revision || 0;
+              joined = true;
+              retryAttempts = 0;
+              if (retryTimer) { clearTimeout(retryTimer); retryTimer = undefined; }
+              flushYjs();
             },
           );
         });
@@ -222,7 +268,11 @@ export function useCollabPresence(input: {
           setState((current) => ({
             ...current,
             remoteYjsUpdate: {
-              updateBase64,
+              // React can batch multiple socket events before the editor renders.
+              // Merge their operations rather than retaining only the last event.
+              updateBase64: current.remoteYjsUpdate
+                ? encodeYjsUpdate(Y.mergeUpdates([decodeYjsUpdate(current.remoteYjsUpdate.updateBase64), decodeYjsUpdate(updateBase64)]))
+                : updateBase64,
               updatedBy,
               sequence: yjsUpdateSequenceRef.current,
             },
@@ -263,6 +313,7 @@ export function useCollabPresence(input: {
         });
 
         socket.on("disconnect", () => {
+          joined = false;
           setState((current) => ({
             ...current,
             status: "disconnected",
@@ -294,6 +345,7 @@ export function useCollabPresence(input: {
 
     return () => {
       cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
       socket?.disconnect();
       if (socketRef.current === socket) {
         socketRef.current = null;
@@ -319,14 +371,17 @@ export function useCollabPresence(input: {
     };
 
     if (ack.ok === false || !ack.snapshot) {
+      if (ack.error === "snapshot_conflict" && ack.snapshot && ack.snapshot.revision >= snapshotRevisionRef.current) {
+        snapshotRevisionRef.current = ack.snapshot.revision;
+        setState((current) => ({ ...current, snapshot: ack.snapshot }));
+      }
       throw new Error(ack.error || "Canvas update failed.");
     }
 
-    snapshotRevisionRef.current = ack.snapshot.revision;
-    setState((current) => ({
-      ...current,
-      snapshot: ack.snapshot || current.snapshot,
-    }));
+    if (ack.snapshot.revision >= snapshotRevisionRef.current) {
+      snapshotRevisionRef.current = ack.snapshot.revision;
+      setState((current) => ({ ...current, snapshot: ack.snapshot }));
+    }
 
     return ack.snapshot;
   }
@@ -348,31 +403,14 @@ export function useCollabPresence(input: {
   }
 
   function sendYjsUpdate(updateBase64: string) {
-    const socket = socketRef.current;
-    if (!socket || !socket.connected) {
-      return;
-    }
-
-    socket
-      .timeout(2500)
-      .emitWithAck("yjs:update", {
-        sessionId: input.sessionId,
-        updateBase64,
-        updatedBy: input.clientId,
-      })
-      .then((ack: { ok?: boolean; yjsStateBase64?: string | null; error?: string }) => {
-        if (ack.ok === false) {
-          return;
-        }
-
-        setState((current) => ({
-          ...current,
-          yjsStateBase64: ack.yjsStateBase64 ?? current.yjsStateBase64,
-        }));
-      })
-      .catch(() => {
-        // Realtime updates are best-effort; the next local change or snapshot keeps the room moving.
-      });
+    const update = decodeYjsUpdate(updateBase64);
+    const pending = pendingYjsRef.current;
+    pendingYjsRef.current = {
+      sessionId: input.sessionId,
+      update: pending?.sessionId === input.sessionId ? Y.mergeUpdates([pending.update, update]) : update,
+      version: (pending?.version ?? 0) + 1,
+    };
+    flushYjsRef.current();
   }
 
   return {

@@ -200,7 +200,7 @@ export async function requireLocalApiAuth(): Promise<LocalApiAuthResult> {
   const user = await getCurrentOwner();
   if (!user) return { user: null, response: NextResponse.json({ error: "Anmeldung erforderlich." }, { status: 401 }) };
   if (user.mustChangePassword) {
-    return { user: null, response: NextResponse.json({ error: "Passwortwechsel erforderlich.", code: "password_change_required" }, { status: 403 }) };
+    return { user: null, response: NextResponse.json({ error: "Passwortwechsel erforderlich.", code: "password_change_required" }, { status: 423 }) };
   }
   return { user, response: null };
 }

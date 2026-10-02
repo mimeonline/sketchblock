@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   getCurrentOwner: vi.fn(),
   getCurrentAuthUser: vi.fn(),
+  getValidSessionGrant: vi.fn(),
   getOwnedSession: vi.fn(),
   validateSessionInvite: vi.fn(),
   recordSessionParticipant: vi.fn(),
@@ -11,6 +12,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/server/auth/owner-session", () => ({ getCurrentOwner: mocks.getCurrentOwner }));
 vi.mock("@/lib/server/auth/session", () => ({ getCurrentAuthUser: mocks.getCurrentAuthUser }));
+vi.mock("@/lib/server/auth/session-grant", () => ({ getValidSessionGrant: mocks.getValidSessionGrant }));
 vi.mock("@/lib/server/database/session-store", () => ({ getOwnedSession: mocks.getOwnedSession }));
 vi.mock("@/lib/server/database/session-invite-store", () => ({
   validateSessionInvite: mocks.validateSessionInvite,
@@ -23,6 +25,64 @@ describe("session access", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.getOwnedSession.mockResolvedValue({ id: "s1" });
+    mocks.getCurrentOwner.mockResolvedValue(null);
+    mocks.getCurrentAuthUser.mockResolvedValue(null);
+    mocks.getValidSessionGrant.mockResolvedValue(null);
+  });
+
+  it("restores collaborator API access from the session grant cookie", async () => {
+    mocks.getCurrentOwner.mockResolvedValue({ id: "other-user" });
+    mocks.getOwnedSession.mockResolvedValue(null);
+    mocks.getCurrentAuthUser.mockResolvedValue({ id: 42, login: "markus", name: "Markus" });
+    mocks.getValidSessionGrant.mockResolvedValue({ role: "collaborator" });
+
+    const result = await authorizeSessionRequest(
+      new NextRequest("http://localhost:4512/api/sessions/s1/state"),
+      "s1",
+      "edit",
+    );
+
+    expect(result.response).toBeNull();
+    expect(result.access).toMatchObject({ role: "collaborator", actor: "markus" });
+  });
+
+  it("rejects a foreign local user requesting owner access even with a guest grant", async () => {
+    mocks.getCurrentOwner.mockResolvedValue({ id: "other-user" });
+    mocks.getOwnedSession.mockResolvedValue(null);
+    mocks.getCurrentAuthUser.mockResolvedValue({ id: 42, login: "markus" });
+    mocks.getValidSessionGrant.mockResolvedValue({ role: "collaborator" });
+
+    const result = await authorizeSessionRequest(new NextRequest("http://localhost:4512/api/sessions/s1/state"), "s1", "owner");
+
+    expect(result.access).toBeNull();
+    expect(result.response?.status).toBe(404);
+  });
+
+  it("rejects a foreign local user with an expired or revoked grant", async () => {
+    mocks.getCurrentOwner.mockResolvedValue({ id: "other-user" });
+    mocks.getOwnedSession.mockResolvedValue(null);
+    mocks.getCurrentAuthUser.mockResolvedValue({ id: 42, login: "markus" });
+
+    const result = await authorizeSessionRequest(new NextRequest("http://localhost:4512/api/sessions/s1/state"), "s1", "edit");
+
+    expect(result.access).toBeNull();
+    expect(result.response?.status).toBe(401);
+  });
+
+  it.each(["view", "edit", "owner"] as const)("locks %s access from a local owner awaiting a password change", async (required) => {
+    mocks.getCurrentOwner.mockResolvedValue({ id: "owner-1", mustChangePassword: true });
+    const result = await authorizeSessionRequest(new NextRequest("http://localhost:4512/api/sessions/s1/state"), "s1", required);
+    expect(result.access).toBeNull();
+    expect(result.response?.status).toBe(423);
+  });
+
+  it("preserves independently authenticated guest access while local owner access is locked", async () => {
+    mocks.getCurrentOwner.mockResolvedValue({ id: "owner-1", mustChangePassword: true });
+    mocks.getCurrentAuthUser.mockResolvedValue({ id: 42, login: "markus" });
+    mocks.getValidSessionGrant.mockResolvedValue({ role: "collaborator" });
+    const result = await authorizeSessionRequest(new NextRequest("http://localhost:4512/api/sessions/s1/state"), "s1", "edit");
+    expect(result.response).toBeNull();
+    expect(result.access).toMatchObject({ role: "collaborator", actor: "markus", permission: "read" });
   });
 
   it("grants owner access only from the local owner session", async () => {

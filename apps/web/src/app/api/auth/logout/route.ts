@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { clearAuthCookie, getAppBaseUrl } from "@/lib/server/auth/session";
 import { clearOwnerAuthCookie, getCurrentOwner } from "@/lib/server/auth/owner-session";
+import { clearSessionGrantCookies } from "@/lib/server/auth/session-grant";
 import { safeRecordAuditEvent } from "@/lib/server/audit/audit-service";
 import { getRequestId } from "@/lib/server/logging/server-logger";
 
@@ -13,6 +14,7 @@ async function logout(request?: NextRequest) {
   const user = await getCurrentOwner();
   await clearAuthCookie();
   await clearOwnerAuthCookie();
+  await clearSessionGrantCookies();
   if (user) await safeRecordAuditEvent({ actorId: user.id, actorUsername: user.username, actorRole: user.role, action: "auth.logout", targetType: "user", targetId: user.id, outcome: "success", requestId });
   return NextResponse.redirect(new URL("/login", getAppBaseUrl()));
 }

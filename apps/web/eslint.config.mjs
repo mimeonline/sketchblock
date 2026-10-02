@@ -11,6 +11,7 @@ const eslintConfig = defineConfig([
     ".next/**",
     // Optional distDir override used for parallel dev instances:
     ".next-preview/**",
+    ".next-review/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

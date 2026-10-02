@@ -99,6 +99,27 @@ export async function validateSessionInvite(sessionId: string, token: string) {
   return result.rows[0] ? rowToInvite(result.rows[0]) : null;
 }
 
+export async function validateSessionInviteGrant(
+  sessionId: string,
+  inviteId: string,
+  role: InviteRole,
+) {
+  const result = await getAppPostgresPool().query<{ id: string } & QueryResultRow>(
+    `
+      SELECT id
+      FROM app_session_invites
+      WHERE id = $1
+        AND session_id = $2
+        AND role = $3
+        AND revoked_at IS NULL
+        AND (expires_at IS NULL OR expires_at > now())
+      LIMIT 1
+    `,
+    [inviteId, sessionId, role],
+  );
+  return Boolean(result.rows[0]);
+}
+
 export async function recordSessionParticipant(input: {
   sessionId: string;
   role: InviteRole;

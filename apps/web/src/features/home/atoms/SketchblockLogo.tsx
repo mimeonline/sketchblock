@@ -4,12 +4,10 @@ type SketchblockLogoProps = {
   variant?: "onDark" | "onLight";
 };
 
-/**
- * Sketchblock-Signet: Eine offene Blockkontur wird von einer freien S-Linie durchlaufen.
- */
+/** A stacked drawing sheet with a single, open sketch stroke. */
 export function SketchblockLogo({ className, variant = "onDark" }: SketchblockLogoProps) {
-  const blockStroke = variant === "onDark" ? "#f8fafc" : "#0f2350";
-  const sketchStroke = variant === "onDark" ? "#34d399" : "#0f8b6d";
+  const blockStroke = variant === "onDark" ? "var(--sidebar-foreground)" : "var(--foreground)";
+  const sketchStroke = variant === "onDark" ? "var(--sidebar-primary)" : "var(--primary)";
 
   return (
     <svg
@@ -21,16 +19,24 @@ export function SketchblockLogo({ className, variant = "onDark" }: SketchblockLo
       xmlns="http://www.w3.org/2000/svg"
     >
       <path
-        d="M38 5H15C9.477 5 5 9.477 5 15V33C5 38.523 9.477 43 15 43H38"
+        d="M10 16H7a3 3 0 0 0-3 3v21a4 4 0 0 0 4 4h22a3 3 0 0 0 3-3v-3"
         stroke={blockStroke}
-        strokeWidth="5"
+        strokeWidth="2.5"
+        opacity="0.5"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <path
-        d="M40 14C35.5 9.5 22.5 10 18.5 17C14.5 24.5 34 21.5 31.5 30C29 38 17 38 11.5 33.5"
+        d="M39 5H16a5 5 0 0 0-5 5v22a5 5 0 0 0 5 5h22a5 5 0 0 0 5-5V18"
+        stroke={blockStroke}
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M20 28l5-12 5 11L43 7"
         stroke={sketchStroke}
-        strokeWidth="4"
+        strokeWidth="3.5"
         strokeLinecap="round"
         strokeLinejoin="round"
       />

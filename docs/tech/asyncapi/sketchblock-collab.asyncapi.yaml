@@ -137,6 +137,12 @@ components:
       messageId: receiveCanvasUpdateMessage
       name: CanvasUpdate
       title: canvas:update payload
+      description: >-
+        Send baseRevision to compare-and-set the full snapshot. A stale write is
+        acknowledged with ok false, error snapshot_conflict, and the current
+        snapshot; clients preserve local Yjs edits and do not retry the stale
+        payload. Omitting baseRevision retains serialized last-write-wins
+        compatibility for legacy clients.
       payload:
         $ref: '#/components/schemas/CanvasUpdatePayload'
     YjsUpdateReceived:
@@ -272,6 +278,7 @@ components:
         baseRevision:
           type: integer
           minimum: 0
+          description: Expected snapshot revision; 0 means no persisted snapshot. Omit only for legacy last-write-wins behavior.
         content:
           description: Full Excalidraw snapshot content.
         updatedBy:

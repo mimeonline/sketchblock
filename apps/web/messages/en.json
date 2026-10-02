@@ -1,5 +1,8 @@
 {
   "Navigation": {
+    "healthOperational": "System operational",
+    "healthDegraded": "System needs attention",
+    "healthUnknown": "System status unknown",
     "overview": "Overview",
     "start": "Home",
     "boards": "Boards",
@@ -15,6 +18,7 @@
     "signOut": "Sign out",
     "healthChecking": "Checking system status",
     "localInstance": "Local instance",
+    "productionInstance": "Production instance",
     "more": "More",
     "mobileNavigation": "Mobile navigation",
     "manageWorkspace": "Manage workspace",
@@ -164,6 +168,15 @@
     "description": "Your visual workspaces in the active repository. Live boards are shown first.", "none": "No boards yet", "scanHint": "Scan your repository to show Excalidraw boards as previews.", "configureRepository": "Configure repository", "extensionHint": "Sketchblock detects files with the .excalidraw extension.", "all": "All boards", "shown": "Showing {visible} of {total} boards.", "allHint": " Find the complete view under All boards.", "previewLoading": "Preparing preview", "previewsLoading": "Loading board previews", "large": "Large board", "empty": "Empty board", "unavailable": "Preview unavailable", "open": "Open board directly", "openEditor": "Open {title} in editor", "largeHint": "View in editor", "emptyHint": "Capture the first idea", "oneWorking": "1 person is working", "manyWorking": "{count} people are working", "workingNames": "Working now: {names}"
   },
   "Editor": {
+    "fitBoard": "Fit board",
+    "fullscreenBoard": "Fullscreen board",
+    "saveDemo": "Save demo",
+    "demoLocalHint": "Save your changes in this local demo workspace.",
+    "demoLiveHint": "Changes synchronize with this demo session. The owner saves the demo state locally.",
+    "demoCollaboratorHint": "Work together in this demo session. The owner saves the demo state.",
+    "guestName": "Guest",
+    "saveFailed": "Saving failed. Try again.",
+    "savingHint": "Saving your changes…",
     "loadingBoard": "Loading board…",
     "ownerLiveHint": "Changes are synchronized with the live session. The owner remains responsible for saving to GitHub.", "ownerLocalHint": "Your changes remain local until you save them to GitHub.", "viewerHint": "Viewer session: This board is read-only.", "collaboratorHint": "Collaborator session: The owner saves the final state to GitHub.", "enterFullscreen": "Enter fullscreen", "leaveFullscreen": "Leave fullscreen", "saving": "Saving…", "saveGitHub": "Save to GitHub"
   },
@@ -174,6 +187,15 @@
     "sessionDataUnavailable": "Session data is currently unavailable. Try again or ask the owner for the current status."
   },
   "Workspace": {
+    "onlinePeople": "{count} online",
+    "demoBoardLoaded": "Demo board loaded.",
+    "demoBoardLoading": "Loading the local demo board…",
+    "demoEditorSubtitle": "Sketch, try collaboration, and save in your local demo workspace.",
+    "demoBoardSaving": "Saving the demo board locally…",
+    "demoBoardSaved": "Demo board saved locally.",
+    "demoSaveTarget": "Local demo workspace",
+    "collaborateBoard": "Collaborate on this board",
+    "serviceReachable": "Collaboration service available",
     "connectRepository": "Connect GitHub and choose a repository to set up Sketchblock.", "synchronized": "Workspace synchronized.", "loadFailed": "The workspace could not be loaded completely. Check the connection and try again.",
     "boardLoading": "Loading the board from GitHub.", "boardOpenFailed": "The board could not be opened.", "boardLoaded": "Current state loaded from GitHub.", "boardSaveFailed": "The board could not be saved.", "boardChooseFirst": "Choose a board first.", "boardStale": "The state on GitHub has changed. Reload the board before saving.", "boardDirty": "Local changes have not been saved yet.", "boardSaving": "Saving changes to GitHub.", "boardSaved": "Saved to GitHub.", "boardSavedCommit": "Saved and pushed to GitHub · Commit {commit}.",
     "repositoryScanFailed": "The repository could not be scanned.", "repositoryReady": "Repository {repository} is ready.", "repositoryEmpty": "Repository {repository} was selected but does not contain an .excalidraw file yet.", "repositoryScanned": "{repository} scanned · {count} boards found.", "repositorySwitchConfirm": "Switching repositories discards local unsaved changes. Switch anyway?", "repositoryActivateFailed": "The repository could not be activated.", "repositorySwitched": "Workspace repository changed: {repository}.", "repositoryDisconnectConfirm": "Disconnect {repository} from Sketchblock?", "repositoryDisconnectFailed": "The repository could not be disconnected.", "repositoryDisconnected": "{repository} disconnected.",

@@ -256,6 +256,13 @@ export function useExcalidrawYjs({
 
   useEffect(() => {
     const doc = docRef.current;
+    if (!enabled || !doc || !initialStateBase64) return;
+    // A reconnect checkpoint merges with the live document and pending edits.
+    Y.applyUpdate(doc, base64ToUint8Array(initialStateBase64), REMOTE_ORIGIN);
+  }, [enabled, initialStateBase64, sessionId, api]);
+
+  useEffect(() => {
+    const doc = docRef.current;
     if (!enabled || !doc || !remoteUpdate || remoteUpdate.sequence <= appliedRemoteSequenceRef.current) {
       return;
     }

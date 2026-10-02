@@ -16,6 +16,8 @@ type PendingPersistence = {
 @Injectable()
 export class YjsDocumentRegistry extends YjsDocumentRegistryPort {
   private readonly docs = new Map<string, Y.Doc>();
+  private readonly documentLoads = new Map<string, Promise<Y.Doc>>();
+  private readonly snapshotRevisions = new Map<string, number>();
   private readonly pendingPersistence = new Map<string, PendingPersistence>();
   private readonly persistenceTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly persistenceQueues = new Map<string, Promise<void>>();
@@ -33,14 +35,23 @@ export class YjsDocumentRegistry extends YjsDocumentRegistryPort {
       return existing;
     }
 
-    const doc = new Y.Doc();
-    const session = await this.store.getSession(sessionId);
-    if (session?.yjsStateBase64) {
-      Y.applyUpdate(doc, Buffer.from(session.yjsStateBase64, "base64"), "store");
+    const pending = this.documentLoads.get(sessionId);
+    if (pending) return pending;
+    const load = (async () => {
+      const doc = new Y.Doc();
+      const session = await this.store.getSession(sessionId);
+      if (session?.yjsStateBase64) {
+        Y.applyUpdate(doc, Buffer.from(session.yjsStateBase64, "base64"), "store");
+      }
+      this.docs.set(sessionId, doc);
+      return doc;
+    })();
+    this.documentLoads.set(sessionId, load);
+    try {
+      return await load;
+    } finally {
+      this.documentLoads.delete(sessionId);
     }
-
-    this.docs.set(sessionId, doc);
-    return doc;
   }
 
   async applyUpdate(input: { sessionId: string; updateBase64: string; updatedBy: string }) {
@@ -64,6 +75,11 @@ export class YjsDocumentRegistry extends YjsDocumentRegistryPort {
   async mirrorSnapshot(input: { sessionId: string; snapshot: unknown; updatedBy: string }) {
     const doc = await this.getDocument(input.sessionId);
     const map = doc.getMap("sketchblock");
+    const revision = (input.snapshot as { revision?: number } | null)?.revision;
+    if (revision !== undefined && revision <= (this.snapshotRevisions.get(input.sessionId) ?? 0)) {
+      return { stateBase64: this.encodeState(doc) };
+    }
+    if (revision !== undefined) this.snapshotRevisions.set(input.sessionId, revision);
 
     doc.transact(() => {
       map.set("snapshot", input.snapshot);
@@ -95,6 +111,7 @@ export class YjsDocumentRegistry extends YjsDocumentRegistryPort {
     const doc = this.docs.get(sessionId);
     doc?.destroy();
     this.docs.delete(sessionId);
+    this.snapshotRevisions.delete(sessionId);
   }
 
   private schedulePersistence(input: PendingPersistence) {

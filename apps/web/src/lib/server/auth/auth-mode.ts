@@ -4,14 +4,14 @@ import type { AuthUser } from "@/lib/server/auth/session";
 import type { GitHubRepositoryPermission } from "@/lib/server/auth/permissions";
 
 export type SketchblockAuthMode = "github" | "dev" | "demo";
-type SketchblockDeploymentEnv = "local" | "production";
+export type SketchblockDeploymentEnvironment = "local" | "production";
 
 const DEFAULT_DEV_USER_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const repositoryPermissions = ["read", "triage", "write", "maintain", "admin"] as const;
 
 function readAuthMode() {
   const configuredMode = process.env.SKETCHBLOCK_AUTH_MODE?.trim();
-  const mode = configuredMode || (readDeploymentEnv() === "local" ? "dev" : "github");
+  const mode = configuredMode || (getSketchblockDeploymentEnvironment() === "local" ? "dev" : "github");
 
   if (mode !== "github" && mode !== "dev" && mode !== "demo") {
     throw new Error("Invalid SKETCHBLOCK_AUTH_MODE. Use github, demo or dev.");
@@ -30,7 +30,7 @@ function readDevPermission(): GitHubRepositoryPermission {
   return permission as GitHubRepositoryPermission;
 }
 
-function readDeploymentEnv(): SketchblockDeploymentEnv {
+export function getSketchblockDeploymentEnvironment(): SketchblockDeploymentEnvironment {
   const value = process.env.SKETCHBLOCK_DEPLOYMENT_ENV?.trim();
 
   if (!value) {
@@ -47,7 +47,7 @@ function readDeploymentEnv(): SketchblockDeploymentEnv {
 export function getSketchblockAuthMode(): SketchblockAuthMode {
   const mode = readAuthMode();
 
-  if (mode !== "github" && readDeploymentEnv() === "production") {
+  if (mode !== "github" && getSketchblockDeploymentEnvironment() === "production") {
     throw new Error(`SKETCHBLOCK_AUTH_MODE=${mode} is not allowed when SKETCHBLOCK_DEPLOYMENT_ENV=production.`);
   }
 

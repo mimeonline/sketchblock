@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Inject, Param, Patch, Post, Req } from "@nestjs/common";
+import { Body, ConflictException, Controller, Get, HttpCode, Inject, Param, Patch, Post, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import {
@@ -9,6 +9,7 @@ import {
   updateSessionStatusPayloadSchema,
 } from "../../application/dtos/collab-schemas.js";
 import { GetSessionStateUseCase } from "../../application/use-cases/get-session-state.use-case.js";
+import { SnapshotConflict } from "../../application/dtos/snapshot-conflict.js";
 import { InspectSessionUseCase } from "../../application/use-cases/inspect-session.use-case.js";
 import { RegisterSessionUseCase } from "../../application/use-cases/register-session.use-case.js";
 import { UpsertSessionSnapshotUseCase } from "../../application/use-cases/upsert-session-snapshot.use-case.js";
@@ -178,6 +179,7 @@ export class SessionsController {
   @ApiParam({ name: "sessionId", example: "demo-session" })
   @ApiBody({ type: UpdateSessionStateDto })
   @ApiResponse({ status: 200, description: "Updated snapshot." })
+  @ApiResponse({ status: 409, description: "Stale baseRevision; response contains snapshot_conflict and the current snapshot." })
   async updateSessionState(
     @Param("sessionId") sessionId: string,
     @Body() body: UpdateSessionStateDto,
@@ -205,7 +207,16 @@ export class SessionsController {
       return { ok: false, error: "invalid_canvas_update_payload" };
     }
 
-    const updated = await this.upsertSessionSnapshot.execute(result.data);
+    let updated;
+    try {
+      updated = await this.upsertSessionSnapshot.execute(result.data);
+    } catch (error) {
+      if (error instanceof SnapshotConflict) {
+        this.logSessionEvent("session.state.update.failed", { sessionId, error: "snapshot_conflict" });
+        throw new ConflictException({ ok: false, error: "snapshot_conflict", code: "snapshot_conflict", snapshot: error.snapshot });
+      }
+      throw error;
+    }
     this.logSessionEvent("session.state.update.succeeded", {
       sessionId,
       updatedBy: result.data.updatedBy,

@@ -5,7 +5,9 @@ const mocks = vi.hoisted(() => ({
   createCollabTicket: vi.fn(() => "signed-ticket"),
   getCurrentOwner: vi.fn(),
   getCurrentAuthUser: vi.fn(),
+  getValidSessionGrant: vi.fn(),
   getSession: vi.fn(),
+  getOwnedSession: vi.fn(),
   validateSessionInvite: vi.fn(),
   recordSessionParticipant: vi.fn(),
 }));
@@ -13,7 +15,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/server/auth/collab-ticket", () => ({ createCollabTicket: mocks.createCollabTicket }));
 vi.mock("@/lib/server/auth/owner-session", () => ({ getCurrentOwner: mocks.getCurrentOwner }));
 vi.mock("@/lib/server/auth/session", () => ({ getCurrentAuthUser: mocks.getCurrentAuthUser }));
-vi.mock("@/lib/server/database/session-store", () => ({ getSession: mocks.getSession }));
+vi.mock("@/lib/server/auth/session-grant", () => ({ getValidSessionGrant: mocks.getValidSessionGrant }));
+vi.mock("@/lib/server/database/session-store", () => ({ getSession: mocks.getSession, getOwnedSession: mocks.getOwnedSession }));
 vi.mock("@/lib/server/database/session-invite-store", () => ({
   validateSessionInvite: mocks.validateSessionInvite,
   recordSessionParticipant: mocks.recordSessionParticipant,
@@ -26,10 +29,12 @@ describe("socket auth token route", () => {
     vi.resetAllMocks();
     mocks.createCollabTicket.mockReturnValue("signed-ticket");
     mocks.getSession.mockResolvedValue({ id: "session-1" });
+    mocks.getOwnedSession.mockResolvedValue({ id: "session-1" });
   });
 
   it("issues owner tickets only from the local owner session", async () => {
     mocks.getCurrentOwner.mockResolvedValue({
+      id: "owner-1",
       username: "admin",
       githubLogin: "mimeonline",
       githubName: "Michael",
@@ -38,11 +43,40 @@ describe("socket auth token route", () => {
     const response = await POST(request({ sessionId: "session-1", role: "owner", clientId: "client-1" }));
 
     expect(response.status).toBe(200);
+    expect(mocks.getOwnedSession).toHaveBeenCalledWith("session-1", "owner-1");
     expect(mocks.createCollabTicket).toHaveBeenCalledWith(expect.objectContaining({
       role: "owner",
       actor: "mimeonline",
       permission: "admin",
     }));
+  });
+
+  it("rejects owner tickets for another local user's session", async () => {
+    mocks.getCurrentOwner.mockResolvedValue({ id: "other-user", username: "other" });
+    mocks.getOwnedSession.mockResolvedValue(null);
+
+    const response = await POST(request({ sessionId: "session-1", role: "owner", clientId: "client-1" }));
+
+    expect(response.status).toBe(404);
+    expect(mocks.getOwnedSession).toHaveBeenCalledWith("session-1", "other-user");
+    expect(mocks.createCollabTicket).not.toHaveBeenCalled();
+  });
+
+  it("locks owner tickets until the required password change", async () => {
+    mocks.getCurrentOwner.mockResolvedValue({ id: "owner-1", username: "admin", mustChangePassword: true });
+    const response = await POST(request({ sessionId: "session-1", role: "owner", clientId: "client-1" }));
+    expect(response.status).toBe(423);
+    expect(await response.json()).toMatchObject({ code: "password_change_required" });
+    expect(mocks.createCollabTicket).not.toHaveBeenCalled();
+  });
+
+  it("preserves the development owner's unowned-session exception", async () => {
+    mocks.getCurrentOwner.mockResolvedValue({ id: "dev-owner", username: "dev" });
+
+    const response = await POST(request({ sessionId: "session-1", role: "owner", clientId: "client-1" }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.getOwnedSession).toHaveBeenCalledWith("session-1", null);
   });
 
   it("uses the server-side invite role even when the client requests collaborator", async () => {
@@ -79,6 +113,40 @@ describe("socket auth token route", () => {
       clientId: "client-1",
       inviteToken: "invalid",
     }));
+
+    expect(response.status).toBe(401);
+    expect(mocks.createCollabTicket).not.toHaveBeenCalled();
+  });
+
+  it("issues participant tickets from a valid session grant", async () => {
+    mocks.getCurrentOwner.mockResolvedValue({ id: "other-user", username: "other" });
+    mocks.getCurrentAuthUser.mockResolvedValue({
+      id: 42,
+      login: "markus",
+      name: "Markus",
+      avatarUrl: null,
+    });
+    mocks.getValidSessionGrant.mockResolvedValue({ role: "collaborator" });
+
+    const response = await POST(request({
+      sessionId: "session-1",
+      role: "collaborator",
+      clientId: "client-1",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.getValidSessionGrant).toHaveBeenCalledWith("session-1", 42);
+    expect(mocks.createCollabTicket).toHaveBeenCalledWith(expect.objectContaining({
+      role: "collaborator",
+      actor: "markus",
+    }));
+  });
+
+  it("rejects participant tickets when the stored grant is invalid", async () => {
+    mocks.getCurrentAuthUser.mockResolvedValue({ id: 42, login: "markus" });
+    mocks.getValidSessionGrant.mockResolvedValue(null);
+
+    const response = await POST(request({ sessionId: "session-1", role: "viewer", clientId: "client-1" }));
 
     expect(response.status).toBe(401);
     expect(mocks.createCollabTicket).not.toHaveBeenCalled();

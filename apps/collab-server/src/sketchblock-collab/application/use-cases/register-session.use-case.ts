@@ -22,6 +22,8 @@ export class RegisterSessionUseCase {
       });
     }
 
-    return session;
+    // Reconnecting clients need accepted in-memory edits even inside the
+    // persistence debounce window.
+    return { ...session, yjsStateBase64: await this.yjsDocuments.getEncodedState(input.sessionId) };
   }
 }

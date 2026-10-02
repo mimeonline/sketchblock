@@ -43,3 +43,44 @@ jobs:
       - name: Check
         working-directory: ${{ matrix.app }}
         run: pnpm run check
+
+  collaboration-persistence:
+    name: Concurrent collaboration persistence
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: sketchblock_test
+          POSTGRES_PASSWORD: test_only
+          POSTGRES_DB: sketchblock_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sketchblock_test -d sketchblock_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      SKETCHBLOCK_TEST_DATABASE_URL: postgresql://sketchblock_test:test_only@localhost:5432/sketchblock_test
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.10.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: apps/collab-server/pnpm-lock.yaml
+      - name: Install
+        working-directory: apps/collab-server
+        run: pnpm install --frozen-lockfile
+      - name: Install isolated test schema
+        run: |
+          for migration in db/flyway/collab/sql/V*.sql; do
+            psql "$SKETCHBLOCK_TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+          done
+      - name: Verify concurrent writes and Yjs recovery
+        working-directory: apps/collab-server
+        run: pnpm exec vitest run src/sketchblock-collab/infrastructure/persistence/postgres-session.store.integration.test.ts

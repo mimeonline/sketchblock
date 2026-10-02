@@ -1,15 +1,15 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type {
   BinaryFiles,
   ExcalidrawImperativeAPI,
   ExcalidrawInitialDataState,
 } from "@excalidraw/excalidraw/types";
 import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Maximize2, Minimize2, Scan } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useExcalidrawYjs } from "@/features/home/hooks/useExcalidrawYjs";
@@ -44,6 +44,9 @@ type ExcalidrawEditorProps = {
   remoteRevision?: number;
   readOnly?: boolean;
   saveDisabled?: boolean;
+  demoMode?: boolean;
+  saveLabel?: string;
+  toolbarContent?: ReactNode;
   onDirty?: () => void;
   onSceneChange?: (content: unknown) => void;
   onSave?: (content: unknown) => Promise<void>;
@@ -74,6 +77,7 @@ function normalizeInitialContent(initialContent: unknown): ExcalidrawInitialData
     const appState = content.appState || {};
 
     return {
+      scrollToContent: true,
       elements: Array.isArray(content.elements)
         ? (content.elements as ExcalidrawInitialDataState["elements"])
         : [],
@@ -113,6 +117,9 @@ export function ExcalidrawEditor({
   remoteRevision,
   readOnly = false,
   saveDisabled = false,
+  demoMode = false,
+  saveLabel,
+  toolbarContent,
   onDirty,
   onSceneChange,
   onSave,
@@ -121,6 +128,7 @@ export function ExcalidrawEditor({
   yjsSync,
 }: ExcalidrawEditorProps) {
   const t = useTranslations("Editor");
+  const locale = useLocale();
   const excalidrawApiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const [excalidrawApi, setExcalidrawApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const sceneRef = useRef<unknown>(null);
@@ -131,6 +139,10 @@ export function ExcalidrawEditor({
   const suppressLocalChangeUntilRef = useRef(0);
   const [fullscreen, setFullscreen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const fullscreenButtonRef = useRef<HTMLButtonElement>(null);
+  const hasFittedContentRef = useRef(false);
 
   useEffect(() => {
     if (!fullscreen) {
@@ -138,9 +150,37 @@ export function ExcalidrawEditor({
     }
 
     const previousOverflow = document.body.style.overflow;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const root = editorRef.current;
+    const isolatedElements: HTMLElement[] = [];
+    // Keep the mounted canvas (and unsaved scene) while isolating the expanded workspace.
+    for (let branch: HTMLElement | null = root; branch?.parentElement; branch = branch.parentElement) {
+      for (const sibling of branch.parentElement.children) {
+        if (sibling !== branch && sibling instanceof HTMLElement && !sibling.hasAttribute("inert")) {
+          sibling.setAttribute("inert", "");
+          isolatedElements.push(sibling);
+        }
+      }
+      if (branch.parentElement === document.body) break;
+    }
+    fullscreenButtonRef.current?.focus();
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !event.defaultPrevented) {
         setFullscreen(false);
+      }
+      if (event.key === "Tab" && root) {
+        const controls = Array.from(root.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]',
+        )).filter((element) => !element.closest('[inert], [aria-hidden="true"]') && element.getClientRects().length > 0);
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (event.shiftKey && (document.activeElement === first || !root.contains(document.activeElement))) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
       }
     };
 
@@ -149,6 +189,8 @@ export function ExcalidrawEditor({
     return () => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", handleKeyDown);
+      isolatedElements.forEach((element) => element.removeAttribute("inert"));
+      previousFocus?.focus();
     };
   }, [fullscreen]);
 
@@ -161,6 +203,33 @@ export function ExcalidrawEditor({
     excalidrawApiRef.current = api;
     setExcalidrawApi(api);
   }, []);
+
+  const fitBoard = useCallback(() => {
+    excalidrawApiRef.current?.scrollToContent(undefined, { fitToContent: true, maxZoom: 1, animate: false });
+  }, []);
+
+  useEffect(() => {
+    if (!excalidrawApi || !initialData.elements?.length || hasFittedContentRef.current) return;
+    let active = true;
+    const frame = requestAnimationFrame(() => {
+      void (async () => {
+        // Excalidraw registers/loads scene fonts during initialization. Measuring earlier
+        // uses fallback metrics and can clip imported text once the real font arrives.
+        await document.fonts?.ready;
+        const { restoreElements } = await import("@excalidraw/excalidraw");
+        if (!active || hasUserInteractedRef.current) return;
+        if (!yjsSync?.enabled) {
+          excalidrawApi.updateScene({
+            elements: restoreElements(excalidrawApi.getSceneElements(), null, { refreshDimensions: true, repairBindings: true }),
+            captureUpdate: "NEVER",
+          });
+        }
+        fitBoard();
+        hasFittedContentRef.current = true;
+      })();
+    });
+    return () => { active = false; cancelAnimationFrame(frame); };
+  }, [excalidrawApi, fitBoard, initialData, yjsSync?.enabled]);
 
   const yjs = useExcalidrawYjs({
     sessionId: yjsSync?.sessionId || "inactive",
@@ -223,13 +292,14 @@ export function ExcalidrawEditor({
     }
 
     const nextData = normalizeInitialContent(remoteContent);
-    isApplyingRemoteRef.current = true;
-    hasUserInteractedRef.current = false;
-    suppressLocalChangeUntilRef.current = window.performance.now() + 500;
-
     if (nextData.files) {
       excalidrawApiRef.current.addFiles(Object.values(nextData.files));
     }
+    // Checkpoints carry binary assets; Yjs exclusively owns the live element document.
+    if (yjsSync?.enabled) return;
+    isApplyingRemoteRef.current = true;
+    hasUserInteractedRef.current = false;
+    suppressLocalChangeUntilRef.current = window.performance.now() + 500;
 
     excalidrawApiRef.current.updateScene({
       elements: nextData.elements,
@@ -243,7 +313,7 @@ export function ExcalidrawEditor({
     window.setTimeout(() => {
       isApplyingRemoteRef.current = false;
     }, 500);
-  }, [readOnly, remoteContent, remoteRevision]);
+  }, [readOnly, remoteContent, remoteRevision, yjsSync?.enabled]);
 
   useEffect(() => {
     const api = excalidrawApiRef.current;
@@ -258,7 +328,7 @@ export function ExcalidrawEditor({
       }
       collaborators.set(cursor.socketId, {
         id: cursor.socketId,
-        username: cursor.displayName || "Gast",
+        username: cursor.displayName || t("guestName"),
         pointer: { x: cursor.pointer.x, y: cursor.pointer.y, tool: "pointer" },
         button: cursor.button || "up",
         color: cursor.color ? { background: cursor.color, stroke: cursor.color } : undefined,
@@ -267,7 +337,7 @@ export function ExcalidrawEditor({
     }
 
     api.updateScene({ collaborators } as Parameters<ExcalidrawImperativeAPI["updateScene"]>[0]);
-  }, [remoteCursors]);
+  }, [remoteCursors, t]);
 
   async function handleSave() {
     if (!onSave) {
@@ -275,10 +345,13 @@ export function ExcalidrawEditor({
     }
 
     setSaving(true);
+    setSaveError(false);
     try {
       await onSave(sceneRef.current ?? initialData);
       hasUserInteractedRef.current = false;
       hasReportedDirtyRef.current = false;
+    } catch {
+      setSaveError(true);
     } finally {
       setSaving(false);
     }
@@ -286,17 +359,43 @@ export function ExcalidrawEditor({
 
   return (
     <div
-      aria-label={fullscreen ? "Board im Vollbild" : undefined}
+      ref={editorRef}
+      aria-label={fullscreen ? t("fullscreenBoard") : undefined}
       aria-modal={fullscreen || undefined}
       className={cn(
-        "grid min-h-[55dvh] grid-rows-[1fr_auto] overflow-hidden rounded-xl border bg-white shadow-sm sm:min-h-[620px]",
+        "grid h-[max(420px,calc(100dvh-16rem))] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-xl border bg-white shadow-sm",
         className,
-        fullscreen && "fixed inset-0 z-50 min-h-screen rounded-none border-0",
+        fullscreen && "fixed inset-0 z-50 h-dvh rounded-none border-0",
       )}
       role={fullscreen ? "dialog" : undefined}
     >
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b bg-white px-3 py-2 text-xs text-muted-foreground">
+        <div className="min-w-0 flex-1 basis-40" aria-live="polite">
+          {saveError ? <span role="alert" className="text-destructive">{t("saveFailed")}</span> : (
+            <span className="leading-5">
+              {mode === "owner"
+                ? demoMode ? t(onSceneChange ? "demoLiveHint" : "demoLocalHint") : t(onSceneChange ? "ownerLiveHint" : "ownerLocalHint")
+                : t(readOnly ? "viewerHint" : demoMode ? "demoCollaboratorHint" : "collaboratorHint")}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {toolbarContent}
+          <Button type="button" variant="ghost" size="icon" onClick={fitBoard} aria-label={t("fitBoard")} title={t("fitBoard")}>
+            <Scan className="size-4" />
+          </Button>
+          <Button ref={fullscreenButtonRef} type="button" variant="ghost" size="icon" onClick={() => setFullscreen((current) => !current)} aria-label={fullscreen ? t("leaveFullscreen") : t("enterFullscreen")} title={fullscreen ? t("leaveFullscreen") : t("enterFullscreen")}>
+            {fullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+          </Button>
+          {mode === "owner" && onSave ? (
+            <Button type="button" size="sm" onClick={handleSave} disabled={saving || saveDisabled}>
+              {saving ? t("saving") : saveLabel || t(demoMode ? "saveDemo" : "saveGitHub")}
+            </Button>
+          ) : null}
+        </div>
+      </div>
       <div
-        className={cn("min-h-[48dvh] bg-white sm:min-h-[560px]", canvasClassName, fullscreen && "min-h-0")}
+        className={cn("min-h-0 bg-white", canvasClassName)}
         onInputCapture={() => {
           if (!readOnly) {
             hasUserInteractedRef.current = true;
@@ -322,6 +421,8 @@ export function ExcalidrawEditor({
           excalidrawAPI={handleExcalidrawApi}
           initialData={initialData}
           theme="light"
+          langCode={locale === "de" ? "de-DE" : "en"}
+          viewModeEnabled={readOnly}
           UIOptions={{
             canvasActions: {
               toggleTheme: false,
@@ -373,33 +474,6 @@ export function ExcalidrawEditor({
             }
           }}
         />
-      </div>
-      <div className="flex flex-col gap-3 border-t bg-white px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-        <span className="leading-5">
-          {mode === "owner"
-            ? onSceneChange
-              ? t("ownerLiveHint")
-              : t("ownerLocalHint")
-            : readOnly
-              ? t("viewerHint")
-              : t("collaboratorHint")}
-        </span>
-        <div className="flex shrink-0 items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={() => setFullscreen((current) => !current)}
-            aria-label={fullscreen ? t("leaveFullscreen") : t("enterFullscreen")}
-          >
-            {fullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
-          </Button>
-          {mode === "owner" ? (
-            <Button type="button" onClick={handleSave} disabled={saving || saveDisabled}>
-              {saving ? t("saving") : t("saveGitHub")}
-            </Button>
-          ) : null}
-        </div>
       </div>
     </div>
   );

@@ -32,7 +32,7 @@ export function LocaleSwitcher() {
     <div className="grid gap-2">
       <label className="text-sm font-medium" htmlFor="locale-switcher">{t("language")}</label>
       <p className="text-sm text-muted-foreground">{t("languageDescription")}</p>
-      <Select value={locale} onValueChange={changeLocale} disabled={pending}>
+      <Select items={[{ value: "en", label: t("english") }, { value: "de", label: t("german") }]} value={locale} onValueChange={changeLocale} disabled={pending}>
         <SelectTrigger id="locale-switcher" className="w-full sm:w-56"><SelectValue /></SelectTrigger>
         <SelectContent>
           <SelectItem value="en">{t("english")}</SelectItem>

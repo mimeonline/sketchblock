@@ -1,4 +1,5 @@
 import { Inject } from "@nestjs/common";
+import { SnapshotConflict } from "../../application/dtos/snapshot-conflict.js";
 import {
   Ack as SocketAck,
   ConnectedSocket,
@@ -229,7 +230,17 @@ export class RealtimeGateway
     }
 
     const updatedBy = this.socketAuth(socket)?.actor || payload.updatedBy;
-    const resultPayload = await this.upsertSessionSnapshot.execute({ ...payload, updatedBy });
+    let resultPayload;
+    try {
+      resultPayload = await this.upsertSessionSnapshot.execute({ ...payload, updatedBy });
+    } catch (error) {
+      if (error instanceof SnapshotConflict) {
+        ack?.({ ok: false, error: "snapshot_conflict", snapshot: error.snapshot });
+        return;
+      }
+      ack?.({ ok: false, error: "snapshot_update_failed" });
+      return;
+    }
 
     socket.to(roomName(payload.sessionId)).emit("canvas:update", resultPayload.snapshot);
     socket.to(roomName(payload.sessionId)).emit("yjs:state:update", {

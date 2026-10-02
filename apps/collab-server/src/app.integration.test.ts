@@ -6,6 +6,7 @@ import { AppModule } from "./app.module.js";
 import { SessionStorePort } from "./sketchblock-collab/application/ports/session-store.port.js";
 import { CollabConfigService } from "./shared/infrastructure/config/collab-config.service.js";
 import { configureHttpBodyParser } from "./shared/infrastructure/http/configure-http-body-parser.js";
+import { SnapshotConflict } from "./sketchblock-collab/application/dtos/snapshot-conflict.js";
 
 describe("Collab server HTTP integration", () => {
   let app: NestExpressApplication;
@@ -159,5 +160,24 @@ describe("Collab server HTTP integration", () => {
           revision: 1,
         });
       });
+  });
+
+  it("returns an actionable 409 for a stale HTTP snapshot revision", async () => {
+    const current = { sessionId: "conflict-session", drawingPath: null, revision: 8, content: { elements: ["current"] }, updatedAt: new Date().toISOString(), updatedBy: "current-writer" };
+    const upsert = vi.spyOn(sessionStore, "upsertSnapshot").mockImplementation(async (input) => {
+      expect(input.baseRevision).toBe(7);
+      throw new SnapshotConflict(current);
+    });
+    try {
+      await request(app.getHttpServer())
+        .patch("/sessions/conflict-session/state")
+        .set("x-forwarded-for", "198.51.100.30")
+        .send({ baseRevision: 7, content: { elements: ["stale"] }, updatedBy: "web-api" })
+        .expect(409)
+        .expect(({ body }) => expect(body).toEqual({ ok: false, error: "snapshot_conflict", code: "snapshot_conflict", snapshot: current }));
+      expect(upsert).toHaveBeenCalledTimes(1);
+    } finally {
+      upsert.mockRestore();
+    }
   });
 });
