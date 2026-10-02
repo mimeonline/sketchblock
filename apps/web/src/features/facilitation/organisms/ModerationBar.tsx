@@ -40,13 +40,13 @@ export function ModerationBar({
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("moderationTitle")}</h2>
         <label className="flex items-center gap-2">
-          <Switch.Root checked={moderation.followOwner} onCheckedChange={(value) => void send({ followOwner: value })} className={switchRoot}>
+          <Switch.Root aria-label={t("followMe")} checked={moderation.followOwner} onCheckedChange={(value) => void send({ followOwner: value })} className={switchRoot}>
             <Switch.Thumb className={switchThumb} />
           </Switch.Root>
           <span>{t("followMe")}</span>
         </label>
         <label className="flex items-center gap-2">
-          <Switch.Root checked={moderation.editingLocked} onCheckedChange={(value) => void send({ editingLocked: value })} className={switchRoot}>
+          <Switch.Root aria-label={t("lockEditing")} checked={moderation.editingLocked} onCheckedChange={(value) => void send({ editingLocked: value })} className={switchRoot}>
             <Switch.Thumb className={switchThumb} />
           </Switch.Root>
           <span>{t("lockEditing")}</span>

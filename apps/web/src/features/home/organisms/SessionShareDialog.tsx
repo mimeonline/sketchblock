@@ -182,6 +182,7 @@ export function SessionShareDialog({
                     <div className="mt-3">
                       <label className="flex items-center gap-2 text-sm">
                         <Switch.Root
+                          aria-label={tGuest("allowToggle")}
                           checked={guestsAllowed}
                           onCheckedChange={(value) => void toggleGuests(value)}
                           className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full bg-input transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[checked]:bg-primary motion-reduce:transition-none"

@@ -109,6 +109,7 @@ export function AdhocSessionBar({
         {isOwner ? (
           <label className="flex items-center gap-2">
             <Switch.Root
+              aria-label={t("participantDownload")}
               checked={allowed}
               onCheckedChange={(value) => void toggle(value)}
               className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full bg-input transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[checked]:bg-primary motion-reduce:transition-none"
