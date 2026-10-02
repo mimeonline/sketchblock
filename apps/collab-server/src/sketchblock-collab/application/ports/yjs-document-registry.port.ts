@@ -12,4 +12,6 @@ export abstract class YjsDocumentRegistryPort {
   }): Promise<{ stateBase64: string }>;
   abstract getEncodedState(sessionId: string): Promise<string>;
   abstract deleteDocument(sessionId: string): void;
+  /** Persists pending updates, then drops the in-memory document. */
+  abstract releaseDocument(sessionId: string): Promise<void>;
 }

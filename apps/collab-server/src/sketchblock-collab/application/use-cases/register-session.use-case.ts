@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 
 import type { JoinSessionPayload } from "../dtos/collab-schemas.js";
+import { SessionClosed } from "../dtos/session-closed.js";
 import { SessionStorePort } from "../ports/session-store.port.js";
 import { YjsDocumentRegistryPort } from "../ports/yjs-document-registry.port.js";
 
@@ -12,6 +13,11 @@ export class RegisterSessionUseCase {
   ) {}
 
   async execute(input: JoinSessionPayload) {
+    const current = await this.store.getSession(input.sessionId);
+    if (current?.status === "closed") {
+      throw new SessionClosed(input.sessionId);
+    }
+
     const session = await this.store.getOrCreateSession(input);
 
     if (input.initialContent !== undefined && session.snapshot && !session.yjsRevision) {

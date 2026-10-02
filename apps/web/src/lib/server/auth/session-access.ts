@@ -9,7 +9,7 @@ import {
   recordSessionParticipant,
   validateSessionInvite,
 } from "@/lib/server/database/session-invite-store";
-import { getOwnedSession } from "@/lib/server/database/session-store";
+import { getOwnedSession, getSession } from "@/lib/server/database/session-store";
 import type { SessionRole } from "@/types/sketchblock";
 
 export type SessionAccess = {
@@ -26,6 +26,8 @@ export async function authorizeSessionRequest(
   required: "view" | "edit" | "owner" = "view",
 ): Promise<{ access: SessionAccess | null; response: NextResponse | null }> {
   const inviteToken = request.nextUrl.searchParams.get("invite");
+  const session = await getSession(sessionId);
+  const sessionClosed = session?.status === "closed";
 
   if (!inviteToken) {
     const owner = await getCurrentOwner();
@@ -33,6 +35,9 @@ export async function authorizeSessionRequest(
     if (owner) {
       const ownedSession = await getOwnedSession(sessionId, owner.id === "dev-owner" ? null : owner.id);
       ownerPasswordChangeRequired = Boolean(ownedSession && owner.mustChangePassword);
+      if (ownedSession && !ownerPasswordChangeRequired && sessionClosed && required !== "view") {
+        return { access: null, response: sessionClosedResponse() };
+      }
       if (ownedSession && !ownerPasswordChangeRequired) return {
         access: {
           role: "owner",
@@ -51,6 +56,10 @@ export async function authorizeSessionRequest(
             : NextResponse.json({ error: "Session not found for the authenticated user." }, { status: 404 }),
         };
       }
+    }
+
+    if (sessionClosed) {
+      return { access: null, response: sessionClosedResponse() };
     }
 
     const user = await getCurrentAuthUser();
@@ -79,6 +88,10 @@ export async function authorizeSessionRequest(
       },
       response: null,
     };
+  }
+
+  if (sessionClosed) {
+    return { access: null, response: sessionClosedResponse() };
   }
 
   const [invite, user] = await Promise.all([
@@ -116,4 +129,8 @@ export async function authorizeSessionRequest(
     },
     response: null,
   };
+}
+
+function sessionClosedResponse() {
+  return NextResponse.json({ error: "This session has ended.", code: "session_closed" }, { status: 410 });
 }

@@ -187,6 +187,10 @@
     "sessionDataUnavailable": "Session data is currently unavailable. Try again or ask the owner for the current status."
   },
   "Workspace": {
+    "sessionEnded": "This session has ended",
+    "sessionEndedDescription": "The owner ended this live session. The board is no longer shared; ask the owner for a new invitation if you need access.",
+    "sessionEndedLive": "This session has ended. Changes are no longer synchronized.",
+    "backToSessions": "Back to collaboration",
     "onlinePeople": "{count} online",
     "demoBoardLoaded": "Demo board loaded.",
     "demoBoardLoading": "Loading the local demo board…",

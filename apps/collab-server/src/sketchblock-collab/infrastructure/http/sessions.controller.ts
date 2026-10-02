@@ -10,6 +10,7 @@ import {
 } from "../../application/dtos/collab-schemas.js";
 import { GetSessionStateUseCase } from "../../application/use-cases/get-session-state.use-case.js";
 import { SnapshotConflict } from "../../application/dtos/snapshot-conflict.js";
+import { SessionClosed } from "../../application/dtos/session-closed.js";
 import { InspectSessionUseCase } from "../../application/use-cases/inspect-session.use-case.js";
 import { RegisterSessionUseCase } from "../../application/use-cases/register-session.use-case.js";
 import { UpsertSessionSnapshotUseCase } from "../../application/use-cases/upsert-session-snapshot.use-case.js";
@@ -85,7 +86,19 @@ export class SessionsController {
       return { ok: false, error: capacity.error };
     }
 
-    const session = await this.registerSessionUseCase.execute(result.data);
+    const payload = SessionAccessPolicy.canSeedContent(auth, Boolean(this.config.authSecret))
+      ? result.data
+      : { sessionId: result.data.sessionId, userId: result.data.userId, displayName: result.data.displayName };
+    let session;
+    try {
+      session = await this.registerSessionUseCase.execute(payload);
+    } catch (error) {
+      if (error instanceof SessionClosed) {
+        this.logSessionEvent("session.register.failed", { sessionId: result.data.sessionId, error: "session_closed" });
+        return { ok: false, error: "session_closed" };
+      }
+      throw error;
+    }
     this.logSessionEvent("session.register.succeeded", {
       sessionId: session.sessionId,
       status: session.status || "active",
@@ -214,6 +227,10 @@ export class SessionsController {
       if (error instanceof SnapshotConflict) {
         this.logSessionEvent("session.state.update.failed", { sessionId, error: "snapshot_conflict" });
         throw new ConflictException({ ok: false, error: "snapshot_conflict", code: "snapshot_conflict", snapshot: error.snapshot });
+      }
+      if (error instanceof SessionClosed) {
+        this.logSessionEvent("session.state.update.failed", { sessionId, error: "session_closed" });
+        throw new ConflictException({ ok: false, error: "session_closed", code: "session_closed" });
       }
       throw error;
     }

@@ -97,6 +97,11 @@ channels:
     publish:
       operationId: publishSessionClosed
       summary: Server notifies clients that a session was closed.
+      description: >-
+        Sent when the owner ends a session over HTTP or Socket.IO. The server
+        disconnects every socket in the room afterwards, releases the live
+        document, and rejects later session:join requests with error
+        session_closed.
       message:
         $ref: '#/components/messages/SessionClosed'
   client:kick:
@@ -131,6 +136,10 @@ components:
       messageId: receiveSessionJoinMessage
       name: JoinSession
       title: session:join payload
+      description: >-
+        initialContent and drawingPath are only accepted from owner and server
+        tickets. Joining an ended session is acknowledged with ok false and
+        error session_closed.
       payload:
         $ref: '#/components/schemas/JoinSessionPayload'
     CanvasUpdate:
@@ -142,7 +151,9 @@ components:
         acknowledged with ok false, error snapshot_conflict, and the current
         snapshot; clients preserve local Yjs edits and do not retry the stale
         payload. Omitting baseRevision retains serialized last-write-wins
-        compatibility for legacy clients.
+        compatibility for legacy clients. Updates require a prior successful
+        session:join on the same socket (error session_not_joined) and are
+        rejected for ended sessions (error session_closed).
       payload:
         $ref: '#/components/schemas/CanvasUpdatePayload'
     YjsUpdateReceived:

@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 
 import type { CanvasUpdatePayload } from "../dtos/collab-schemas.js";
+import { SessionClosed } from "../dtos/session-closed.js";
 import { SessionStorePort } from "../ports/session-store.port.js";
 import { YjsDocumentRegistryPort } from "../ports/yjs-document-registry.port.js";
 
@@ -13,6 +14,9 @@ export class UpsertSessionSnapshotUseCase {
 
   async execute(input: CanvasUpdatePayload) {
     const session = await this.store.getSession(input.sessionId);
+    if (session?.status === "closed") {
+      throw new SessionClosed(input.sessionId);
+    }
     const snapshot = await this.store.upsertSnapshot(input, session?.drawingPath || null);
     const yjsState = await this.yjsDocuments.mirrorSnapshot({
       sessionId: input.sessionId,

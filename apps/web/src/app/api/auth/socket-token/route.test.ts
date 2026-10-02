@@ -151,6 +151,15 @@ describe("socket auth token route", () => {
     expect(response.status).toBe(401);
     expect(mocks.createCollabTicket).not.toHaveBeenCalled();
   });
+
+  it("refuses socket tickets for an ended session", async () => {
+    mocks.getSession.mockResolvedValue({ id: "session-1", status: "closed" });
+
+    const response = await POST(request({ sessionId: "session-1", role: "owner", clientId: "client-1" }));
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({ code: "session_closed" });
+  });
 });
 
 function request(body: object) {

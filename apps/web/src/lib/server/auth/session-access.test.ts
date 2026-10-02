@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getCurrentAuthUser: vi.fn(),
   getValidSessionGrant: vi.fn(),
   getOwnedSession: vi.fn(),
+  getSession: vi.fn(),
   validateSessionInvite: vi.fn(),
   recordSessionParticipant: vi.fn(),
 }));
@@ -13,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/server/auth/owner-session", () => ({ getCurrentOwner: mocks.getCurrentOwner }));
 vi.mock("@/lib/server/auth/session", () => ({ getCurrentAuthUser: mocks.getCurrentAuthUser }));
 vi.mock("@/lib/server/auth/session-grant", () => ({ getValidSessionGrant: mocks.getValidSessionGrant }));
-vi.mock("@/lib/server/database/session-store", () => ({ getOwnedSession: mocks.getOwnedSession }));
+vi.mock("@/lib/server/database/session-store", () => ({ getOwnedSession: mocks.getOwnedSession, getSession: mocks.getSession }));
 vi.mock("@/lib/server/database/session-invite-store", () => ({
   validateSessionInvite: mocks.validateSessionInvite,
   recordSessionParticipant: mocks.recordSessionParticipant,
@@ -25,6 +26,7 @@ describe("session access", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.getOwnedSession.mockResolvedValue({ id: "s1" });
+    mocks.getSession.mockResolvedValue({ id: "s1", status: "active" });
     mocks.getCurrentOwner.mockResolvedValue(null);
     mocks.getCurrentAuthUser.mockResolvedValue(null);
     mocks.getValidSessionGrant.mockResolvedValue(null);
@@ -146,5 +148,29 @@ describe("session access", () => {
       githubUserId: 42,
       role: "collaborator",
     }));
+  });
+
+  it("rejects participant access to an ended session even with a valid grant", async () => {
+    mocks.getSession.mockResolvedValue({ id: "s1", status: "closed" });
+    mocks.getCurrentAuthUser.mockResolvedValue({ id: 42, login: "markus" });
+    mocks.getValidSessionGrant.mockResolvedValue({ role: "collaborator" });
+
+    const viewResult = await authorizeSessionRequest(new NextRequest("http://localhost:4512/api/sessions/s1/state"), "s1", "view");
+    const inviteResult = await authorizeSessionRequest(new NextRequest("http://localhost:4512/api/sessions/s1/state?invite=token"), "s1", "edit");
+
+    expect(viewResult.response?.status).toBe(410);
+    expect(inviteResult.response?.status).toBe(410);
+    expect(mocks.recordSessionParticipant).not.toHaveBeenCalled();
+  });
+
+  it("lets the owner read but not edit an ended session", async () => {
+    mocks.getSession.mockResolvedValue({ id: "s1", status: "closed" });
+    mocks.getCurrentOwner.mockResolvedValue({ id: "owner-1", username: "owner", mustChangePassword: false });
+
+    const view = await authorizeSessionRequest(new NextRequest("http://localhost:4512/api/sessions/s1/state"), "s1", "view");
+    const edit = await authorizeSessionRequest(new NextRequest("http://localhost:4512/api/sessions/s1/state"), "s1", "edit");
+
+    expect(view.access).toMatchObject({ role: "owner" });
+    expect(edit.response?.status).toBe(410);
   });
 });

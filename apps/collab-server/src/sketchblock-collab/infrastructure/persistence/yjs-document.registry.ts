@@ -114,6 +114,19 @@ export class YjsDocumentRegistry extends YjsDocumentRegistryPort {
     this.snapshotRevisions.delete(sessionId);
   }
 
+  async releaseDocument(sessionId: string) {
+    const pending = this.pendingPersistence.get(sessionId);
+    this.cancelScheduledPersistence(sessionId);
+    if (pending) {
+      await this.enqueuePersistence(pending).catch((error: unknown) => {
+        this.logger.errorEvent("yjs.persistence.failed", { sessionId, error });
+      });
+    } else {
+      await this.persistenceQueues.get(sessionId)?.catch(() => undefined);
+    }
+    this.deleteDocument(sessionId);
+  }
+
   private schedulePersistence(input: PendingPersistence) {
     this.pendingPersistence.set(input.sessionId, input);
     if (this.persistenceTimers.has(input.sessionId)) {

@@ -25,6 +25,9 @@ export async function POST(request: NextRequest) {
     if (!session) {
       return NextResponse.json({ error: "Session not found." }, { status: 404 });
     }
+    if (session.status === "closed") {
+      return NextResponse.json({ error: "This session has ended.", code: "session_closed" }, { status: 409 });
+    }
 
     if (body.role === "owner") {
       const owner = await getCurrentOwner();

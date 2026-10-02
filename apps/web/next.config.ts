@@ -40,7 +40,10 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/:path*",
-        headers: buildSecurityHeaders(process.env),
+        headers: buildSecurityHeaders({
+          APP_BASE_URL: process.env.APP_BASE_URL,
+          NEXT_PUBLIC_COLLAB_SERVER_URL: process.env.NEXT_PUBLIC_COLLAB_SERVER_URL,
+        }),
       },
     ];
   },

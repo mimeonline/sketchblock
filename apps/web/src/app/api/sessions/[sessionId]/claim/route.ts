@@ -20,6 +20,9 @@ export async function GET(
     getCurrentAuthUser(),
   ]);
 
+  if (session?.status === "closed") {
+    return NextResponse.redirect(new URL(`/join/${sessionId}`, getAppBaseUrl()));
+  }
   if (!session || !invite) {
     return NextResponse.json({ error: "Valid session invitation required." }, { status: 404 });
   }

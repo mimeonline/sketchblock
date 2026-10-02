@@ -2073,7 +2073,8 @@ export function JoinSessionTemplate({
     displayName: identity.displayName,
   });
   const isOwner = sessionRole === "owner";
-  const isViewer = sessionRole === "viewer";
+  const sessionEnded = collabPresence.sessionStatus === "closed" || session?.status === "closed";
+  const isViewer = sessionRole === "viewer" || sessionEnded;
   const demoMode = session?.repositoryId === "demo-repository";
   const cursorColor = useMemo(() => cursorColorFor(clientId), [clientId]);
   const remoteCursors = useMemo(() => Object.values(collabPresence.cursors), [collabPresence.cursors]);
@@ -2109,8 +2110,12 @@ export function JoinSessionTemplate({
           snapshot?: CollaborationSessionSnapshot;
           audit?: unknown;
           error?: string;
+          code?: string;
         };
 
+        if (payload.code === "session_closed") {
+          throw new Error(t("sessionEndedLive"));
+        }
         if (!response.ok || !payload.session || !payload.snapshot) {
           throw new Error(payload.error || t("sessionLoadFailed"));
         }
@@ -2326,6 +2331,12 @@ export function JoinSessionTemplate({
             <span className="max-w-44 truncate text-xs text-muted-foreground" title={identity.displayName}>{identity.displayName}</span>
           </div>
         </header>
+
+        {sessionEnded && sessionLoadState.status === "ready" ? (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-950" role="status">
+            {t("sessionEndedLive")}
+          </div>
+        ) : null}
 
         {sessionLoadState.status === "error" ? (
           <div className="grid min-h-64 place-items-center rounded-xl border border-destructive/25 bg-background px-5 py-10 text-center" role="alert">

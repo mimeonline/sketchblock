@@ -187,6 +187,10 @@
     "sessionDataUnavailable": "Die Session-Daten sind gerade nicht erreichbar. Versuche es erneut oder frage den Owner nach dem aktuellen Status."
   },
   "Workspace": {
+    "sessionEnded": "Diese Session wurde beendet",
+    "sessionEndedDescription": "Der Owner hat diese Live-Session beendet. Das Board wird nicht mehr geteilt; bitte den Owner um eine neue Einladung, wenn du weiter Zugriff brauchst.",
+    "sessionEndedLive": "Diese Session wurde beendet. Änderungen werden nicht mehr synchronisiert.",
+    "backToSessions": "Zurück zur Zusammenarbeit",
     "onlinePeople": "{count} online",
     "demoBoardLoaded": "Demo-Board geladen.",
     "demoBoardLoading": "Lokales Demo-Board wird geladen…",

@@ -7,6 +7,11 @@ import { SessionStorePort } from "./sketchblock-collab/application/ports/session
 import type { StoredSession } from "./sketchblock-collab/application/dtos/collab-schemas.js";
 import { SnapshotConflict } from "./sketchblock-collab/application/dtos/snapshot-conflict.js";
 
+function signTicket(role: "owner" | "collaborator" | "viewer", actor: string) {
+  const payload = Buffer.from(JSON.stringify({ kind: "collab-ticket", sessionId: "socket-test", clientId: actor, actor, displayName: actor, role, permission: role === "viewer" ? "read" : "write", expiresAt: Date.now() + 60_000 })).toString("base64url");
+  return `${payload}.${createHmac("sha256", "socket-test-secret").update(payload).digest("base64url")}`;
+}
+
 // Exercise the real Engine.IO polling transport without another client dependency.
 class PollingClient {
   private sid = "";
@@ -22,11 +27,9 @@ class PollingClient {
     const response = await fetch(this.url(), { method: "POST", body: packet, headers: { "Content-Type": "text/plain" }, signal: AbortSignal.timeout(4000) });
     if (!response.ok) throw new Error(`send failed: ${response.status}`);
   }
-  async connect(role: "collaborator" | "viewer", actor: string) {
+  async connect(role: "owner" | "collaborator" | "viewer", actor: string) {
     this.sid = JSON.parse((await this.read())[0].slice(1)).sid;
-    const payload = Buffer.from(JSON.stringify({ kind: "collab-ticket", sessionId: "socket-test", clientId: actor, actor, displayName: actor, role, permission: role === "viewer" ? "read" : "write", expiresAt: Date.now() + 60_000 })).toString("base64url");
-    const token = `${payload}.${createHmac("sha256", "socket-test-secret").update(payload).digest("base64url")}`;
-    await this.send(`40${JSON.stringify({ token })}`);
+    await this.send(`40${JSON.stringify({ token: signTicket(role, actor) })}`);
     expect((await this.read()).some((packet) => packet.startsWith("40"))).toBe(true);
   }
   async emit(event: string, payload: unknown): Promise<Record<string, any>> {
@@ -64,7 +67,7 @@ describe("Socket.IO multi-client collaboration", () => {
     },
     async upsertYjsState(input) { session!.yjsStateBase64 = input.stateBase64; session!.yjsRevision = (session!.yjsRevision ?? 0) + 1; return session!; },
     async appendSessionAudit() { return session; },
-    async updateSessionStatus() { return session; },
+    async updateSessionStatus(input) { if (session) session.status = input.status; return session; },
     async deleteSession() { const previous = session; session = null; return previous; },
   };
   beforeAll(async () => {
@@ -110,5 +113,24 @@ describe("Socket.IO multi-client collaboration", () => {
     expect([...recovered.getMap("elements").keys()].sort()).toEqual(["edit-0", "edit-1"]);
     docs.forEach((doc) => doc.destroy()); recovered.destroy();
     expect(ack.presence.filter((presence: { userId: string }) => presence.userId === "second")).toHaveLength(1);
+  });
+
+  it("ends live collaboration when the owner closes the session", async () => {
+    const owner = new PollingClient(origin);
+    const collaborator = new PollingClient(origin);
+    clients.push(owner, collaborator);
+    await owner.connect("owner", "owner");
+    await collaborator.connect("collaborator", "late");
+    expect(await owner.emit("session:join", { sessionId: "socket-test", userId: "owner" })).toMatchObject({ ok: true });
+    expect(await collaborator.emit("yjs:update", { sessionId: "socket-test", updatedBy: "late", updateBase64: Buffer.from(Y.encodeStateAsUpdate(new Y.Doc())).toString("base64") })).toMatchObject({ ok: false, error: "session_not_joined" });
+    const serverPayload = Buffer.from(JSON.stringify({ kind: "collab-ticket", sessionId: "*", clientId: "web-api", actor: "web-api", displayName: "web", role: "server", permission: "admin", expiresAt: Date.now() + 60_000 })).toString("base64url");
+    const serverTicket = `${serverPayload}.${createHmac("sha256", "socket-test-secret").update(serverPayload).digest("base64url")}`;
+    const closed = await fetch(`${origin}/sessions/socket-test/close`, { method: "POST", headers: { Authorization: `Bearer ${serverTicket}`, "Content-Type": "application/json" }, body: JSON.stringify({ closedBy: "web-api" }) });
+    expect(await closed.json()).toMatchObject({ ok: true, status: "closed" });
+    expect(session?.status).toBe("closed");
+    // Connected participants are disconnected by the server.
+    await expect(owner.emit("session:inspect", { sessionId: "socket-test" })).rejects.toThrow();
+    expect(await collaborator.emit("session:join", { sessionId: "socket-test", userId: "late" })).toMatchObject({ ok: false, error: "session_closed" });
+    expect(await collaborator.emit("canvas:update", { sessionId: "socket-test", updatedBy: "late", content: "after-close" })).toMatchObject({ ok: false, error: "session_not_joined" });
   });
 });

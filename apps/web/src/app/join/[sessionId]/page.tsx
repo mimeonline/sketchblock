@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { JoinSessionTemplate } from "@/features/home/templates/HomeTemplate";
+import { SessionEndedNotice } from "@/features/join/organisms/SessionEndedNotice";
 import { getCurrentOwner, requireOwnerPageAuth } from "@/lib/server/auth/owner-session";
 import { getValidSessionGrant } from "@/lib/server/auth/session-grant";
 import { getCurrentAuthUser, requirePageAuth } from "@/lib/server/auth/session";
@@ -27,6 +28,14 @@ export default async function JoinSessionPage({ params, searchParams }: JoinSess
       redirect("/sessions");
     }
     notFound();
+  }
+
+  if (session.status === "closed" && ownerMode !== "1") {
+    const owner = await getCurrentOwner();
+    if (owner && await getOwnedSession(sessionId, owner.id === "dev-owner" ? null : owner.id)) {
+      redirect(`/join/${sessionId}?owner=1`);
+    }
+    return <SessionEndedNotice showSessionsLink={false} />;
   }
 
   if (ownerMode === "1") {

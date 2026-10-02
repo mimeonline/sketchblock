@@ -35,10 +35,10 @@ export async function GET() {
     const [collabServer, collabSessions] = await Promise.all([
       getCollabServerStatus(sessions.length),
       Promise.all(sessions.map(async (session) => {
-        const invites = await ensureSessionInvites(session.id, userId);
+        const invites = session.status === "closed" ? null : await ensureSessionInvites(session.id, userId);
         return {
           ...session,
-          shareLinks: inviteLinks(session.id, invites),
+          shareLinks: invites ? inviteLinks(session.id, invites) : undefined,
           participants: participants.filter((participant) => participant.sessionId === session.id),
           collab: await inspectCollabSession(session),
         };

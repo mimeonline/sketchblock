@@ -22,6 +22,7 @@ import {
   kickClientPayloadSchema,
   updateSessionStatusPayloadSchema,
   yjsUpdatePayloadSchema,
+  type JoinSessionPayload,
   type PresenceUser,
 } from "../../application/dtos/collab-schemas.js";
 import { PresenceStorePort } from "../../application/ports/presence-store.port.js";
@@ -34,18 +35,19 @@ import { RemoveClientUseCase } from "../../application/use-cases/remove-client.u
 import { UpdateSessionStatusUseCase } from "../../application/use-cases/update-session-status.use-case.js";
 import { UpsertSessionSnapshotUseCase } from "../../application/use-cases/upsert-session-snapshot.use-case.js";
 import { SessionAccessPolicy } from "../../domain/services/session-access-policy.js";
+import { SessionClosed } from "../../application/dtos/session-closed.js";
 import { CollabConfigService } from "../../../shared/infrastructure/config/collab-config.service.js";
 import { StructuredLoggerService } from "../../../shared/infrastructure/logging/structured-logger.service.js";
 import { CollabRateLimitService } from "../../../shared/infrastructure/security/collab-rate-limit.service.js";
+import { resolveClientIp } from "../../../shared/infrastructure/security/client-ip.js";
 import { CollabTicketVerifier, type CollabTicketPayload } from "../auth/collab-ticket.verifier.js";
 import { SessionStorePort } from "../../application/ports/session-store.port.js";
+import { SocketSessionConnections, sessionRoomName } from "./socket-session-connections.js";
 
 type AckCallback = (response: unknown) => void;
 type AuthenticatedSocket = Socket & { data: { auth?: CollabTicketPayload } };
 
-function roomName(sessionId: string) {
-  return `session:${sessionId}`;
-}
+const roomName = sessionRoomName;
 
 function socketSessionIds(socketRooms: Set<string>) {
   return Array.from(socketRooms)
@@ -89,9 +91,12 @@ export class RealtimeGateway
     private readonly updateSessionStatusUseCase: UpdateSessionStatusUseCase,
     @Inject(UpsertSessionSnapshotUseCase)
     private readonly upsertSessionSnapshot: UpsertSessionSnapshotUseCase,
+    @Inject(SocketSessionConnections)
+    private readonly connections: SocketSessionConnections,
   ) {}
 
   afterInit(server: Server) {
+    this.connections.attach(server);
     server.use((socket: AuthenticatedSocket, next) => {
       const connectLimit = this.rateLimits.consumeSocketConnect(this.socketIpAddress(socket));
       if (!connectLimit.allowed) {
@@ -165,7 +170,17 @@ export class RealtimeGateway
     }
 
     const auth = this.socketAuth(socket);
-    const session = await this.registerSessionUseCase.execute(payload);
+    let session;
+    try {
+      session = await this.registerSessionUseCase.execute(this.joinPayloadForRole(payload, auth));
+    } catch (error) {
+      if (error instanceof SessionClosed) {
+        this.logSocketEvent("session.join.failed", socket, { sessionId: payload.sessionId, error: "session_closed" });
+        ack?.({ ok: false, error: "session_closed" });
+        return;
+      }
+      throw error;
+    }
 
     const presenceUser: PresenceUser = {
       socketId: socket.id,
@@ -176,6 +191,12 @@ export class RealtimeGateway
       joinedAt: new Date().toISOString(),
     };
 
+    // The socket may disconnect while the join awaits persistence; never register
+    // presence for a socket that is already gone (ghost participants).
+    if (!socket.connected) {
+      this.logSocketEvent("session.join.aborted", socket, { sessionId: payload.sessionId, error: "socket_disconnected" });
+      return;
+    }
     await socket.join(roomName(payload.sessionId));
     this.presence.addPresence(payload.sessionId, presenceUser);
 
@@ -228,6 +249,11 @@ export class RealtimeGateway
       ack?.({ ok: false, error: "not_authorized" });
       return;
     }
+    if (!this.hasJoined(socket, payload.sessionId)) {
+      this.logSocketEvent("canvas.update.failed", socket, { sessionId: payload.sessionId, error: "session_not_joined" });
+      ack?.({ ok: false, error: "session_not_joined" });
+      return;
+    }
 
     const updatedBy = this.socketAuth(socket)?.actor || payload.updatedBy;
     let resultPayload;
@@ -236,6 +262,10 @@ export class RealtimeGateway
     } catch (error) {
       if (error instanceof SnapshotConflict) {
         ack?.({ ok: false, error: "snapshot_conflict", snapshot: error.snapshot });
+        return;
+      }
+      if (error instanceof SessionClosed) {
+        ack?.({ ok: false, error: "session_closed" });
         return;
       }
       ack?.({ ok: false, error: "snapshot_update_failed" });
@@ -264,7 +294,7 @@ export class RealtimeGateway
     }
 
     const payload = result.data;
-    if (!this.canAccessSession(socket, payload.sessionId)) {
+    if (!this.canAccessSession(socket, payload.sessionId) || !this.hasJoined(socket, payload.sessionId)) {
       return;
     }
 
@@ -304,8 +334,25 @@ export class RealtimeGateway
       return;
     }
 
+    if (!this.hasJoined(socket, payload.sessionId)) {
+      this.logSocketEvent("yjs.update.failed", socket, { sessionId: payload.sessionId, error: "session_not_joined" });
+      ack?.({ ok: false, error: "session_not_joined" });
+      return;
+    }
+
     const updatedBy = this.socketAuth(socket)?.actor || payload.updatedBy;
-    const update = await this.applyYjsUpdate.execute({ ...payload, updatedBy });
+    let update;
+    try {
+      update = await this.applyYjsUpdate.execute({ ...payload, updatedBy });
+    } catch (error) {
+      this.logSocketEvent("yjs.update.failed", socket, {
+        sessionId: payload.sessionId,
+        error: "invalid_yjs_update",
+        reason: error instanceof Error ? error.message : "unknown",
+      });
+      ack?.({ ok: false, error: "invalid_yjs_update" });
+      return;
+    }
 
     socket.to(roomName(payload.sessionId)).emit("yjs:update", {
       sessionId: payload.sessionId,
@@ -527,12 +574,6 @@ export class RealtimeGateway
       return;
     }
 
-    this.presence.deleteSession(sessionId);
-    this.server.to(roomName(sessionId)).emit("session:closed", {
-      sessionId,
-      closedBy,
-    });
-    await this.server.in(roomName(sessionId)).socketsLeave(roomName(sessionId));
     this.logSocketEvent("session.close.succeeded", socket, {
       sessionId,
       closedBy,
@@ -644,6 +685,19 @@ export class RealtimeGateway
     });
   }
 
+  private hasJoined(socket: AuthenticatedSocket, sessionId: string) {
+    return socket.rooms.has(roomName(sessionId));
+  }
+
+  private joinPayloadForRole(payload: JoinSessionPayload, auth: CollabTicketPayload | null): JoinSessionPayload {
+    // Only the web server and the owner may seed initial board content or the drawing path.
+    if (SessionAccessPolicy.canSeedContent(auth, Boolean(this.config.authSecret))) {
+      return payload;
+    }
+    const { initialContent: _initialContent, drawingPath: _drawingPath, ...rest } = payload;
+    return rest;
+  }
+
   private socketAuth(socket: AuthenticatedSocket) {
     return socket.data.auth || null;
   }
@@ -721,12 +775,11 @@ export class RealtimeGateway
   }
 
   private socketIpAddress(socket: Socket) {
-    const forwardedFor = socket.handshake.headers["x-forwarded-for"];
-    if (typeof forwardedFor === "string" && forwardedFor.trim()) {
-      return forwardedFor.split(",")[0]?.trim() || "unknown";
-    }
-
-    return socket.handshake.address || socket.conn.remoteAddress || "unknown";
+    return resolveClientIp({
+      forwardedFor: socket.handshake.headers["x-forwarded-for"],
+      remoteAddress: socket.handshake.address || socket.conn.remoteAddress,
+      trustProxy: this.config.trustProxy,
+    });
   }
 
   private logSocketEvent(event: string, socket: AuthenticatedSocket, fields: Record<string, unknown> = {}) {

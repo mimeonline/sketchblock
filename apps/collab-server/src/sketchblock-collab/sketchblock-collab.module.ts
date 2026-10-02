@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 
 import { PresenceStorePort } from "./application/ports/presence-store.port.js";
+import { SessionConnectionsPort } from "./application/ports/session-connections.port.js";
 import { SessionStorePort } from "./application/ports/session-store.port.js";
 import { YjsDocumentRegistryPort } from "./application/ports/yjs-document-registry.port.js";
 import { DatabaseDiagnosticsPort } from "./application/ports/database-diagnostics.port.js";
@@ -23,6 +24,7 @@ import { PostgresDatabaseDiagnosticsAdapter } from "./infrastructure/persistence
 import { YjsDocumentRegistry } from "./infrastructure/persistence/yjs-document.registry.js";
 import { PresenceRegistry } from "./infrastructure/realtime/presence.registry.js";
 import { RealtimeGateway } from "./infrastructure/realtime/realtime.gateway.js";
+import { SocketSessionConnections } from "./infrastructure/realtime/socket-session-connections.js";
 
 @Module({
   controllers: [HealthController, SessionsController],
@@ -37,6 +39,11 @@ import { RealtimeGateway } from "./infrastructure/realtime/realtime.gateway.js";
     RegisterSessionUseCase,
     RemoveClientUseCase,
     RealtimeGateway,
+    SocketSessionConnections,
+    {
+      provide: SessionConnectionsPort,
+      useExisting: SocketSessionConnections,
+    },
     UpdateSessionStatusUseCase,
     UpsertSessionSnapshotUseCase,
     {

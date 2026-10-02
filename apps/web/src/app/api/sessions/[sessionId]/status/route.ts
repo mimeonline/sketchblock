@@ -5,6 +5,7 @@ import { getRequestId } from "@/lib/server/logging/server-logger";
 
 import { requireOwnerApiAuth } from "@/lib/server/auth/owner-session";
 import { updateCollabSessionStatus } from "@/lib/server/collab/collab-server-client";
+import { revokeSessionInvites } from "@/lib/server/database/session-invite-store";
 import { getOwnedSession, updateSessionStatus } from "@/lib/server/database/session-store";
 
 export const runtime = "nodejs";
@@ -50,6 +51,11 @@ export async function PATCH(request: NextRequest, { params }: SessionStatusRoute
     }
 
     await updateSessionStatus(sessionId, body.status, userId);
+    if (body.status === "closed") {
+      // Ending a session ends participant access; invitations cannot be reused.
+      const revokedInvites = await revokeSessionInvites(sessionId);
+      await safeRecordAuditEvent({ actorId: auth.owner.id, actorUsername: auth.owner.username, actorRole: auth.owner.role, action: "session.invite.revoke", targetType: "session", targetId: sessionId, outcome: "success", metadata: { revokedInvites, reason: "session_closed" }, requestId, sessionId });
+    }
     await safeRecordAuditEvent({ actorId: auth.owner.id, actorUsername: auth.owner.username, actorRole: auth.owner.role, action: body.status === "closed" ? "session.end" : "session.status.change", targetType: "session", targetId: sessionId, outcome: "success", metadata: { status: body.status }, requestId, sessionId });
 
     return NextResponse.json({ session: { ...session, status: body.status, collab }, collab });

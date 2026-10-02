@@ -82,6 +82,19 @@ export async function ensureSessionInvites(sessionId: string, ownerId: string | 
   return { collaborator, viewer };
 }
 
+export async function revokeSessionInvites(sessionId: string) {
+  const result = await getAppPostgresPool().query(
+    `
+      UPDATE app_session_invites
+      SET revoked_at = now()
+      WHERE session_id = $1
+        AND revoked_at IS NULL
+    `,
+    [sessionId],
+  );
+  return result.rowCount ?? 0;
+}
+
 export async function validateSessionInvite(sessionId: string, token: string) {
   if (!token || token.length > 256) return null;
   const result = await getAppPostgresPool().query<InviteRow>(

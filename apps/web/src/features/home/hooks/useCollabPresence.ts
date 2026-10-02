@@ -138,8 +138,14 @@ export function useCollabPresence(input: {
             inviteToken: input.inviteToken,
           }),
         });
-        const tokenPayload = (await tokenResponse.json()) as { token?: string; error?: string };
+        const tokenPayload = (await tokenResponse.json()) as { token?: string; error?: string; code?: string };
 
+        if (tokenPayload.code === "session_closed") {
+          if (!cancelled) {
+            setState({ status: "disconnected", presence: [], audit: [], sessionStatus: "closed" });
+          }
+          return;
+        }
         if (!tokenResponse.ok || !tokenPayload.token) {
           throw new Error(tokenPayload.error || "Could not create socket auth token.");
         }
@@ -185,7 +191,9 @@ export function useCollabPresence(input: {
                   presence: [],
                   audit: [],
                   error: ack.error || "Collab join failed.",
+                  sessionStatus: ack.error === "session_closed" ? "closed" : undefined,
                 });
+                if (ack.error === "session_closed") socket?.disconnect();
                 return;
               }
 
