@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   getCurrentOwner: vi.fn(),
   getCurrentAuthUser: vi.fn(),
   getValidSessionGrant: vi.fn(),
+  getValidGuestGrant: vi.fn(),
   getSession: vi.fn(),
   getOwnedSession: vi.fn(),
   notFound: vi.fn(() => {
@@ -37,6 +38,8 @@ vi.mock("@/lib/server/auth/session", () => ({
   requirePageAuth: mocks.requirePageAuth,
 }));
 
+vi.mock("@/lib/server/auth/guest-grant", () => ({ getValidGuestGrant: mocks.getValidGuestGrant }));
+vi.mock("@/features/join/organisms/GuestJoinForm", () => ({ GuestJoinForm: () => null }));
 vi.mock("@/lib/server/auth/session-grant", () => ({
   getValidSessionGrant: mocks.getValidSessionGrant,
 }));
@@ -63,6 +66,7 @@ describe("join session page", () => {
     mocks.getCurrentOwner.mockResolvedValue(null);
     mocks.getCurrentAuthUser.mockResolvedValue(null);
     mocks.getValidSessionGrant.mockResolvedValue(null);
+    mocks.getValidGuestGrant.mockResolvedValue(null);
   });
 
   it("recovers a bare join URL as owner access for an authenticated owner", async () => {
@@ -181,5 +185,43 @@ describe("join session page", () => {
     })).rejects.toThrow("NEXT_NOT_FOUND");
 
     expect(mocks.notFound).toHaveBeenCalledOnce();
+  });
+
+  it("renders the guest join form for a viewer invite when guests are enabled", async () => {
+    mocks.getSession.mockResolvedValue({ id: "session-123", title: "Board", allowAnonymousViewers: true });
+    mocks.validateSessionInvite.mockResolvedValue({ id: "i1", role: "viewer" });
+
+    const result = await JoinSessionPage({
+      params: Promise.resolve({ sessionId: "session-123" }),
+      searchParams: Promise.resolve({ invite: "tok" }),
+    });
+
+    expect(result).toMatchObject({ props: { sessionId: "session-123", inviteToken: "tok", boardTitle: "Board" } });
+    expect(mocks.requirePageAuth).not.toHaveBeenCalled();
+  });
+
+  it("keeps the GitHub login for collaborator invites or disabled guests", async () => {
+    mocks.getSession.mockResolvedValue({ id: "session-123", allowAnonymousViewers: true });
+    mocks.validateSessionInvite.mockResolvedValue({ id: "i1", role: "collaborator" });
+    mocks.requirePageAuth.mockRejectedValue(new Error("NEXT_REDIRECT:/login"));
+    await expect(JoinSessionPage({
+      params: Promise.resolve({ sessionId: "session-123" }),
+      searchParams: Promise.resolve({ invite: "tok" }),
+    })).rejects.toThrow("NEXT_REDIRECT:/login");
+
+    mocks.getSession.mockResolvedValue({ id: "session-123", allowAnonymousViewers: false });
+    mocks.validateSessionInvite.mockResolvedValue({ id: "i1", role: "viewer" });
+    await expect(JoinSessionPage({
+      params: Promise.resolve({ sessionId: "session-123" }),
+      searchParams: Promise.resolve({ invite: "tok" }),
+    })).rejects.toThrow("NEXT_REDIRECT:/login");
+  });
+
+  it("renders the session for a valid guest grant", async () => {
+    mocks.getValidGuestGrant.mockResolvedValue({ guestId: "gabc", displayName: "Ada", inviteId: "i1" });
+    await expect(JoinSessionPage({
+      params: Promise.resolve({ sessionId: "session-123" }),
+      searchParams: Promise.resolve({}),
+    })).resolves.toMatchObject({ props: { identity: { login: "guest-gabc", displayName: "Ada" }, role: "viewer" } });
   });
 });

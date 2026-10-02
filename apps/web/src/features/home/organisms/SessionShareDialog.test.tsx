@@ -118,4 +118,33 @@ describe("SessionShareDialog", () => {
 
     await expect(copyText(`${window.location.origin}${viewerHref}`)).resolves.toBe(false);
   });
+
+  it("toggles guest viewing via PATCH and hides the switch without sessionId", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
+    vi.stubGlobal("fetch", fetchMock);
+    const view = render(
+      <SessionShareDialog collaboratorHref={collaboratorHref} viewerHref={viewerHref} sessionId="session-123" />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Einladen" }));
+    const toggle = await screen.findByRole("switch", { name: "Ansehen ohne Konto erlauben" });
+    fireEvent.click(toggle);
+    await waitFor(() => expect(toggle).toHaveAttribute("aria-checked", "true"));
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/sessions/session-123/settings",
+      expect.objectContaining({ method: "PATCH", body: JSON.stringify({ allowAnonymousViewers: true }) }),
+    );
+    fireEvent.click(toggle);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/sessions/session-123/settings",
+      expect.objectContaining({ body: JSON.stringify({ allowAnonymousViewers: false }) }),
+    );
+    vi.unstubAllGlobals();
+    view.unmount();
+
+    render(<SessionShareDialog collaboratorHref={collaboratorHref} viewerHref={viewerHref} />);
+    fireEvent.click(screen.getByRole("button", { name: "Einladen" }));
+    await screen.findByRole("tab", { name: "Viewer" });
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+  });
 });

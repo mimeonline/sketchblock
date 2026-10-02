@@ -13,6 +13,7 @@ type SessionRow = QueryResultRow & {
   expires_at?: Date | string | null;
   title?: string | null;
   participant_download?: boolean;
+  allow_anonymous_viewers?: boolean;
   drawing_path: string;
   status: SessionLifecycleStatus;
   created_at: Date | string;
@@ -161,6 +162,23 @@ export async function setPostgresParticipantDownload(
   return result.rows[0] ? rowToSession(result.rows[0]) : null;
 }
 
+export async function setPostgresAllowAnonymousViewers(
+  sessionId: string,
+  value: boolean,
+  userId: string | null,
+): Promise<CollaborationSession | null> {
+  const result = userId
+    ? await getAppPostgresPool().query<SessionRow>(
+      "UPDATE app_sessions SET allow_anonymous_viewers = $2 WHERE id = $1 AND created_by_user_id = $3 RETURNING *",
+      [sessionId, value, userId],
+    )
+    : await getAppPostgresPool().query<SessionRow>(
+      "UPDATE app_sessions SET allow_anonymous_viewers = $2 WHERE id = $1 RETURNING *",
+      [sessionId, value],
+    );
+  return result.rows[0] ? rowToSession(result.rows[0]) : null;
+}
+
 export async function getPostgresSession(sessionId: string): Promise<CollaborationSession | null> {
   const result = await getAppPostgresPool().query<SessionRow>("SELECT * FROM app_sessions WHERE id = $1", [sessionId]);
   return result.rows[0] ? rowToSession(result.rows[0]) : null;
@@ -291,6 +309,7 @@ function rowToSession(row: SessionRow): CollaborationSession {
     title: row.title ?? null,
     expiresAt: row.expires_at ? toIso(row.expires_at) : null,
     participantDownload: row.participant_download ?? true,
+    allowAnonymousViewers: row.allow_anonymous_viewers ?? false,
     drawingPath: row.drawing_path,
     status: row.status,
     createdAt: toIso(row.created_at),

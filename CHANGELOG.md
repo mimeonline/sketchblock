@@ -4,6 +4,7 @@
 
 ### Added
 
+- Guest viewers: enable "Allow viewing without an account" per session in the share dialog; guests enter a display name and watch live boards read-only.
 - Ad-hoc rooms: upload an Excalidraw file or image with embedded scene to start a temporary live session without GitHub; participants download results as Excalidraw, PNG, or SVG.
 - Configuration for ad-hoc room lifetime, retention, and upload size limits (`SKETCHBLOCK_ADHOC_TTL_HOURS`, `SKETCHBLOCK_ADHOC_RETENTION_HOURS`, `SKETCHBLOCK_MAX_UPLOAD_BYTES`).
 

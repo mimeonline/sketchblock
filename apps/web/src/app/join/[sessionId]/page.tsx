@@ -1,8 +1,12 @@
 import { notFound, redirect } from "next/navigation";
 
+import { drawingTitle } from "@/lib/drawing-title";
+
 import { JoinSessionTemplate } from "@/features/home/templates/HomeTemplate";
+import { GuestJoinForm } from "@/features/join/organisms/GuestJoinForm";
 import { SessionEndedNotice } from "@/features/join/organisms/SessionEndedNotice";
 import { getCurrentOwner, requireOwnerPageAuth } from "@/lib/server/auth/owner-session";
+import { getValidGuestGrant } from "@/lib/server/auth/guest-grant";
 import { getValidSessionGrant } from "@/lib/server/auth/session-grant";
 import { getCurrentAuthUser, requirePageAuth } from "@/lib/server/auth/session";
 import { isParticipantRemoved, validateSessionInvite } from "@/lib/server/database/session-invite-store";
@@ -65,6 +69,16 @@ export default async function JoinSessionPage({ params, searchParams }: JoinSess
         />
       );
     }
+    const guest = user ? null : await getValidGuestGrant(sessionId);
+    if (guest) {
+      return (
+        <JoinSessionTemplate
+          identity={{ login: `guest-${guest.guestId}`, displayName: guest.displayName }}
+          sessionId={sessionId}
+          role="viewer"
+        />
+      );
+    }
     const owner = await getCurrentOwner();
     if (owner && await getOwnedSession(sessionId, owner.id === "dev-owner" ? null : owner.id)) {
       redirect(`/join/${sessionId}?owner=1`);
@@ -74,6 +88,23 @@ export default async function JoinSessionPage({ params, searchParams }: JoinSess
 
   const validatedInvite = await validateSessionInvite(sessionId, invite);
   if (!validatedInvite) notFound();
+
+  const currentUser = await getCurrentAuthUser();
+  if (!currentUser) {
+    const guest = await getValidGuestGrant(sessionId);
+    if (guest) {
+      return (
+        <JoinSessionTemplate
+          identity={{ login: `guest-${guest.guestId}`, displayName: guest.displayName }}
+          sessionId={sessionId}
+          role="viewer"
+        />
+      );
+    }
+    if (validatedInvite.role === "viewer" && session.allowAnonymousViewers) {
+      return <GuestJoinForm sessionId={sessionId} inviteToken={invite} boardTitle={session.title ? drawingTitle(session.title) : undefined} />;
+    }
+  }
 
   const returnTo = `/join/${sessionId}?invite=${encodeURIComponent(invite)}`;
   const authUser = await requirePageAuth(returnTo, "read");

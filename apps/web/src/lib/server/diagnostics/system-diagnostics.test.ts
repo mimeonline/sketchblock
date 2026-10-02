@@ -17,7 +17,7 @@ describe("getSystemDiagnostics", () => {
     vi.stubEnv("NEXT_PUBLIC_SKETCHBLOCK_VERSION", "1.2.3");
     appQuery.mockReset();
     appQuery.mockResolvedValueOnce({ rows: [{ ok: 1 }] });
-    appQuery.mockResolvedValueOnce({ rows: [{ version: "13", description: "adhoc sessions", installed_on: new Date("2026-07-12T10:00:00Z") }] });
+    appQuery.mockResolvedValueOnce({ rows: [{ version: "15", description: "instance workspace", installed_on: new Date("2026-07-12T10:00:00Z") }] });
     getCollabDatabaseDiagnostics.mockReset();
     getCollabDatabaseDiagnostics.mockResolvedValue({ reachable: true, schemaVersion: "1", migrationStatus: "aktuell", latestSuccessfulMigration: { version: "1", description: "collab persistence base", installedAt: "2026-07-12T08:00:00.000Z" } });
   });
@@ -29,7 +29,7 @@ describe("getSystemDiagnostics", () => {
 
     const result = await getSystemDiagnostics();
     expect(result.webApp).toMatchObject({ version: "1.2.3", deploymentEnvironment: "production" });
-    expect(result.databases.app).toMatchObject({ reachable: true, schemaVersion: "13", migrationStatus: "aktuell" });
+    expect(result.databases.app).toMatchObject({ reachable: true, schemaVersion: "15", migrationStatus: "aktuell" });
     expect(result.databases.collab).toMatchObject({ reachable: true, schemaVersion: "1", migrationStatus: "aktuell" });
     expect(result.collabServer).toMatchObject({ reachable: true, activeSessions: 2, connectedClients: 4 });
     expect(JSON.stringify(result)).not.toContain("must-not-leak");

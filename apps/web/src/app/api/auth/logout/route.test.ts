@@ -16,6 +16,7 @@ vi.mock("@/lib/server/auth/owner-session", () => ({
   clearOwnerAuthCookie: sessionMocks.clearOwnerAuthCookie,
   getCurrentOwner: sessionMocks.getCurrentOwner,
 }));
+vi.mock("@/lib/server/auth/guest-grant", () => ({ clearGuestGrantCookies: vi.fn() }));
 vi.mock("@/lib/server/auth/session-grant", () => ({
   clearSessionGrantCookies: sessionMocks.clearSessionGrantCookies,
 }));

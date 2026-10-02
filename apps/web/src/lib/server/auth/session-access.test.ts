@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   getCurrentOwner: vi.fn(),
   getCurrentAuthUser: vi.fn(),
   getValidSessionGrant: vi.fn(),
+  getValidGuestGrant: vi.fn(),
+  touchSessionGuest: vi.fn(),
   getOwnedSession: vi.fn(),
   getSession: vi.fn(),
   validateSessionInvite: vi.fn(),
@@ -14,6 +16,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/server/auth/owner-session", () => ({ getCurrentOwner: mocks.getCurrentOwner }));
 vi.mock("@/lib/server/auth/session", () => ({ getCurrentAuthUser: mocks.getCurrentAuthUser }));
+vi.mock("@/lib/server/auth/guest-grant", () => ({ getValidGuestGrant: mocks.getValidGuestGrant }));
+vi.mock("@/lib/server/database/session-guest-store", () => ({ touchSessionGuest: mocks.touchSessionGuest }));
 vi.mock("@/lib/server/auth/session-grant", () => ({ getValidSessionGrant: mocks.getValidSessionGrant }));
 vi.mock("@/lib/server/database/session-store", () => ({ getOwnedSession: mocks.getOwnedSession, getSession: mocks.getSession }));
 vi.mock("@/lib/server/database/session-invite-store", () => ({
@@ -32,6 +36,8 @@ describe("session access", () => {
     mocks.getCurrentOwner.mockResolvedValue(null);
     mocks.getCurrentAuthUser.mockResolvedValue(null);
     mocks.getValidSessionGrant.mockResolvedValue(null);
+    mocks.getValidGuestGrant.mockResolvedValue(null);
+    mocks.touchSessionGuest.mockResolvedValue(undefined);
   });
 
   it("restores collaborator API access from the session grant cookie", async () => {
@@ -174,5 +180,27 @@ describe("session access", () => {
 
     expect(view.access).toMatchObject({ role: "owner" });
     expect(edit.response?.status).toBe(410);
+  });
+
+  it("grants view access to a valid guest as a viewer without recording a participant", async () => {
+    mocks.getOwnedSession.mockResolvedValue(null);
+    mocks.getValidGuestGrant.mockResolvedValue({ guestId: "gabc", displayName: "Ada", inviteId: "i1" });
+
+    const result = await authorizeSessionRequest(new NextRequest("http://localhost:4512/api/sessions/s1/state"), "s1", "view");
+
+    expect(result.response).toBeNull();
+    expect(result.access).toEqual({ role: "viewer", actor: "guest-gabc", displayName: "Ada", permission: "read" });
+    expect(mocks.recordSessionParticipant).not.toHaveBeenCalled();
+    expect(mocks.touchSessionGuest).toHaveBeenCalledWith("s1", "gabc");
+  });
+
+  it.each(["edit", "owner"] as const)("rejects %s access for guests with 403", async (required) => {
+    mocks.getOwnedSession.mockResolvedValue(null);
+    mocks.getValidGuestGrant.mockResolvedValue({ guestId: "gabc", displayName: "Ada", inviteId: "i1" });
+
+    const result = await authorizeSessionRequest(new NextRequest("http://localhost:4512/api/sessions/s1/state"), "s1", required);
+
+    expect(result.access).toBeNull();
+    expect(result.response?.status).toBe(403);
   });
 });

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireOwnerApiAuth } from "@/lib/server/auth/owner-session";
 import { rejectCrossOriginRequest } from "@/lib/server/auth/request-security";
 import { inspectCollabSession, kickCollabClient } from "@/lib/server/collab/collab-server-client";
+import { markGuestRemoved } from "@/lib/server/database/session-guest-store";
 import { findParticipantUserIdByLogin, markParticipantRemoved } from "@/lib/server/database/session-invite-store";
 import { getOwnedSession } from "@/lib/server/database/session-store";
 
@@ -39,9 +40,14 @@ export async function DELETE(request: Request, { params }: SessionClientRouteCon
   const target = runtime.presence?.find((client) => client.socketId === socketId);
   const excludeParticipant = Boolean(target && target.role !== "owner");
   if (target && excludeParticipant) {
-    const githubUserId = await findParticipantUserIdByLogin(sessionId, target.userId);
-    if (githubUserId !== null) {
-      await markParticipantRemoved(sessionId, githubUserId, ownerId);
+    // GitHub logins may also start with "guest-", so fall back to the participant lookup.
+    const guestRemoved = target.userId.startsWith("guest-")
+      && await markGuestRemoved(sessionId, target.userId.slice("guest-".length));
+    if (!guestRemoved) {
+      const githubUserId = await findParticipantUserIdByLogin(sessionId, target.userId);
+      if (githubUserId !== null) {
+        await markParticipantRemoved(sessionId, githubUserId, ownerId);
+      }
     }
   }
 

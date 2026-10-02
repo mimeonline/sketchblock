@@ -1587,6 +1587,7 @@ function LiveSessionHero({
           collaboratorExpiresAt={session.shareLinks?.collaboratorExpiresAt}
           viewerExpiresAt={session.shareLinks?.viewerExpiresAt}
           sessionId={session.id}
+          allowAnonymousViewers={session.allowAnonymousViewers}
         />
         <EndSessionDialog session={session} onEndSession={onEndSession} />
       </CardContent>
@@ -2370,10 +2371,10 @@ export function JoinSessionTemplate({
             <h1 className="mt-1 break-words text-xl font-bold">{session?.drawingPath ? drawingDisplayName(session.drawingPath) : t("sessionLoading")}</h1>
             <p className="text-sm text-muted-foreground">
               {demoMode ? t("demoWorkspace") : t("roleSession", { role: sessionRoleLabel(sessionRole) })}
-              {saveTarget || !isOwner ? " · " : null}
+              {saveTarget || (!isOwner && session?.sourceKind === "repository") ? " · " : null}
               {saveTarget ? (
                 <span title={saveTarget.path}>{t("savesTo", { repository: saveTarget.repository, branch: saveTarget.branch })}</span>
-              ) : !isOwner ? (
+              ) : !isOwner && session?.sourceKind === "repository" ? (
                 <span>{t("ownerSavesHint")}</span>
               ) : null}
             </p>
@@ -2513,6 +2514,7 @@ function OwnerSessionPanel({
   snapshot: CollaborationSessionSnapshot | null;
 }) {
   const t = useTranslations("Workspace");
+  const tGuest = useTranslations("Guest");
   const locale = useLocale();
   return (
     <>
@@ -2579,6 +2581,7 @@ function OwnerSessionPanel({
                       tooltip={`${client.displayName} (@${client.userId}) · ${client.socketId}`}
                     />
                     {client.role ? <span className="shrink-0"><StatusBadge value={client.role} /></span> : null}
+                    {client.userId.startsWith("guest-") ? <Badge variant="outline" className="shrink-0">{tGuest("badge")}</Badge> : null}
                   </span>
                   <Button
                     type="button"

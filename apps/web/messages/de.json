@@ -291,5 +291,24 @@
     "deleteConfirm": "Dieses Board mit allen Versionen löschen? Laufende Sessions des Boards werden beendet. Das lässt sich nicht rückgängig machen.",
     "deleteFailed": "Das Board konnte nicht gelöscht werden.",
     "createdBy": "von {user}"
+  },
+  "Guest": {
+    "joinTitle": "Als Gast beitreten",
+    "nameLabel": "Dein Anzeigename",
+    "namePlaceholder": "z. B. Alex",
+    "privacy": "Kein Konto nötig. Dein Name ist für andere Teilnehmende sichtbar. Du kannst das Board nur ansehen.",
+    "submit": "Board ansehen",
+    "submitting": "Beitritt läuft …",
+    "signIn": "Stattdessen mit GitHub anmelden",
+    "errorinvalid_name": "Bitte gib einen Namen mit 1 bis 40 Zeichen ein.",
+    "errorguests_disabled": "Der Owner hat das Ansehen ohne Konto nicht erlaubt.",
+    "errorinvalid_invite": "Dieser Einladungslink ist ungültig oder abgelaufen.",
+    "errorsession_closed": "Diese Session wurde beendet.",
+    "errorrate_limited": "Zu viele Versuche. Bitte versuche es später erneut.",
+    "errorgeneric": "Der Beitritt ist fehlgeschlagen. Bitte versuche es erneut.",
+    "allowToggle": "Ansehen ohne Konto erlauben",
+    "allowHelp": "Wer den Viewer-Link hat, kann mit einem Anzeigenamen zusehen. Gäste können nur ansehen.",
+    "settingsFailed": "Die Einstellung konnte nicht gespeichert werden.",
+    "badge": "Gast"
   }
 }

@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   getCurrentOwner: vi.fn(),
   getCurrentAuthUser: vi.fn(),
   getValidSessionGrant: vi.fn(),
+  getValidGuestGrant: vi.fn(),
+  touchSessionGuest: vi.fn(),
   getSession: vi.fn(),
   getOwnedSession: vi.fn(),
   validateSessionInvite: vi.fn(),
@@ -16,6 +18,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/server/auth/collab-ticket", () => ({ createCollabTicket: mocks.createCollabTicket }));
 vi.mock("@/lib/server/auth/owner-session", () => ({ getCurrentOwner: mocks.getCurrentOwner }));
 vi.mock("@/lib/server/auth/session", () => ({ getCurrentAuthUser: mocks.getCurrentAuthUser }));
+vi.mock("@/lib/server/auth/guest-grant", () => ({ getValidGuestGrant: mocks.getValidGuestGrant }));
+vi.mock("@/lib/server/database/session-guest-store", () => ({ touchSessionGuest: mocks.touchSessionGuest }));
 vi.mock("@/lib/server/auth/session-grant", () => ({ getValidSessionGrant: mocks.getValidSessionGrant }));
 vi.mock("@/lib/server/database/session-store", () => ({ getSession: mocks.getSession, getOwnedSession: mocks.getOwnedSession }));
 vi.mock("@/lib/server/database/session-invite-store", () => ({
