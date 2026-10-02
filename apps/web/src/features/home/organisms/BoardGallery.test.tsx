@@ -212,4 +212,28 @@ describe("BoardGallery", () => {
     expect(screen.getByText("Lege ein neues Board an oder lade eine Excalidraw-Datei hoch.")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Repository einrichten" })).not.toBeInTheDocument();
   });
+
+  it("displays stored title when available for instance workspace boards", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => undefined)));
+
+    const drawingWithTitle: DrawingFile = {
+      ...drawing,
+      title: "Sprint Planning",
+    };
+
+    render(<BoardGallery drawings={[drawingWithTitle]} provider="instance" />);
+
+    expect(screen.getByText("Sprint Planning")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Sprint Planning im Editor öffnen" })).toBeInTheDocument();
+  });
+
+  it("falls back to path-derived title when stored title is unavailable", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => undefined)));
+
+    render(<BoardGallery drawings={[drawing]} provider="instance" />);
+
+    expect(screen.getByText("System map")).toBeInTheDocument();
+  });
 });

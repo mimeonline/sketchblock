@@ -194,7 +194,7 @@ function BoardCard({
   const previewRef = useRef<HTMLDivElement | null>(null);
   const [previewStatus, setPreviewStatus] = useState<PreviewStatus>("loading");
   const [largePreviewRequested, setLargePreviewRequested] = useState(false);
-  const title = drawingTitle(drawing.path);
+  const title = drawing.title ?? drawingTitle(drawing.path);
   const editorHref = `/editor?path=${encodeURIComponent(drawing.path)}`;
 
   useEffect(() => {

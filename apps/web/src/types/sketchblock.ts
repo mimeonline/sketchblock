@@ -22,6 +22,8 @@ export type DrawingFile = {
   repositoryId?: string;
   /** Set for instance-workspace boards. */
   boardId?: string;
+  /** Stored title for instance-workspace boards. */
+  title?: string;
 };
 
 export type DrawingContent = {
@@ -30,6 +32,8 @@ export type DrawingContent = {
   content: unknown;
   /** Set for instance-workspace boards. */
   boardId?: string;
+  /** Stored title for instance-workspace boards. */
+  title?: string;
 };
 
 export type SaveDrawingInput = {
