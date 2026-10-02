@@ -53,6 +53,10 @@ type ExcalidrawEditorProps = {
   onSceneChange?: (content: unknown) => void;
   onSave?: (content: unknown) => Promise<void>;
   onPointerUpdate?: (payload: { pointer: { x: number; y: number }; button: "up" | "down" }) => void;
+  /** Facilitation hooks: scroll/zoom changes, API handle and an overlay layer above the canvas. */
+  onScrollChange?: (scrollX: number, scrollY: number, zoom: { value: number }) => void;
+  onApiReady?: (api: ExcalidrawImperativeAPI | null) => void;
+  canvasOverlay?: ReactNode;
   remoteCursors?: CollabCursor[];
   yjsSync?: {
     sessionId: string;
@@ -127,6 +131,9 @@ export function ExcalidrawEditor({
   onSceneChange,
   onSave,
   onPointerUpdate,
+  onScrollChange,
+  onApiReady,
+  canvasOverlay,
   remoteCursors,
   yjsSync,
 }: ExcalidrawEditorProps) {
@@ -206,7 +213,8 @@ export function ExcalidrawEditor({
   const handleExcalidrawApi = useCallback((api: ExcalidrawImperativeAPI) => {
     excalidrawApiRef.current = api;
     setExcalidrawApi(api);
-  }, []);
+    onApiReady?.(api);
+  }, [onApiReady]);
 
   const fitBoard = useCallback(() => {
     excalidrawApiRef.current?.scrollToContent(undefined, { fitToContent: true, maxZoom: 1, animate: false });
@@ -407,7 +415,7 @@ export function ExcalidrawEditor({
         </div>
       </div>
       <div
-        className={cn("min-h-0 bg-white", canvasClassName)}
+        className={cn("relative min-h-0 bg-white", canvasClassName)}
         onInputCapture={() => {
           if (!readOnly) {
             hasUserInteractedRef.current = true;
@@ -440,6 +448,7 @@ export function ExcalidrawEditor({
               toggleTheme: false,
             },
           }}
+          onScrollChange={onScrollChange}
           onPointerUpdate={(payload) => {
             onPointerUpdate?.({
               pointer: { x: payload.pointer.x, y: payload.pointer.y },
@@ -486,6 +495,7 @@ export function ExcalidrawEditor({
             }
           }}
         />
+        {canvasOverlay}
       </div>
     </div>
   );

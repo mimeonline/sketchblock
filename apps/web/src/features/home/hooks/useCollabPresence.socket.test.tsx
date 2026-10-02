@@ -99,3 +99,47 @@ describe("snapshot acknowledgements", () => {
     docs.forEach((doc) => doc.destroy()); recovered.destroy(); hook.unmount();
   });
 });
+
+describe("facilitation events", () => {
+  afterEach(() => { vi.unstubAllGlobals(); mock.handlers.clear(); vi.clearAllMocks(); });
+
+  it("reads moderation/votes from the join ack and applies broadcasts", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ token: "test" }) }));
+    const initial = { followOwner: false, editingLocked: false, timer: null, voting: { open: false, votesPerParticipant: 3 } };
+    mock.socket.emit.mockImplementation((event, _payload, ack) => {
+      if (event === "session:join") ack({ ok: true, moderation: initial, votes: { a: ["x"] } });
+    });
+    const hook = renderHook(() => useCollabPresence({ sessionId: "s", clientId: "c", role: "collaborator" }));
+    await waitFor(() => expect(mock.handlers.has("connect")).toBe(true));
+    act(() => mock.handlers.get("connect")!());
+    expect(hook.result.current.votes).toEqual({ a: ["x"] });
+    act(() => mock.handlers.get("moderation:state")!({ moderation: { ...initial, editingLocked: true } }));
+    expect(hook.result.current.moderation.editingLocked).toBe(true);
+    act(() => mock.handlers.get("votes:state")!({ votes: { b: ["y", "z"] } }));
+    expect(hook.result.current.votes).toEqual({ b: ["y", "z"] });
+    act(() => mock.handlers.get("viewport:update")!({ scrollX: 1, scrollY: 2, zoom: 1.5 }));
+    expect(hook.result.current.remoteViewport).toMatchObject({ scrollX: 1, scrollY: 2, zoom: 1.5 });
+    act(() => mock.handlers.get("reaction")!({ emoji: "🎉", pointer: { x: 1, y: 2 } }));
+    expect(hook.result.current.reactions).toHaveLength(1);
+    mock.socket.emitWithAck.mockResolvedValue({ ok: false, error: "vote_limit_reached" });
+    let ack: unknown;
+    await act(async () => { ack = await hook.result.current.toggleVote("a"); });
+    expect(ack).toEqual({ ok: false, error: "vote_limit_reached" });
+    expect(mock.socket.emitWithAck).toHaveBeenCalledWith("vote:toggle", { sessionId: "s", elementId: "a" });
+    hook.unmount();
+  });
+
+  it("does not raise the sync error for editing_locked yjs acks", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ token: "test" }) }));
+    mock.socket.emit.mockImplementation((event, _payload, ack) => { if (event === "session:join") ack({ ok: true }); });
+    mock.socket.emitWithAck.mockResolvedValue({ ok: false, error: "editing_locked" });
+    const hook = renderHook(() => useCollabPresence({ sessionId: "s", clientId: "c", role: "collaborator" }));
+    await waitFor(() => expect(mock.handlers.has("connect")).toBe(true));
+    act(() => mock.handlers.get("connect")!());
+    const doc = new Y.Doc(); doc.getMap("e").set("k", 1);
+    await act(async () => { hook.result.current.sendYjsUpdate(window.btoa(Array.from(Y.encodeStateAsUpdate(doc), (b) => String.fromCharCode(b)).join(""))); });
+    expect(mock.socket.emitWithAck).toHaveBeenCalled();
+    expect(hook.result.current.syncError).toBeUndefined();
+    hook.unmount();
+  });
+});

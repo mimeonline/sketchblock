@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import * as Y from "yjs";
 
+import { DEFAULT_MODERATION, type FacilitationAck, type IncomingReaction, type ModerationState, type ModerationUpdate, type ReactionEmoji, type RemoteViewport, type VotesState } from "@/features/facilitation/types";
 import type { CollabCursor, CollaborationSessionSnapshot, CollabPresenceClient, SessionAuditEvent, SessionLifecycleStatus, SessionRole } from "@/types/sketchblock";
 
 type CollabPresenceState = {
@@ -23,6 +24,8 @@ type CollabPresenceState = {
   } | null;
   audit: SessionAuditEvent[];
   error?: string;
+  moderation: ModerationState;
+  votes: VotesState;
 };
 
 const DEFAULT_LOCAL_COLLAB_SERVER_URL = "http://localhost:4513";
@@ -75,7 +78,13 @@ export function useCollabPresence(input: {
     status: "connecting",
     presence: [],
     audit: [],
+    moderation: DEFAULT_MODERATION,
+    votes: {},
   });
+  const [remoteViewport, setRemoteViewport] = useState<RemoteViewport | null>(null);
+  const [reactions, setReactions] = useState<IncomingReaction[]>([]);
+  const reactionIdRef = useRef(0);
+  const viewportSequenceRef = useRef(0);
   const [cursors, setCursors] = useState<Record<string, CollabCursor>>({});
   const socketRef = useRef<Socket | null>(null);
   const snapshotRevisionRef = useRef(0);
@@ -119,6 +128,8 @@ export function useCollabPresence(input: {
             retryTimer = setTimeout(() => { retryTimer = undefined; flushYjs(); }, Math.max(1, ack.retryAfterSeconds ?? 1) * 1000);
             return;
           }
+          // editing_locked is expected while the owner pauses editing; the UI shows the lock.
+          if (ack.error === "editing_locked") return;
           setState((current) => ({ ...current, syncError: ack.error || "yjs_update_rejected" }));
           return;
         }
@@ -156,7 +167,7 @@ export function useCollabPresence(input: {
 
         if (tokenPayload.code === "session_closed") {
           if (!cancelled) {
-            setState({ status: "disconnected", presence: [], audit: [], sessionStatus: "closed" });
+            setState({ status: "disconnected", presence: [], audit: [], moderation: DEFAULT_MODERATION, votes: {}, sessionStatus: "closed" });
           }
           return;
         }
@@ -197,12 +208,16 @@ export function useCollabPresence(input: {
               audit?: SessionAuditEvent[];
               yjsStateBase64?: string | null;
               yjsRevision?: number;
+              moderation?: ModerationState;
+              votes?: VotesState;
             }) => {
               if (ack?.ok === false) {
                 setState({
                   status: "error",
                   presence: [],
                   audit: [],
+                  moderation: DEFAULT_MODERATION,
+                  votes: {},
                   error: ack.error || "Collab join failed.",
                   sessionStatus: ack.error === "session_closed" ? "closed" : undefined,
                 });
@@ -220,6 +235,8 @@ export function useCollabPresence(input: {
                 yjsRevision: ack?.yjsRevision || 0,
                 remoteYjsUpdate: null,
                 audit: ack?.audit || [],
+                moderation: ack?.moderation || DEFAULT_MODERATION,
+                votes: ack?.votes || {},
               });
               snapshotRevisionRef.current = ack?.snapshot?.revision || 0;
               joined = true;
@@ -315,6 +332,31 @@ export function useCollabPresence(input: {
           }));
         });
 
+        socket.on("moderation:state", (payload: { moderation?: ModerationState }) => {
+          if (!payload?.moderation) return;
+          const moderation = payload.moderation;
+          setState((current) => ({ ...current, moderation }));
+        });
+
+        socket.on("votes:state", (payload: { votes?: VotesState }) => {
+          if (!payload?.votes) return;
+          const votes = payload.votes;
+          setState((current) => ({ ...current, votes }));
+        });
+
+        socket.on("viewport:update", (payload: { scrollX?: number; scrollY?: number; zoom?: number }) => {
+          if (typeof payload?.scrollX !== "number" || typeof payload.scrollY !== "number" || typeof payload.zoom !== "number") return;
+          viewportSequenceRef.current += 1;
+          setRemoteViewport({ scrollX: payload.scrollX, scrollY: payload.scrollY, zoom: payload.zoom, sequence: viewportSequenceRef.current });
+        });
+
+        socket.on("reaction", (payload: { emoji?: string; pointer?: { x: number; y: number }; displayName?: string; socketId?: string }) => {
+          if (!payload?.emoji) return;
+          reactionIdRef.current += 1;
+          const reaction: IncomingReaction = { id: reactionIdRef.current, emoji: payload.emoji, pointer: payload.pointer, displayName: payload.displayName, socketId: payload.socketId };
+          setReactions((current) => [...current.slice(-19), reaction]);
+        });
+
         socket.on("session:closed", () => {
           setState((current) => ({
             ...current,
@@ -347,6 +389,8 @@ export function useCollabPresence(input: {
             status: "error",
             presence: [],
             audit: [],
+            moderation: DEFAULT_MODERATION,
+            votes: {},
             error: error.message,
           });
         });
@@ -356,6 +400,8 @@ export function useCollabPresence(input: {
             status: "error",
             presence: [],
             audit: [],
+            moderation: DEFAULT_MODERATION,
+            votes: {},
             error: error instanceof Error ? error.message : "Socket authentication failed.",
           });
         }
@@ -434,8 +480,48 @@ export function useCollabPresence(input: {
     flushYjsRef.current();
   }
 
+  async function request(event: string, payload: Record<string, unknown>): Promise<FacilitationAck> {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return { ok: false, error: "not_connected" };
+    try {
+      const ack = (await socket.timeout(2500).emitWithAck(event, { sessionId: input.sessionId, ...payload })) as FacilitationAck | undefined;
+      return ack?.ok === false ? { ok: false, error: ack.error || "rejected" } : { ok: true };
+    } catch {
+      return { ok: false, error: "timeout" };
+    }
+  }
+
+  function updateModeration(update: ModerationUpdate) {
+    return request("moderation:update", { ...update });
+  }
+
+  function sendViewport(viewport: { scrollX: number; scrollY: number; zoom: number }) {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+    socket.emit("viewport:update", { sessionId: input.sessionId, ...viewport });
+  }
+
+  function toggleVote(elementId: string) {
+    return request("vote:toggle", { elementId });
+  }
+
+  function sendReaction(emoji: ReactionEmoji, pointer?: { x: number; y: number }) {
+    return request("reaction:send", pointer ? { emoji, pointer } : { emoji });
+  }
+
+  function dismissReaction(id: number) {
+    setReactions((current) => current.filter((reaction) => reaction.id !== id));
+  }
+
   return {
     ...state,
+    remoteViewport,
+    reactions,
+    dismissReaction,
+    updateModeration,
+    sendViewport,
+    toggleVote,
+    sendReaction,
     cursors,
     serverUrl: collabServerUrl,
     pushSnapshot,

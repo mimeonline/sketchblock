@@ -187,3 +187,17 @@
     padding-bottom: calc(6rem + env(safe-area-inset-bottom));
   }
 }
+
+/* Facilitation: floating emoji reactions */
+@keyframes sb-reaction-float {
+  from { opacity: 1; transform: translate(-50%, 0); }
+  to { opacity: 0; transform: translate(-50%, -96px); }
+}
+@keyframes sb-reaction-fade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+.sb-reaction { animation: sb-reaction-float 2.4s ease-out forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .sb-reaction { animation: sb-reaction-fade 2.4s linear forwards; }
+}

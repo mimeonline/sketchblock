@@ -79,7 +79,13 @@ import { RepositoryPickerDialog } from "@/features/home/organisms/RepositoryPick
 import { SessionShareDialog } from "@/features/home/organisms/SessionShareDialog";
 import { AdhocUploadCard } from "@/features/adhoc/organisms/AdhocUploadCard";
 import { WorkspaceBoardActions } from "@/features/workspace/organisms/WorkspaceBoardActions";
+import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { AdhocSessionBar } from "@/features/adhoc/molecules/AdhocSessionBar";
+import { useFollowOwner, useViewportBroadcast } from "@/features/facilitation/hooks/useFollowOwner";
+import { FacilitationStrip } from "@/features/facilitation/organisms/FacilitationStrip";
+import { ModerationBar } from "@/features/facilitation/organisms/ModerationBar";
+import { ReactionLayer } from "@/features/facilitation/organisms/ReactionLayer";
+import { VoteOverlay, VoteSummary } from "@/features/facilitation/organisms/VoteOverlay";
 import { AdhocSessionMeta } from "@/features/adhoc/molecules/AdhocSessionMeta";
 import type { HomeView } from "@/features/home/types/home-view";
 import { resolveBoardPath } from "@/features/home/templates/board-selection";
@@ -2147,8 +2153,16 @@ export function JoinSessionTemplate({
   const cursorColor = useMemo(() => cursorColorFor(clientId), [clientId]);
   const remoteCursors = useMemo(() => Object.values(collabPresence.cursors), [collabPresence.cursors]);
   const cursorThrottleRef = useRef(0);
+  const [excalidrawApi, setExcalidrawApi] = useState<ExcalidrawImperativeAPI | null>(null);
+  const lastPointerRef = useRef<{ x: number; y: number } | undefined>(undefined);
+  const moderation = collabPresence.moderation;
+  const follow = useFollowOwner({ api: excalidrawApi, followOwner: moderation.followOwner, isOwner, viewport: collabPresence.remoteViewport });
+  const handleScrollChange = useViewportBroadcast({ api: excalidrawApi, enabled: isOwner && moderation.followOwner, send: collabPresence.sendViewport });
+  const editingPaused = moderation.editingLocked && !isOwner;
+  const actorIds = useMemo(() => [clientId, identity.login], [clientId, identity.login]);
 
   function handlePointerUpdate(payload: { pointer: { x: number; y: number }; button: "up" | "down" }) {
+    lastPointerRef.current = payload.pointer;
     const now = window.performance.now();
     if (now - cursorThrottleRef.current < 45) {
       return;
@@ -2374,6 +2388,16 @@ export function JoinSessionTemplate({
   }
 
   const editor = (
+    <div className="grid min-w-0 content-start gap-2">
+    <FacilitationStrip
+      moderation={moderation}
+      isOwner={isOwner}
+      following={follow.following}
+      followActive={follow.active}
+      onToggleFollow={() => follow.setStopped((current) => !current)}
+      onReaction={collabPresence.sendReaction}
+      getPointer={() => lastPointerRef.current}
+    />
     <ExcalidrawEditor
       hint={session?.sourceKind === "adhoc" ? tAdhoc("editorHint") : undefined}
       className="h-[max(520px,calc(100dvh-11rem))]"
@@ -2382,8 +2406,16 @@ export function JoinSessionTemplate({
       initialContent={drawing?.content}
       remoteContent={remoteScene?.content}
       remoteRevision={remoteScene?.revision}
-      readOnly={isViewer}
-      onSceneChange={isViewer ? undefined : handleSceneChange}
+      readOnly={isViewer || editingPaused}
+      onApiReady={setExcalidrawApi}
+      onScrollChange={handleScrollChange}
+      canvasOverlay={
+        <>
+          <VoteOverlay api={excalidrawApi} votes={collabPresence.votes} voting={moderation.voting} actorIds={actorIds} onToggleVote={collabPresence.toggleVote} />
+          <ReactionLayer reactions={collabPresence.reactions} api={excalidrawApi} onDone={collabPresence.dismissReaction} />
+        </>
+      }
+      onSceneChange={isViewer || editingPaused ? undefined : handleSceneChange}
       onSave={isOwner && session?.sourceKind !== "adhoc" ? handleOwnerSave : undefined}
       onPointerUpdate={handlePointerUpdate}
       remoteCursors={remoteCursors}
@@ -2397,6 +2429,7 @@ export function JoinSessionTemplate({
         onSendUpdate: collabPresence.sendYjsUpdate,
       }}
     />
+    </div>
   );
 
   return (
@@ -2438,6 +2471,12 @@ export function JoinSessionTemplate({
 
         {session?.sourceKind === "adhoc" ? (
           <AdhocSessionBar sessionId={sessionId} isOwner={isOwner} title={session.title} expiresAt={session.expiresAt} participantDownload={session.participantDownload} inviteToken={inviteToken} />
+        ) : null}
+
+        {isOwner && sessionLoadState.status === "ready" && !sessionEnded ? (
+          <ModerationBar moderation={moderation} onUpdate={collabPresence.updateModeration}>
+            {moderation.voting.open || Object.keys(collabPresence.votes).length > 0 ? <VoteSummary api={excalidrawApi} votes={collabPresence.votes} /> : null}
+          </ModerationBar>
         ) : null}
 
         {sessionEnded && sessionLoadState.status === "ready" ? (
