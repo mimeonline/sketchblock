@@ -4,6 +4,7 @@
 
 ### Added
 
+- Facilitation: owners moderate live sessions with viewport following, edit locks, timer presets, voting (1–10 votes per person), emoji reactions, and top-voted elements summary. State clears when sessions end or the server restarts.
 - Guest viewers: enable "Allow viewing without an account" per session in the share dialog; guests enter a display name and watch live boards read-only.
 - Ad-hoc rooms: upload an Excalidraw file or image with embedded scene to start a temporary live session without GitHub; participants download results as Excalidraw, PNG, or SVG.
 - Instance workspace: every local user has a private workspace for creating boards and managing versions without GitHub integration.
