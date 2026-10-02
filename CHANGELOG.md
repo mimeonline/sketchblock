@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Large board previews can be loaded on demand while the gallery keeps its automatic rendering limit. Board status filters use the same translated labels as badges; the file list has striped rows and accessible full-path tooltips.
 - Build release images on native AMD64 and ARM64 runners and merge their manifests, avoiding ARM emulation failures. Existing release tags can be rebuilt through a validated manual workflow dispatch.
 
 ## 0.2.0 - 2026-10-02

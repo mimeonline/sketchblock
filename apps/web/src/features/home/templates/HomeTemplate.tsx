@@ -1324,7 +1324,7 @@ function RepositoryView({
   );
 }
 
-function DrawingsView({
+export function DrawingsView({
   drawings,
   sessions,
   selectedPath,
@@ -1334,6 +1334,7 @@ function DrawingsView({
   selectedPath: string;
 }) {
   const t = useTranslations("Workspace");
+  const tStatus = useTranslations("Common.status");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const statuses = useMemo(
@@ -1394,7 +1395,7 @@ function DrawingsView({
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
-        <Select items={[{ value: "all", label: t("allStatuses") }, ...statuses.map((status) => ({ value: status, label: drawingStatusLabel(status) }))]} value={statusFilter} onValueChange={(value) => setStatusFilter(value ?? "all")}>
+        <Select items={[{ value: "all", label: t("allStatuses") }, ...statuses.map((status) => ({ value: status, label: tStatus(status) }))]} value={statusFilter} onValueChange={(value) => setStatusFilter(value ?? "all")}>
           <SelectTrigger className="w-full sm:w-44" aria-label={t("allStatuses")}>
             <SelectValue />
           </SelectTrigger>
@@ -1403,7 +1404,7 @@ function DrawingsView({
               <SelectItem value="all">{t("allStatuses")}</SelectItem>
               {statuses.map((status) => (
                 <SelectItem key={status} value={status}>
-                  {drawingStatusLabel(status)}
+                  {tStatus(status)}
                 </SelectItem>
               ))}
             </SelectGroup>
@@ -2001,7 +2002,7 @@ function SettingsView({
   );
 }
 
-function DrawingTable({
+export function DrawingTable({
   drawings,
   selectedPath,
   showActions,
@@ -2012,10 +2013,10 @@ function DrawingTable({
 }) {
   const t = useTranslations("Workspace");
   return (
-    <div className="overflow-hidden rounded-xl border bg-background">
+    <div className="overflow-hidden rounded-xl border bg-white dark:bg-card">
         <Table>
-          <TableHeader>
-            <TableRow>
+          <TableHeader className="bg-slate-200 dark:bg-muted">
+            <TableRow className="hover:bg-slate-200 dark:hover:bg-muted">
               <TableHead>{t("path")}</TableHead>
               <TableHead className="hidden md:table-cell">{t("lastCommit")}</TableHead>
               <TableHead className="hidden lg:table-cell">Base SHA</TableHead>
@@ -2031,9 +2032,17 @@ function DrawingTable({
                 </TableCell>
               </TableRow>
             ) : (
-              drawings.map((drawingItem) => (
-                <TableRow key={drawingItem.path} className={selectedPath === drawingItem.path ? "bg-primary/5" : ""}>
-                  <TableCell className="max-w-[420px] truncate font-mono text-xs">{drawingItem.path}</TableCell>
+              drawings.map((drawingItem, index) => (
+                <TableRow
+                  key={drawingItem.path}
+                  aria-selected={selectedPath === drawingItem.path}
+                  className={cn(
+                    "hover:bg-slate-100 dark:hover:bg-muted/70",
+                    index % 2 === 0 ? "bg-white dark:bg-card" : "bg-slate-50 dark:bg-muted/30",
+                    selectedPath === drawingItem.path && "bg-primary/10 hover:bg-primary/15 dark:bg-primary/15 dark:hover:bg-primary/20",
+                  )}
+                >
+                  <TableCell className="max-w-[420px] font-mono text-xs"><TruncatedValue text={drawingItem.path} focusable className="focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-ring" /></TableCell>
                   <TableCell className="hidden md:table-cell">{drawingItem.lastCommit}</TableCell>
                   <TableCell className="hidden font-mono text-xs lg:table-cell">{drawingItem.sha.slice(0, 7)}</TableCell>
                   <TableCell><StatusBadge value={drawingItem.status} /></TableCell>
@@ -2751,14 +2760,16 @@ function TruncatedValue({
   text,
   tooltip,
   className,
+  focusable = false,
 }: {
   text: string;
   tooltip?: string;
   className?: string;
+  focusable?: boolean;
 }) {
   return (
     <Tooltip>
-      <TooltipTrigger render={<span className={cn("block min-w-0 cursor-default truncate", className)} />}>
+      <TooltipTrigger render={<span tabIndex={focusable ? 0 : undefined} className={cn("block min-w-0 cursor-default truncate", className)} />}>
         {text}
       </TooltipTrigger>
       <TooltipContent className="break-all font-mono text-xs">{tooltip || text}</TooltipContent>
@@ -2787,18 +2798,6 @@ function InfoRow({
 
 function drawingDisplayName(path: string) {
   return drawingTitle(path);
-}
-
-function drawingStatusLabel(status: DrawingFile["status"]) {
-  const labels: Record<DrawingFile["status"], string> = {
-    indexed: "Indexed",
-    saved: "Saved",
-    dirty: "Unsaved",
-    stale: "Outdated",
-    conflict: "Conflict",
-  };
-
-  return labels[status] || status;
 }
 
 function sessionLifecycleLabel(status: SessionLifecycleStatus) {

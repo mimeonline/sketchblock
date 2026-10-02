@@ -12,7 +12,7 @@ import {
   Layers3,
 } from "lucide-react";
 
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/features/home/atoms/StatusBadge";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -186,6 +186,7 @@ function BoardCard({
   const t = useTranslations("Boards");
   const previewRef = useRef<HTMLDivElement | null>(null);
   const [previewStatus, setPreviewStatus] = useState<PreviewStatus>("loading");
+  const [largePreviewRequested, setLargePreviewRequested] = useState(false);
   const title = drawingTitle(drawing.path);
   const editorHref = `/editor?path=${encodeURIComponent(drawing.path)}`;
 
@@ -195,7 +196,7 @@ function BoardCard({
     let delayId: number | null = window.setTimeout(() => {
       delayId = null;
       const render = () => {
-        void renderPreview(drawing.path, previewRef.current, controller.signal).then((status) => {
+        void renderPreview(drawing.path, previewRef.current, controller.signal, largePreviewRequested).then((status) => {
           if (!controller.signal.aborted) {
             setPreviewStatus(status);
           }
@@ -218,22 +219,23 @@ function BoardCard({
         window.cancelIdleCallback(idleCallbackId);
       }
     };
-  }, [drawing.path, index]);
+  }, [drawing.path, drawing.sha, index, largePreviewRequested]);
 
   return (
-    <Link
-      aria-label={t("openEditor", { title })}
-      className="group min-w-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-      href={editorHref}
-    >
+    <div className="group relative min-w-0 rounded-xl">
       <Card
         className={cn(
-          "h-full gap-0 rounded-xl py-0 shadow-sm transition-[box-shadow,transform] duration-200 group-hover:-translate-y-0.5 group-hover:shadow-lg motion-reduce:transform-none",
+          "relative h-full gap-0 rounded-xl py-0 shadow-sm transition-[box-shadow,transform] duration-200 group-hover:-translate-y-0.5 group-hover:shadow-lg motion-reduce:transform-none",
           presence
             ? "ring-emerald-300/80 group-hover:ring-emerald-400"
             : "group-hover:ring-primary/35",
         )}
       >
+        <Link
+          aria-label={t("openEditor", { title })}
+          className="absolute inset-0 z-10 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          href={editorHref}
+        />
         <div
           className="relative aspect-[16/10] overflow-hidden border-b bg-muted/30"
           style={{
@@ -245,7 +247,15 @@ function BoardCard({
             ref={previewRef}
             className="absolute inset-4 grid place-items-center overflow-hidden transition-transform duration-300 group-hover:scale-[1.015] motion-reduce:transform-none"
           />
-          {previewStatus !== "ready" ? <PreviewFallback status={previewStatus} /> : null}
+          {previewStatus !== "ready" ? (
+            <PreviewFallback
+              status={previewStatus}
+              onLoadLarge={() => {
+                setPreviewStatus("loading");
+                setLargePreviewRequested(true);
+              }}
+            />
+          ) : null}
           {presence ? (
             <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-background/95 px-2.5 py-1 text-xs font-semibold text-emerald-700 shadow-sm backdrop-blur-sm">
               <span
@@ -281,7 +291,7 @@ function BoardCard({
           </div>
         </div>
       </Card>
-    </Link>
+    </div>
   );
 }
 
@@ -372,7 +382,7 @@ function participantNames(presence: BoardPresence, t: ReturnType<typeof useTrans
     : t("manyWorking", { count: presence.count });
 }
 
-function PreviewFallback({ status }: { status: PreviewStatus }) {
+function PreviewFallback({ status, onLoadLarge }: { status: PreviewStatus; onLoadLarge: () => void }) {
   const t = useTranslations("Boards");
   if (status === "loading") {
     return (
@@ -396,7 +406,7 @@ function PreviewFallback({ status }: { status: PreviewStatus }) {
       : t("open");
 
   return (
-    <div className="absolute inset-0 grid place-items-center bg-muted/90 text-muted-foreground backdrop-blur-[1px]">
+    <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center bg-muted/90 text-muted-foreground backdrop-blur-[1px]">
       <div className="grid justify-items-center gap-2 text-center">
         <span className="grid size-10 place-items-center rounded-xl bg-background text-foreground shadow-sm">
           <Icon className="size-5" aria-hidden="true" />
@@ -405,12 +415,17 @@ function PreviewFallback({ status }: { status: PreviewStatus }) {
           <span className="text-xs font-semibold text-foreground">{label}</span>
           <span className="text-[11px]">{hint}</span>
         </div>
+        {large ? (
+          <Button className="pointer-events-auto relative mt-1" variant="outline" size="sm" onClick={onLoadLarge}>
+            {t("loadPreview")}
+          </Button>
+        ) : null}
       </div>
     </div>
   );
 }
 
-async function renderPreview(path: string, target: HTMLDivElement | null, signal: AbortSignal): Promise<PreviewStatus> {
+async function renderPreview(path: string, target: HTMLDivElement | null, signal: AbortSignal, allowLarge = false): Promise<PreviewStatus> {
   if (!target) {
     return "error";
   }
@@ -428,7 +443,7 @@ async function renderPreview(path: string, target: HTMLDivElement | null, signal
     if (visibleElementCount === 0) {
       return "empty";
     }
-    if (visibleElementCount > MAX_PREVIEW_ELEMENTS) {
+    if (visibleElementCount > MAX_PREVIEW_ELEMENTS && !allowLarge) {
       return "large";
     }
 
