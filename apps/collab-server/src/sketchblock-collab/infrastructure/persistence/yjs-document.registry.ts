@@ -107,6 +107,13 @@ export class YjsDocumentRegistry extends YjsDocumentRegistryPort {
     };
   }
 
+  async getLiveElements(sessionId: string): Promise<unknown[]> {
+    const doc = await this.getDocument(sessionId);
+    return Array.from(doc.getMap("elements").values()).map((element) =>
+      element instanceof Y.AbstractType ? element.toJSON() : element,
+    );
+  }
+
   async getEncodedState(sessionId: string): Promise<string> {
     const doc = await this.getDocument(sessionId);
     return this.encodeState(doc);

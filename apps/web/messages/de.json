@@ -187,6 +187,7 @@
     "sessionDataUnavailable": "Die Session-Daten sind gerade nicht erreichbar. Versuche es erneut oder frage den Owner nach dem aktuellen Status."
   },
   "Workspace": {
+    "githubConflict": "Das Board wurde nach dem Start dieser Session in GitHub geändert. Es wurde nichts überschrieben; übernimm deine Änderungen in eine neue Session, um sie zu speichern.",
     "joinLiveSession": "Live-Session öffnen",
     "saveBeforeSession": "Speichere deine Änderungen, bevor du eine Live-Session startest.",
     "startingSession": "Session wird gestartet …",

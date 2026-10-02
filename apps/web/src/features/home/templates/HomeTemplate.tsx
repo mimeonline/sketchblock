@@ -2184,13 +2184,17 @@ export function JoinSessionTemplate({
     }, 600);
   }, [clientId, collabPresence.snapshot, sessionLoadState.status]);
 
-  async function pushSessionSnapshot(content: unknown) {
+  async function pushSessionSnapshot(content: unknown, attempt = 0): Promise<CollaborationSessionSnapshot | null> {
     let nextSnapshot: CollaborationSessionSnapshot | null = null;
 
     try {
       nextSnapshot = await collabPresence.pushSnapshot(content);
     } catch (error) {
-      if (error instanceof Error && error.message === "snapshot_conflict") throw error;
+      if (error instanceof Error && error.message === "snapshot_conflict") {
+        // Another editor checkpointed first; the revision is refreshed, so retry once.
+        if (attempt === 0) return pushSessionSnapshot(content, 1);
+        throw error;
+      }
       const inviteQuery = inviteToken ? `?invite=${encodeURIComponent(inviteToken)}` : "";
       const response = await fetch(`/api/sessions/${sessionId}/state${inviteQuery}`, {
         method: "PATCH",
@@ -2229,7 +2233,9 @@ export function JoinSessionTemplate({
     }
 
     pushTimeoutRef.current = window.setTimeout(() => {
-      void pushSessionSnapshot(content).catch(() => {
+      void pushSessionSnapshot(content).catch((error: unknown) => {
+        // Live elements are synchronized via Yjs; a lost checkpoint race is not user-facing.
+        if (error instanceof Error && error.message === "snapshot_conflict") return;
         setClientActionNotice({ tone: "error", message: t("sessionSyncFailed") });
       });
     }, 1500);
@@ -2237,7 +2243,11 @@ export function JoinSessionTemplate({
 
   async function handleOwnerSave(content: unknown) {
     try {
-      const snapshotResult = await pushSessionSnapshot(content);
+      // The server saves the live collaborative document; a checkpoint race must not block saving.
+      const snapshotResult = await pushSessionSnapshot(content).catch((error: unknown) => {
+        if (error instanceof Error && error.message === "snapshot_conflict") return null;
+        throw error;
+      });
 
       setSessionSaveState({
         status: "saving",
@@ -2252,8 +2262,12 @@ export function JoinSessionTemplate({
       const payload = (await response.json()) as {
         result?: SessionSaveResult;
         error?: string;
+        code?: string;
       };
 
+      if (payload.code === "github_conflict") {
+        throw new Error(t("githubConflict"));
+      }
       if (!response.ok || !payload.result) {
         throw new Error(payload.error || t("sessionSaveFailed"));
       }

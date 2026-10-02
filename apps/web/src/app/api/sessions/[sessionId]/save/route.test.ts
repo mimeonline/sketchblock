@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   saveDrawing: vi.fn(),
   getOwnedSession: vi.fn(),
   updateSessionBaseSha: vi.fn(),
+  getCollabSessionSnapshot: vi.fn(),
 }));
 
 vi.mock("@/lib/server/audit/audit-service", () => ({ safeRecordAuditEvent: vi.fn() }));
@@ -21,7 +22,7 @@ vi.mock("@/lib/server/auth/owner-session", () => ({
   requireLinkedOwnerGitHub: vi.fn(),
 }));
 vi.mock("@/lib/server/collab/collab-server-client", () => ({
-  getCollabSessionSnapshot: async () => ({ snapshot: { content: { elements: [] }, revision: 3 } }),
+  getCollabSessionSnapshot: mocks.getCollabSessionSnapshot,
   updateCollabSessionStatus: vi.fn(),
 }));
 vi.mock("@/lib/server/database/session-store", () => ({
@@ -48,6 +49,16 @@ describe("session save route", () => {
     mocks.getOwnedSession.mockResolvedValue({ id: "s1", repositoryId: "r1", drawingPath: "b.excalidraw", baseSha: "base-sha" });
     mocks.openDrawing.mockResolvedValue({ sha: "fresh-sha" });
     mocks.saveDrawing.mockResolvedValue({ path: "b.excalidraw", commitSha: "c1", contentSha: "new-sha" });
+    mocks.getCollabSessionSnapshot.mockResolvedValue({ snapshot: { content: { elements: [] }, revision: 3 }, materializedContent: null });
+  });
+
+  it("saves the materialized live board instead of a stale checkpoint", async () => {
+    mocks.getCollabSessionSnapshot.mockResolvedValue({
+      snapshot: { content: { elements: [{ id: "stale" }] }, revision: 3 },
+      materializedContent: { elements: [{ id: "live" }] },
+    });
+    await POST(req(), context);
+    expect(mocks.saveDrawing.mock.calls[0][1]).toMatchObject({ content: { elements: [{ id: "live" }] } });
   });
 
   it("saves with the session base sha, not the fresh GitHub sha, and records the new sha", async () => {

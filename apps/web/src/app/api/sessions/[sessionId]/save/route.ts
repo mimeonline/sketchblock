@@ -41,6 +41,9 @@ export async function POST(request: Request, { params }: SessionSaveRouteContext
     if (!collabState.snapshot) {
       return NextResponse.json({ error: "Session has no snapshot to save." }, { status: 400 });
     }
+    // The live collaborative document is authoritative for elements; the checkpoint
+    // contributes app state and binary files.
+    const boardContent = collabState.materializedContent ?? collabState.snapshot.content;
 
     const repository = userId
       ? await requireOwnedRepositoryById(session.repositoryId, userId)
@@ -51,7 +54,7 @@ export async function POST(request: Request, { params }: SessionSaveRouteContext
     const result = await saveDrawing(repository, {
       path: session.drawingPath,
       sha: baseSha,
-      content: collabState.snapshot.content,
+      content: boardContent,
       message: `Save ${session.drawingPath} from Sketchblock session ${session.id}`,
     });
     await updateCollabSessionStatus({
@@ -62,7 +65,7 @@ export async function POST(request: Request, { params }: SessionSaveRouteContext
     await upsertSessionSnapshot({
       sessionId,
       drawingPath: session.drawingPath,
-      content: collabState.snapshot.content,
+      content: boardContent,
       revision: collabState.snapshot.revision,
       updatedBy: "web-api",
     });

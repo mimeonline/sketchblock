@@ -291,11 +291,13 @@ async function inspectCollabSessionLegacy(
 
 export async function getCollabSessionSnapshot(sessionId: string): Promise<{
   snapshot: CollaborationSessionSnapshot | null;
+  materializedContent: unknown;
   status: SessionLifecycleStatus;
   audit: SessionAuditEvent[];
 }> {
   const ack = await collabHttpRequest<{
     snapshot?: CollaborationSessionSnapshot | null;
+    materializedContent?: unknown;
     status?: SessionLifecycleStatus;
     audit?: SessionAuditEvent[];
   }>(`/sessions/${encodeURIComponent(sessionId)}/state`);
@@ -306,6 +308,7 @@ export async function getCollabSessionSnapshot(sessionId: string): Promise<{
 
   return {
     snapshot: ack.snapshot || null,
+    materializedContent: ack.materializedContent ?? ack.snapshot?.content ?? null,
     status: ack.status || "active",
     audit: ack.audit || [],
   };

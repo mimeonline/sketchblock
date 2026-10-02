@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 
+import { materializeBoardContent } from "../../domain/services/board-materializer.js";
 import { SessionStorePort } from "../ports/session-store.port.js";
 import { YjsDocumentRegistryPort } from "../ports/yjs-document-registry.port.js";
 
@@ -13,6 +14,10 @@ export class GetSessionStateUseCase {
   async execute(sessionId: string) {
     const session = await this.store.getSession(sessionId);
     const yjsStateBase64 = await this.yjsDocuments.getEncodedState(sessionId);
+    const liveElements = await this.yjsDocuments.getLiveElements(sessionId);
+    const materializedContent = session?.snapshot
+      ? materializeBoardContent(session.snapshot.content, liveElements)
+      : null;
 
     return {
       sessionId,
@@ -20,6 +25,7 @@ export class GetSessionStateUseCase {
       status: session?.status || "active",
       drawingPath: session?.drawingPath || null,
       snapshot: session?.snapshot || null,
+      materializedContent,
       snapshotRevision: session?.snapshot?.revision || 0,
       snapshotUpdatedAt: session?.snapshot?.updatedAt || null,
       snapshotUpdatedBy: session?.snapshot?.updatedBy || null,
