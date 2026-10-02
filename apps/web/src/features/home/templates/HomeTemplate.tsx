@@ -77,6 +77,9 @@ import { ExcalidrawEditor } from "@/features/home/organisms/ExcalidrawEditor";
 import { EditorView } from "@/features/home/organisms/EditorView";
 import { RepositoryPickerDialog } from "@/features/home/organisms/RepositoryPickerDialog";
 import { SessionShareDialog } from "@/features/home/organisms/SessionShareDialog";
+import { AdhocUploadCard } from "@/features/adhoc/organisms/AdhocUploadCard";
+import { AdhocSessionBar } from "@/features/adhoc/molecules/AdhocSessionBar";
+import { AdhocSessionMeta } from "@/features/adhoc/molecules/AdhocSessionMeta";
 import type { HomeView } from "@/features/home/types/home-view";
 import { resolveBoardPath } from "@/features/home/templates/board-selection";
 import { UserAdministrationPanel } from "@/features/users/organisms/UserAdministrationPanel";
@@ -630,6 +633,7 @@ export function HomeTemplate({ deploymentEnvironment, view, initialPath = "", us
             </div>
           ) : null}
 
+          {(view === "dashboard" || view === "sessions") && <AdhocUploadCard />}
           {view === "dashboard" && (
             <DashboardView
               repository={activeRepository}
@@ -1562,8 +1566,9 @@ function LiveSessionHero({
             </Badge>
           </div>
           <CardTitle as="h2" className="break-words text-2xl sm:text-3xl">
-            {drawingDisplayName(session.drawingPath)}
+            {session.title || drawingDisplayName(session.drawingPath)}
           </CardTitle>
+          {session.sourceKind === "adhoc" ? <div className="mt-2"><AdhocSessionMeta expiresAt={session.expiresAt} /></div> : null}
         </div>
         <PresenceAvatars presence={presence} count={session.collab?.presenceCount} />
       </CardHeader>
@@ -1676,8 +1681,9 @@ function EarlierSessions({
             <div className="grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center" key={session.id}>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="min-w-0 break-words font-semibold">{drawingDisplayName(session.drawingPath)}</span>
+                  <span className="min-w-0 break-words font-semibold">{session.title || drawingDisplayName(session.drawingPath)}</span>
                   <StatusBadge value={status} />
+                  {session.sourceKind === "adhoc" ? <AdhocSessionMeta expiresAt={session.expiresAt} /> : null}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {t("closedAgo", { time: formatRelativeTime(session.collab?.lastCheckedAt || session.updatedAt, locale) })}
@@ -2327,7 +2333,7 @@ export function JoinSessionTemplate({
       remoteRevision={remoteScene?.revision}
       readOnly={isViewer}
       onSceneChange={isViewer ? undefined : handleSceneChange}
-      onSave={isOwner ? handleOwnerSave : undefined}
+      onSave={isOwner && session?.sourceKind !== "adhoc" ? handleOwnerSave : undefined}
       onPointerUpdate={handlePointerUpdate}
       remoteCursors={remoteCursors}
       yjsSync={{
@@ -2377,6 +2383,10 @@ export function JoinSessionTemplate({
           <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-2 text-sm text-destructive" role="alert">
             {collabPresence.syncError === "yjs_document_too_large" ? t("liveSyncTooLarge") : t("liveSyncRejected")}
           </div>
+        ) : null}
+
+        {session?.sourceKind === "adhoc" ? (
+          <AdhocSessionBar sessionId={sessionId} isOwner={isOwner} title={session.title} expiresAt={session.expiresAt} participantDownload={session.participantDownload} inviteToken={inviteToken} />
         ) : null}
 
         {sessionEnded && sessionLoadState.status === "ready" ? (
