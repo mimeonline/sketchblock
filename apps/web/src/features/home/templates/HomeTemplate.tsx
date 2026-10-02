@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
+import { drawingTitle } from "@/lib/drawing-title";
 import {
   ArrowRight,
   CheckCircle2,
@@ -2053,6 +2054,7 @@ export function JoinSessionTemplate({
   const [session, setSession] = useState<CollaborationSession | null>(null);
   const [drawing, setDrawing] = useState<DrawingContent | null>(null);
   const [snapshot, setSnapshot] = useState<CollaborationSessionSnapshot | null>(null);
+  const [saveTarget, setSaveTarget] = useState<{ repository: string; branch: string; path: string } | null>(null);
   const [sessionLoadState, setSessionLoadState] = useState<{
     status: "loading" | "ready" | "error";
     message?: string;
@@ -2120,6 +2122,7 @@ export function JoinSessionTemplate({
           audit?: unknown;
           error?: string;
           code?: string;
+          saveTarget?: { repository: string; branch: string; path: string } | null;
         };
 
         if (payload.code === "session_closed") {
@@ -2130,6 +2133,7 @@ export function JoinSessionTemplate({
         }
 
         setSession(payload.session);
+        setSaveTarget(payload.saveTarget ?? null);
         setSnapshot(payload.snapshot);
         setRemoteScene({ content: payload.snapshot.content, revision: payload.snapshot.revision });
         isApplyingRemoteSnapshotRef.current = true;
@@ -2342,10 +2346,23 @@ export function JoinSessionTemplate({
       <main className={cn("mx-auto grid gap-3", isOwner ? "max-w-[1720px]" : "max-w-none")}>
         <header className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-background px-4 py-3 shadow-sm">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{t("liveCollaboration")}</p>
+            <p className="flex flex-wrap items-center gap-x-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+              {isOwner ? (
+                <Link className="normal-case tracking-normal text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="/sessions">
+                  {t("backToSessions")}
+                </Link>
+              ) : null}
+              <span>{t("liveCollaboration")}</span>
+            </p>
             <h1 className="mt-1 break-words text-xl font-bold">{session?.drawingPath ? drawingDisplayName(session.drawingPath) : t("sessionLoading")}</h1>
             <p className="text-sm text-muted-foreground">
               {demoMode ? t("demoWorkspace") : t("roleSession", { role: sessionRoleLabel(sessionRole) })}
+              {saveTarget || !isOwner ? " · " : null}
+              {saveTarget ? (
+                <span title={saveTarget.path}>{t("savesTo", { repository: saveTarget.repository, branch: saveTarget.branch })}</span>
+              ) : !isOwner ? (
+                <span>{t("ownerSavesHint")}</span>
+              ) : null}
             </p>
           </div>
           <div className="flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2 text-sm">
@@ -2734,13 +2751,7 @@ function InfoRow({
 }
 
 function drawingDisplayName(path: string) {
-  const fileName = drawingFileName(path);
-  const title = fileName.replace(/\.excalidraw$/i, "").replace(/[-_]+/g, " ").trim();
-  return title || "Unbenanntes Board";
-}
-
-function drawingFileName(path: string) {
-  return path.split("/").pop() || path;
+  return drawingTitle(path);
 }
 
 function drawingStatusLabel(status: DrawingFile["status"]) {

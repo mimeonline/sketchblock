@@ -9,6 +9,7 @@ import { useState } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/features/home/atoms/StatusBadge";
 import { ExcalidrawEditor } from "@/features/home/organisms/ExcalidrawEditor";
+import { drawingTitle } from "@/lib/drawing-title";
 import { cn } from "@/lib/utils";
 import type { DrawingContent, DrawingFile, EditorSaveState, RepositoryRecord } from "@/types/sketchblock";
 
@@ -94,7 +95,7 @@ export function EditorView({
     <div className="grid min-w-0 gap-3">
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border bg-background px-3 py-2" aria-label={t("saveStatus")}>
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <span className="max-w-full truncate font-semibold" title={selectedDrawing.path}>{selectedDrawing.path.split("/").pop()?.replace(/\.excalidraw$/i, "") || selectedDrawing.path}</span>
+          <span className="max-w-full truncate font-semibold" title={selectedDrawing.path}>{drawingTitle(selectedDrawing.path)}</span>
           <Badge variant="outline">{repository?.branch || "–"}</Badge>
           <StatusBadge value={saveState.status} />
           <span className="text-xs text-muted-foreground">{saveState.message}</span>

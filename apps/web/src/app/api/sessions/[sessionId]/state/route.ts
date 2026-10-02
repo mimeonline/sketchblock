@@ -84,9 +84,20 @@ export async function GET(_request: NextRequest, { params }: SessionStateRouteCo
       return NextResponse.json({ error: "Session not found." }, { status: 404 });
     }
 
+    // Only the owner learns where the board is stored; participants may lack repository access.
+    const repository = auth.access.role === "owner"
+      ? await (auth.access.localUserId
+        ? requireOwnedRepositoryById(state.session.repositoryId, auth.access.localUserId)
+        : requireRepositoryById(state.session.repositoryId)
+      ).catch(() => null)
+      : null;
+
     return NextResponse.json({
       ...state,
       audit: auth.access.role === "owner" ? state.audit : [],
+      saveTarget: repository
+        ? { repository: `${repository.owner}/${repository.name}`, branch: repository.branch, path: state.session.drawingPath }
+        : null,
     });
   } catch (error) {
     return NextResponse.json(

@@ -16,6 +16,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/features/home/atoms/StatusBadge";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { drawingTitle } from "@/lib/drawing-title";
 import { cn } from "@/lib/utils";
 import type {
   CollaborationSession,
@@ -474,10 +475,4 @@ function sceneElements(content: unknown): Array<{ isDeleted?: boolean }> {
 
   const elements = (content as { elements?: unknown }).elements;
   return Array.isArray(elements) ? (elements as Array<{ isDeleted?: boolean }>) : [];
-}
-
-function drawingTitle(path: string) {
-  const fileName = path.split("/").pop() || path;
-  const title = fileName.replace(/\.excalidraw$/i, "").replace(/[-_]+/g, " ").trim();
-  return title ? `${title.charAt(0).toUpperCase()}${title.slice(1)}` : "Unbenanntes Board";
 }
