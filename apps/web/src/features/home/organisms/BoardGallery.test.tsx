@@ -89,7 +89,7 @@ describe("BoardGallery", () => {
     render(<BoardGallery drawings={[drawing]} sessions={[{ ...activeSession, collab: undefined }]} />);
 
     expect(screen.queryByText("Live")).not.toBeInTheDocument();
-    expect(screen.getByText("Indiziert")).toBeInTheDocument();
+    expect(screen.getByText("Gefunden")).toBeInTheDocument();
   });
 
   it("defers rendering for very large boards", async () => {

@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security support begins with the first public `v0.1.0` release. Supported versions will be listed here with each release line.
+Security fixes target the latest `0.2.x` release. Installations on `0.1.x` should upgrade to `0.2.0` to receive the authentication, session-access and save-conflict fixes described in [CHANGELOG.md](CHANGELOG.md).
 
 ## Report a vulnerability
 

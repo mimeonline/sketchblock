@@ -7,11 +7,8 @@ const eslintConfig = defineConfig([
   ...nextTs,
   // Override default ignores of eslint-config-next.
   globalIgnores([
-    // Default ignores of eslint-config-next:
-    ".next/**",
-    // Optional distDir override used for parallel dev instances:
-    ".next-preview/**",
-    ".next-review/**",
+    // Next build outputs, including isolated dev and release directories:
+    ".next*/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

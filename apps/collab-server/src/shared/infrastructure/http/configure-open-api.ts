@@ -10,7 +10,7 @@ export function configureOpenApi(app: NestExpressApplication, enabled: boolean):
   const documentConfig = new DocumentBuilder()
     .setTitle("Sketchblock Collab Server API")
     .setDescription("HTTP API for server-side collaboration session management. Socket.IO realtime events are documented separately.")
-    .setVersion("0.1.0")
+    .setVersion("0.2.0")
     .addBearerAuth(
       {
         type: "http",

@@ -28,7 +28,7 @@ Session lifecycle, snapshots, Yjs state, and audit events are stored in the conf
 
 The web application issues short-lived signed collaboration tickets. The collaboration server validates those tickets and enforces session roles; it does not implement a separate user login flow.
 
-Redis and horizontal scaling are outside the current `0.1.0` scope.
+Redis and horizontal scaling are outside the current `0.2.0` scope.
 
 Canvas snapshot writers should send `baseRevision`, including `0` for a session without a snapshot. The store checks that revision while holding a transaction-scoped session lock. A stale write receives `{ ok: false, error: "snapshot_conflict", snapshot }` with the current snapshot and creates no snapshot audit event. Clients refresh their revision and preserve local Yjs edits; they must not retry the rejected full payload blindly. Legacy clients that omit the revision retain serialized last-write-wins behavior.
 
