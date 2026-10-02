@@ -4,12 +4,13 @@ import { safeRecordAuditEvent } from "@/lib/server/audit/audit-service";
 import { getRequestId } from "@/lib/server/logging/server-logger";
 
 import { openDrawing, saveDrawing } from "@/lib/server/application/drawing-use-cases";
-import { requireLinkedOwnerGitHub, requireOwnerApiAuth } from "@/lib/server/auth/owner-session";
+import { requireOwnerApiAuth } from "@/lib/server/auth/owner-session";
 import { getCollabSessionSnapshot, updateCollabSessionStatus } from "@/lib/server/collab/collab-server-client";
 import { getOwnedSession, updateSessionBaseSha, updateSessionStatus, upsertSessionSnapshot } from "@/lib/server/database/session-store";
 import { requireOwnedRepositoryById, requireRepositoryById } from "@/lib/server/database/repository-store";
 import { StorageConflictError } from "@/lib/server/application/storage-errors";
 
+import { requireGitHubForRepository } from "@/lib/server/workspace/github-requirement";
 import { isRepositorySession } from "@/lib/server/domain/session-lifecycle";
 
 export const runtime = "nodejs";
@@ -29,8 +30,6 @@ export async function POST(request: Request, { params }: SessionSaveRouteContext
     if (auth.response || !auth.owner) {
       return auth.response;
     }
-    requireLinkedOwnerGitHub(auth.owner);
-
     const { sessionId } = await params;
     const userId = auth.owner.id === "dev-owner" ? null : auth.owner.id;
     const session = await getOwnedSession(sessionId, userId);
@@ -57,6 +56,7 @@ export async function POST(request: Request, { params }: SessionSaveRouteContext
     const repository = userId
       ? await requireOwnedRepositoryById(session.repositoryId, userId)
       : await requireRepositoryById(session.repositoryId);
+    requireGitHubForRepository(auth.owner, repository);
     // Use the sha recorded at session start so GitHub's optimistic locking detects
     // changes committed meanwhile; only legacy sessions fall back to the current sha.
     const baseSha = session.baseSha ?? (await openDrawing(repository, session.drawingPath)).sha;

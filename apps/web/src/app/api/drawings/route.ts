@@ -16,11 +16,20 @@ export async function GET() {
       return auth.response;
     }
 
+    const repository = await getActiveRepository(auth.owner.id);
+    if (repository?.provider === "instance") {
+      // The instance workspace needs no GitHub identity and no scan bookkeeping.
+      const boards = await listDrawings(repository);
+      return NextResponse.json({
+        configured: true,
+        repository: { ...repository, status: "ready" as const, drawingCount: boards.length },
+        drawings: boards,
+      });
+    }
     if (!auth.owner.githubUserId) {
       return NextResponse.json({ configured: false, repository: null, drawings: [], githubConnected: false });
     }
     const github = requireLinkedOwnerGitHub(auth.owner);
-    const repository = await getActiveRepository(auth.owner.id);
     const drawings = repository ? await listDrawings(repository) : [];
     const scannedRepository = repository
       ? {

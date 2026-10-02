@@ -4,7 +4,8 @@ import { safeRecordAuditEvent } from "@/lib/server/audit/audit-service";
 import { rejectCrossOriginRequest } from "@/lib/server/auth/request-security";
 import { getRequestId } from "@/lib/server/logging/server-logger";
 
-import { requireLinkedOwnerGitHub, requireOwnerApiAuth } from "@/lib/server/auth/owner-session";
+import { requireOwnerApiAuth } from "@/lib/server/auth/owner-session";
+import { requireGitHubForRepository } from "@/lib/server/workspace/github-requirement";
 import { validateDrawingPath } from "@/lib/server/domain/validate-drawing-path";
 import { openDrawing } from "@/lib/server/application/drawing-use-cases";
 import {
@@ -68,9 +69,9 @@ export async function POST(request: NextRequest) {
       return auth.response;
     }
 
-    requireLinkedOwnerGitHub(auth.owner);
     const body = sessionSchema.parse(await request.json());
     const repository = await requireActiveRepository(auth.owner.id);
+    requireGitHubForRepository(auth.owner, repository);
 
     const drawingPath = validateDrawingPath(body.path);
     const drawing = await openDrawing(repository, drawingPath);

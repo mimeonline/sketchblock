@@ -20,12 +20,16 @@ export type DrawingFile = {
   lastCommit: string;
   status: DrawingStatus;
   repositoryId?: string;
+  /** Set for instance-workspace boards. */
+  boardId?: string;
 };
 
 export type DrawingContent = {
   path: string;
   sha: string;
   content: unknown;
+  /** Set for instance-workspace boards. */
+  boardId?: string;
 };
 
 export type SaveDrawingInput = {

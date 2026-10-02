@@ -7,6 +7,7 @@ import {
   requireOwnedRepositoryById,
   updateOwnedRepositoryScan,
 } from "@/lib/server/database/repository-store";
+import { listDrawings } from "@/lib/server/application/drawing-use-cases";
 import { getWritableGitHubRepository, scanGitHubRepository } from "@/lib/server/github/github-repository-adapter";
 import { getRequestId, withRequestId } from "@/lib/server/logging/server-logger";
 
@@ -29,6 +30,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
     const { repositoryId } = await context.params;
     const connectedRepository = await requireOwnedRepositoryById(repositoryId, auth.owner.id);
+    if (connectedRepository.provider === "instance") {
+      const boards = await listDrawings(connectedRepository);
+      return withRequestId(
+        NextResponse.json({ repository: { ...connectedRepository, drawingCount: boards.length }, drawings: boards }),
+        requestId,
+      );
+    }
     const githubRepository = await getWritableGitHubRepository(connectedRepository.githubRepositoryId);
     const result = await scanGitHubRepository(githubRepository);
     const repository = await updateOwnedRepositoryScan(auth.owner.id, result.repository);

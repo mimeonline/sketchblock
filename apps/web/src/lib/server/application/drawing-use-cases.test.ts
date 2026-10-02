@@ -13,6 +13,15 @@ vi.mock("@/lib/server/demo/demo-store", () => ({
   getDemoDrawing: vi.fn(),
   saveDemoDrawing: mocks.saveDemoDrawing,
 }));
+vi.mock("@/lib/server/database/workspace-board-store", () => ({
+  listWorkspaceBoards: vi.fn(),
+  getWorkspaceBoardByPath: vi.fn(),
+  saveWorkspaceBoard: vi.fn(),
+  createWorkspaceBoard: vi.fn(),
+  renameWorkspaceBoard: vi.fn(),
+  deleteWorkspaceBoard: vi.fn(),
+  revisionToSha: (revision: number) => `rev-${revision}`,
+}));
 vi.mock("@/lib/server/github/github-repository-adapter", () => {
   class GitHubApiError extends Error {
     constructor(public readonly status: number, message: string) {
@@ -30,6 +39,7 @@ vi.mock("@/lib/server/github/github-repository-adapter", () => {
 import { getDrawingStorage, saveDrawing } from "./drawing-use-cases";
 import { StorageConflictError } from "./storage-errors";
 import { DemoDrawingStorage } from "@/lib/server/demo/demo-drawing-storage";
+import { InstanceDrawingStorage } from "@/lib/server/workspace/instance-drawing-storage";
 import { GitHubDrawingStorage } from "@/lib/server/github/github-drawing-storage";
 import { GitHubApiError } from "@/lib/server/github/github-repository-adapter";
 import type { RepositoryRecord } from "@/types/sketchblock";
@@ -50,7 +60,7 @@ describe("drawing storage selection", () => {
   it("selects by repository provider", () => {
     expect(getDrawingStorage(repo("github"))).toBe(GitHubDrawingStorage);
     expect(getDrawingStorage(repo("demo"))).toBe(DemoDrawingStorage);
-    expect(() => getDrawingStorage(repo("instance"))).toThrow();
+    expect(getDrawingStorage(repo("instance"))).toBe(InstanceDrawingStorage);
   });
 
   it("falls back to demo storage in demo auth mode", () => {

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/features/home/atoms/StatusBadge";
+import { WorkspaceVersionsPanel } from "@/features/workspace/organisms/WorkspaceVersionsPanel";
 import { ExcalidrawEditor } from "@/features/home/organisms/ExcalidrawEditor";
 import { drawingTitle } from "@/lib/drawing-title";
 import { cn } from "@/lib/utils";
@@ -141,6 +142,9 @@ export function EditorView({
         }}
         onSave={onSave}
       />
+      {repository?.provider === "instance" && drawing.boardId ? (
+        <WorkspaceVersionsPanel boardId={drawing.boardId} boardTitle={drawingTitle(selectedDrawing.path)} onRestored={onReload} />
+      ) : null}
       <aside className="min-w-0" aria-label={t("gitDetails")}>
         <div>
           {saveState.status === "stale" || saveState.status === "conflict" || saveState.status === "error" ? (

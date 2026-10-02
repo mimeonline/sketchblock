@@ -4,6 +4,7 @@ import type { PoolClient, QueryResultRow } from "pg";
 
 import { getAppPostgresPool } from "@/lib/server/database/postgres";
 import { DEMO_REPOSITORY } from "@/lib/server/demo/demo-store";
+import { instanceRepositoryFor, isInstanceRepositoryId } from "@/lib/server/workspace/instance-repository";
 import type { RepositoryRecord } from "@/types/sketchblock";
 
 type RepositoryUserIdentity = {
@@ -16,7 +17,7 @@ type RepositoryUserIdentity = {
 
 type RepositoryRow = QueryResultRow & {
   id: string;
-  github_repository_id: string | number;
+  github_repository_id: string | number | null;
   owner: string;
   name: string;
   branch: string;
@@ -45,6 +46,75 @@ export async function getActiveRepository(userId: string): Promise<RepositoryRec
   );
 
   return result.rows[0] ? rowToRepository(result.rows[0]) : null;
+}
+
+/**
+ * Persists the per-user instance workspace pseudo repository on first use and
+ * returns it. It is selected automatically only if the user has no active
+ * repository yet. Returns null when the user is not a persisted local user
+ * (demo and dev identities).
+ */
+export async function ensureInstanceRepository(user: {
+  id: string;
+  username: string;
+}): Promise<RepositoryRecord | null> {
+  const pseudo = instanceRepositoryFor(user);
+  const pool = getAppPostgresPool();
+  const existing = await pool.query<RepositoryRow>(
+    `
+      SELECT repository.*
+      FROM app_repositories repository
+      INNER JOIN app_user_repositories selection ON selection.repository_id = repository.id
+      WHERE repository.id = $1 AND repository.connected_by_user_id = $2 AND selection.user_id = $2
+    `,
+    [pseudo.id, user.id],
+  );
+  if (existing.rows[0]) {
+    return rowToRepository(existing.rows[0]);
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const known = await client.query("SELECT 1 FROM app_users WHERE id = $1", [user.id]);
+    if (!known.rows[0]) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+    const inserted = await client.query<RepositoryRow>(
+      `
+        INSERT INTO app_repositories (
+          id, github_repository_id, owner, name, branch, html_url, api_url, private,
+          status, connected_by_user_id, updated_at
+        )
+        VALUES ($1, NULL, $2, $3, $4, '', '', true, 'ready', $5, now())
+        ON CONFLICT (id) DO UPDATE
+        SET owner = EXCLUDED.owner, updated_at = now()
+        WHERE app_repositories.connected_by_user_id = EXCLUDED.connected_by_user_id
+        RETURNING *
+      `,
+      [pseudo.id, pseudo.owner, pseudo.name, pseudo.branch, user.id],
+    );
+    await client.query(
+      `
+        INSERT INTO app_user_repositories (github_user_id, user_id, repository_id, is_active, selected_at)
+        VALUES (
+          NULL, $1, $2,
+          NOT EXISTS (SELECT 1 FROM app_user_repositories WHERE user_id = $1 AND is_active = true),
+          now()
+        )
+        ON CONFLICT (user_id, repository_id) DO NOTHING
+      `,
+      [user.id, pseudo.id],
+    );
+    await client.query("COMMIT");
+    return inserted.rows[0] ? rowToRepository(inserted.rows[0]) : pseudo;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function listOwnedRepositories(userId: string): Promise<RepositoryRecord[]> {
@@ -193,6 +263,9 @@ export async function activateOwnedRepository(userId: string, repositoryId: stri
 }
 
 export async function disconnectOwnedRepository(userId: string, repositoryId: string): Promise<void> {
+  if (isInstanceRepositoryId(repositoryId)) {
+    throw new Error("The instance workspace cannot be disconnected.");
+  }
   const pool = getAppPostgresPool();
   const client = await pool.connect();
 
@@ -353,8 +426,8 @@ async function upsertRepository(client: PoolClient, userId: string, repository: 
 function rowToRepository(row: RepositoryRow): RepositoryRecord {
   return {
     id: row.id,
-    provider: row.id === DEMO_REPOSITORY.id ? "demo" : "github",
-    githubRepositoryId: Number(row.github_repository_id),
+    provider: row.id === DEMO_REPOSITORY.id ? "demo" : isInstanceRepositoryId(row.id) ? "instance" : "github",
+    githubRepositoryId: row.github_repository_id === null ? 0 : Number(row.github_repository_id),
     owner: row.owner,
     name: row.name,
     branch: row.branch,

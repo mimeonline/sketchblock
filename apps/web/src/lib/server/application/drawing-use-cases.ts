@@ -11,12 +11,14 @@ import type { DrawingStoragePort } from "@/lib/server/application/drawing-storag
 import { isDemoAuthMode } from "@/lib/server/auth/auth-mode";
 import { DemoDrawingStorage } from "@/lib/server/demo/demo-drawing-storage";
 import { GitHubDrawingStorage } from "@/lib/server/github/github-drawing-storage";
+import { InstanceDrawingStorage } from "@/lib/server/workspace/instance-drawing-storage";
 
 export function getDrawingStorage(repository: RepositoryRecord): DrawingStoragePort {
   // Demo auth mode always uses the demo store, regardless of the repository record.
   const provider = isDemoAuthMode() ? "demo" : repository.provider;
   if (provider === "demo") return DemoDrawingStorage;
   if (provider === "github") return GitHubDrawingStorage;
+  if (provider === "instance") return InstanceDrawingStorage;
   throw new Error(`No storage available for provider "${provider}".`);
 }
 

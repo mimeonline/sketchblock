@@ -8,6 +8,7 @@ import { isDemoAuthMode } from "@/lib/server/auth/auth-mode";
 import { ensureDemoWorkspace } from "@/lib/server/demo/demo-store";
 import { getGitHubAccessToken } from "@/lib/server/auth/session";
 import {
+  ensureInstanceRepository,
   getActiveRepository,
   listOwnedRepositories,
   saveActiveRepository,
@@ -42,22 +43,21 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (isDemoAuthMode()) await ensureDemoWorkspace();
-    const githubAccessReady = Boolean(await getGitHubAccessToken());
-    if (!auth.owner.githubUserId) {
-      return withRequestId(
-        NextResponse.json({ repositories: [], activeRepository: null, githubConnected: false }),
-        requestId,
-      );
+    if (isDemoAuthMode()) {
+      await ensureDemoWorkspace();
+    } else {
+      // Every real local user always has an instance workspace, with or without GitHub.
+      await ensureInstanceRepository({ id: auth.owner.id, username: auth.owner.username });
     }
+    const githubAccessReady = Boolean(await getGitHubAccessToken());
     const activeRepository = await getActiveRepository(auth.owner.id);
     const repositories = await listOwnedRepositories(auth.owner.id);
     return withRequestId(
       NextResponse.json({
         repositories,
         activeRepository,
-        githubConnected: githubAccessReady,
-        githubIdentityLinked: true,
+        githubConnected: githubAccessReady && Boolean(auth.owner.githubUserId),
+        githubIdentityLinked: Boolean(auth.owner.githubUserId),
         demoMode: isDemoAuthMode(),
       }),
       requestId,

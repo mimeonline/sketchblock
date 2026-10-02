@@ -78,6 +78,7 @@ import { EditorView } from "@/features/home/organisms/EditorView";
 import { RepositoryPickerDialog } from "@/features/home/organisms/RepositoryPickerDialog";
 import { SessionShareDialog } from "@/features/home/organisms/SessionShareDialog";
 import { AdhocUploadCard } from "@/features/adhoc/organisms/AdhocUploadCard";
+import { WorkspaceBoardActions } from "@/features/workspace/organisms/WorkspaceBoardActions";
 import { AdhocSessionBar } from "@/features/adhoc/molecules/AdhocSessionBar";
 import { AdhocSessionMeta } from "@/features/adhoc/molecules/AdhocSessionMeta";
 import type { HomeView } from "@/features/home/types/home-view";
@@ -634,6 +635,7 @@ export function HomeTemplate({ deploymentEnvironment, view, initialPath = "", us
           ) : null}
 
           {(view === "dashboard" || view === "sessions") && <AdhocUploadCard />}
+          {(view === "dashboard" || view === "drawings") && activeRepository?.provider === "instance" && <WorkspaceBoardActions />}
           {view === "dashboard" && (
             <DashboardView
               repository={activeRepository}
@@ -1196,10 +1198,12 @@ function RepositoryView({
                       <RefreshCcw className={cn(scanningId === item.id && "animate-spin")} data-icon="inline-start" />
                       {t("scan")}
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => onRepositoryDisconnect(item.id)} disabled={Boolean(scanningId)}>
-                      <Trash2 data-icon="inline-start" />
-                      {t("disconnect")}
-                    </Button>
+                    {item.provider !== "instance" ? (
+                      <Button size="sm" variant="ghost" onClick={() => onRepositoryDisconnect(item.id)} disabled={Boolean(scanningId)}>
+                        <Trash2 data-icon="inline-start" />
+                        {t("disconnect")}
+                      </Button>
+                    ) : null}
                   </CardContent>
                 </Card>
               );

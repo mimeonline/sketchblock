@@ -5,8 +5,9 @@ import { getRequestId } from "@/lib/server/logging/server-logger";
 import { rejectCrossOriginRequest } from "@/lib/server/auth/request-security";
 
 import { saveDrawing } from "@/lib/server/application/drawing-use-cases";
-import { requireLinkedOwnerGitHub, requireOwnerApiAuth } from "@/lib/server/auth/owner-session";
+import { requireOwnerApiAuth } from "@/lib/server/auth/owner-session";
 import { requireActiveRepository } from "@/lib/server/database/repository-store";
+import { requireGitHubForRepository } from "@/lib/server/workspace/github-requirement";
 import { validateDrawingPath } from "@/lib/server/domain/validate-drawing-path";
 import { StorageConflictError } from "@/lib/server/application/storage-errors";
 
@@ -29,10 +30,9 @@ export async function POST(request: NextRequest) {
     if (auth.response || !auth.owner) {
       return auth.response;
     }
-    requireLinkedOwnerGitHub(auth.owner);
-
     const body = saveSchema.parse(await request.json());
     const repository = await requireActiveRepository(auth.owner.id);
+    requireGitHubForRepository(auth.owner, repository);
     const result = await saveDrawing(repository, {
       ...body,
       path: validateDrawingPath(body.path),

@@ -13,13 +13,13 @@ const MAX_BYTES = 10 * 1024 * 1024;
 const ACCEPT = ".excalidraw,.json,.png,.svg";
 const KNOWN_CODES = ["too_large", "invalid_json", "invalid_board", "too_many_elements", "invalid_file", "rate_limited", "collab_unavailable"];
 
-class UploadError extends Error {
+export class UploadError extends Error {
   constructor(public key: string) {
     super(key);
   }
 }
 
-async function fileToBoardText(file: File): Promise<string> {
+export async function fileToBoardText(file: File): Promise<string> {
   const lower = file.name.toLowerCase();
   if (lower.endsWith(".excalidraw") || lower.endsWith(".json")) {
     return file.text();
