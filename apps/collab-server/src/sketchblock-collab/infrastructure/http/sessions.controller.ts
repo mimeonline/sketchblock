@@ -11,6 +11,7 @@ import {
 import { GetSessionStateUseCase } from "../../application/use-cases/get-session-state.use-case.js";
 import { SnapshotConflict } from "../../application/dtos/snapshot-conflict.js";
 import { SessionClosed } from "../../application/dtos/session-closed.js";
+import { PurgeSessionUseCase } from "../../application/use-cases/purge-session.use-case.js";
 import { InspectSessionUseCase } from "../../application/use-cases/inspect-session.use-case.js";
 import { RegisterSessionUseCase } from "../../application/use-cases/register-session.use-case.js";
 import { UpsertSessionSnapshotUseCase } from "../../application/use-cases/upsert-session-snapshot.use-case.js";
@@ -56,6 +57,8 @@ export class SessionsController {
     private readonly updateSessionStatus: UpdateSessionStatusUseCase,
     @Inject(CloseSessionUseCase)
     private readonly closeSessionUseCase: CloseSessionUseCase,
+    @Inject(PurgeSessionUseCase)
+    private readonly purgeSessionUseCase: PurgeSessionUseCase,
     @Inject(DocumentEvictionScheduler)
     private readonly evictions: DocumentEvictionScheduler,
   ) {}
@@ -346,6 +349,40 @@ export class SessionsController {
       status: closed.session.status,
       audit: closed.session.audit,
     };
+  }
+
+  @Post(":sessionId/purge")
+  @HttpCode(200)
+  @ApiOperation({ summary: "Delete a session and all its data (server admin ticket required)." })
+  @ApiParam({ name: "sessionId", example: "demo-session" })
+  @ApiResponse({ status: 200, description: "Purge result; purged is false when the session did not exist." })
+  @ApiResponse({ status: 403, type: ErrorResponseDto })
+  async purgeSession(@Param("sessionId") sessionId: string, @Req() request: CollabHttpRequest) {
+    const authResult = this.readAuth(request);
+    if (!authResult.ok) {
+      return this.authError("session.purge.failed", authResult.error, sessionId);
+    }
+
+    const auth = authResult.payload;
+    if (
+      !this.config.authSecret ||
+      auth?.role !== "server" ||
+      auth.permission !== "admin" ||
+      !SessionAccessPolicy.canAdmin(auth, sessionId, true)
+    ) {
+      this.logSessionEvent("session.purge.failed", { sessionId, error: "not_authorized" });
+      return { ok: false, error: "not_authorized" };
+    }
+
+    const result = inspectSessionPayloadSchema.safeParse({ sessionId });
+    if (!result.success) {
+      this.logSessionEvent("session.purge.failed", { error: "invalid_session_inspect_payload" });
+      return { ok: false, error: "invalid_session_inspect_payload" };
+    }
+
+    const { purged } = await this.purgeSessionUseCase.execute(sessionId);
+    this.logSessionEvent("session.purge.succeeded", { sessionId, purged });
+    return { ok: true, sessionId, purged };
   }
 
   private readAuth(

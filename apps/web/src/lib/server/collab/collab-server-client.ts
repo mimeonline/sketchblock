@@ -388,6 +388,20 @@ export async function updateCollabSessionStatus(input: {
   }
 }
 
+export async function purgeCollabSession(sessionId: string): Promise<{ ok: boolean; purged: boolean; error?: string }> {
+  try {
+    const ack = await collabHttpRequest<{ purged?: boolean }>(`/sessions/${encodeURIComponent(sessionId)}/purge`, {
+      method: "POST",
+    });
+    if (ack.ok !== true) {
+      return { ok: false, purged: false, error: ack.error || "Collab session purge failed." };
+    }
+    return { ok: true, purged: ack.purged === true };
+  } catch (error) {
+    return { ok: false, purged: false, error: error instanceof Error ? error.message : "Collab server purge unavailable." };
+  }
+}
+
 export async function closeCollabSession(sessionId: string): Promise<CollabSessionRuntime> {
   const checkedAt = new Date().toISOString();
 

@@ -197,6 +197,7 @@ function signTicket(role: "server" | "collaborator", secret: string) {
 describe("Collab server HTTP integration with auth", () => {
   let app: NestExpressApplication;
   const secret = "metrics-test-secret";
+  const purgeableSessions = new Set<string>();
 
   beforeAll(async () => {
     process.env.COLLAB_AUTH_SECRET = secret;
@@ -206,7 +207,11 @@ describe("Collab server HTTP integration with auth", () => {
     delete process.env.COLLAB_EXPOSE_API_DOCS;
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(SessionStorePort)
-      .useValue({ async countSessions() { return 0; }, async getSession() { return null; } })
+      .useValue({
+        async countSessions() { return 0; },
+        async getSession() { return null; },
+        async deleteSession(sessionId: string) { return purgeableSessions.delete(sessionId) ? { sessionId } : null; },
+      })
       .compile();
     app = moduleRef.createNestApplication<NestExpressApplication>({ bodyParser: false });
     configureOpenApi(app, app.get(CollabConfigService).exposeApiDocs);
@@ -226,6 +231,31 @@ describe("Collab server HTTP integration with auth", () => {
       .set("Authorization", `Bearer ${signTicket("server", secret)}`)
       .expect(200)
       .expect(({ body }) => expect(body.sessions.maxActiveSessions).toBeGreaterThan(0));
+  });
+
+  it("purges sessions only with a server ticket and reports purged false the second time", async () => {
+    purgeableSessions.add("adhoc-1");
+    const server = `Bearer ${signTicket("server", secret)}`;
+    await request(app.getHttpServer())
+      .post("/sessions/adhoc-1/purge")
+      .expect(200)
+      .expect(({ body }) => expect(body.ok).toBe(false));
+    await request(app.getHttpServer())
+      .post("/sessions/adhoc-1/purge")
+      .set("Authorization", `Bearer ${signTicket("collaborator", secret)}`)
+      .expect(200)
+      .expect(({ body }) => expect(body).toEqual({ ok: false, error: "not_authorized" }));
+    expect(purgeableSessions.has("adhoc-1")).toBe(true);
+    await request(app.getHttpServer())
+      .post("/sessions/adhoc-1/purge")
+      .set("Authorization", server)
+      .expect(200)
+      .expect(({ body }) => expect(body).toEqual({ ok: true, sessionId: "adhoc-1", purged: true }));
+    await request(app.getHttpServer())
+      .post("/sessions/adhoc-1/purge")
+      .set("Authorization", server)
+      .expect(200)
+      .expect(({ body }) => expect(body).toEqual({ ok: true, sessionId: "adhoc-1", purged: false }));
   });
 
   it("does not mount API docs by default", async () => {

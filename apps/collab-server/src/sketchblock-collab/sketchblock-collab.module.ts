@@ -9,6 +9,7 @@ import { ApplyYjsUpdateUseCase } from "./application/use-cases/apply-yjs-update.
 import { CloseSessionUseCase } from "./application/use-cases/close-session.use-case.js";
 import { GetSessionStateUseCase } from "./application/use-cases/get-session-state.use-case.js";
 import { InspectSessionUseCase } from "./application/use-cases/inspect-session.use-case.js";
+import { PurgeSessionUseCase } from "./application/use-cases/purge-session.use-case.js";
 import { RegisterSessionUseCase } from "./application/use-cases/register-session.use-case.js";
 import { RemoveClientUseCase } from "./application/use-cases/remove-client.use-case.js";
 import { UpdateSessionStatusUseCase } from "./application/use-cases/update-session-status.use-case.js";
@@ -38,6 +39,7 @@ import { SocketSessionConnections } from "./infrastructure/realtime/socket-sessi
     GetSessionStateUseCase,
     GetDatabaseDiagnosticsUseCase,
     InspectSessionUseCase,
+    PurgeSessionUseCase,
     RegisterSessionUseCase,
     RemoveClientUseCase,
     RealtimeGateway,

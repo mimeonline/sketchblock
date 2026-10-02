@@ -8,6 +8,7 @@ import { CollabConfigService } from "../../../shared/infrastructure/config/colla
 import { StructuredLoggerService } from "../../../shared/infrastructure/logging/structured-logger.service.js";
 
 const PERSISTENCE_DEBOUNCE_MS = 250;
+const PURGE_TOMBSTONE_MS = 60_000;
 
 type PendingPersistence = {
   sessionId: string;
@@ -23,6 +24,8 @@ export class YjsDocumentRegistry extends YjsDocumentRegistryPort {
   private readonly pendingPersistence = new Map<string, PendingPersistence>();
   private readonly persistenceTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly persistenceQueues = new Map<string, Promise<void>>();
+  /** Sessions being purged; persistence is skipped until the tombstone expires. */
+  private readonly purgedSessions = new Set<string>();
   /** Bumped on every access or mutation so releaseDocument can detect activity during its awaits. */
   private readonly generations = new Map<string, number>();
 
@@ -138,6 +141,14 @@ export class YjsDocumentRegistry extends YjsDocumentRegistryPort {
     this.generations.delete(sessionId);
   }
 
+  async purgeDocument(sessionId: string): Promise<void> {
+    this.purgedSessions.add(sessionId);
+    setTimeout(() => this.purgedSessions.delete(sessionId), PURGE_TOMBSTONE_MS).unref?.();
+    this.cancelScheduledPersistence(sessionId);
+    await this.persistenceQueues.get(sessionId)?.catch(() => undefined);
+    this.deleteDocument(sessionId);
+  }
+
   /**
    * Persists pending state and drops the document. Returns false (document kept) when the
    * session was touched while persistence was awaited, so late updates are never discarded.
@@ -193,6 +204,7 @@ export class YjsDocumentRegistry extends YjsDocumentRegistryPort {
   private enqueuePersistence(input: PendingPersistence) {
     const previous = this.persistenceQueues.get(input.sessionId) ?? Promise.resolve();
     const next = previous.catch(() => undefined).then(async () => {
+      if (this.purgedSessions.has(input.sessionId)) return;
       await this.store.upsertYjsState(input);
     });
     this.persistenceQueues.set(input.sessionId, next);

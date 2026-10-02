@@ -16,4 +16,6 @@ export abstract class YjsDocumentRegistryPort {
   abstract deleteDocument(sessionId: string): void;
   /** Persists pending updates, then drops the in-memory document. Resolves false when activity during the release kept the document. */
   abstract releaseDocument(sessionId: string): Promise<boolean>;
+  /** Discards pending persistence and the live document without writing; later persistence for this session is blocked for a grace period. */
+  abstract purgeDocument(sessionId: string): Promise<void>;
 }
