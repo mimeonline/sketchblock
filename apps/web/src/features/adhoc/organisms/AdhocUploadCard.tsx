@@ -7,6 +7,7 @@ import { Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -44,15 +45,52 @@ export async function fileToBoardText(file: File): Promise<string> {
   throw new UploadError("errorUnsupported");
 }
 
+function createEmptyBoard(): string {
+  return JSON.stringify({
+    type: "excalidraw",
+    version: 2,
+    source: "sketchblock",
+    elements: [],
+    appState: { viewBackgroundColor: "#ffffff" },
+    files: {},
+  });
+}
+
+interface SubmitPayload {
+  fileName: string;
+  board: string;
+}
+
 export function AdhocUploadCard() {
   const t = useTranslations("Adhoc");
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const roomNameRef = useRef<HTMLInputElement>(null);
   const hintId = useId();
   const errorId = useId();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
+
+  async function submitSession(payload: SubmitPayload) {
+    setBusy(true);
+    try {
+      const response = await fetch("/api/adhoc-sessions", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = (await response.json().catch(() => ({}))) as { url?: string; code?: string };
+      if (!response.ok || !data.url) {
+        const key = data.code && KNOWN_CODES.includes(data.code) ? `error${data.code}` : "errorgeneric";
+        throw new UploadError(key);
+      }
+      router.push(data.url);
+    } catch (caught) {
+      setError(t(caught instanceof UploadError ? (caught.key as "errorgeneric") : "errorReadFailed"));
+      setBusy(false);
+    }
+  }
 
   async function handleFile(file: File | undefined) {
     if (!file || busy) return;
@@ -61,20 +99,9 @@ export function AdhocUploadCard() {
       setError(t("errorTooLarge"));
       return;
     }
-    setBusy(true);
     try {
       const board = await fileToBoardText(file);
-      const response = await fetch("/api/adhoc-sessions", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ fileName: file.name, board }),
-      });
-      const payload = (await response.json().catch(() => ({}))) as { url?: string; code?: string };
-      if (!response.ok || !payload.url) {
-        const key = payload.code && KNOWN_CODES.includes(payload.code) ? `error${payload.code}` : "errorgeneric";
-        throw new UploadError(key);
-      }
-      router.push(payload.url);
+      await submitSession({ fileName: file.name, board });
     } catch (caught) {
       setError(t(caught instanceof UploadError ? (caught.key as "errorgeneric") : "errorReadFailed"));
       setBusy(false);
@@ -83,13 +110,21 @@ export function AdhocUploadCard() {
     }
   }
 
+  async function handleStartEmptyRoom() {
+    if (busy) return;
+    setError(null);
+    const roomName = (roomNameRef.current?.value ?? "").trim();
+    const fileName = roomName ? `${roomName}.excalidraw` : "New board.excalidraw";
+    await submitSession({ fileName, board: createEmptyBoard() });
+  }
+
   return (
     <Card className="mb-5">
       <CardHeader>
         <CardTitle as="h2" className="text-lg">{t("uploadTitle")}</CardTitle>
         <p className="text-sm text-muted-foreground">{t("uploadDescription")}</p>
       </CardHeader>
-      <CardContent className="grid gap-3">
+      <CardContent className="grid gap-6">
         <div
           data-testid="adhoc-dropzone"
           className={cn(
@@ -130,6 +165,38 @@ export function AdhocUploadCard() {
           </Button>
           <p className="text-xs text-muted-foreground" id={hintId}>{t("dropZoneHint")}</p>
         </div>
+
+        <div className="border-t pt-4">
+          <h3 className="mb-3 text-sm font-medium">{t("emptyRoomTitle")}</h3>
+          <p className="mb-3 text-xs text-muted-foreground">{t("emptyRoomDescription")}</p>
+          <div className="grid gap-2">
+            <label htmlFor="room-name" className="text-sm font-medium">
+              {t("roomNameLabel")}
+            </label>
+            <Input
+              id="room-name"
+              ref={roomNameRef}
+              placeholder={t("roomNamePlaceholder")}
+              maxLength={80}
+              disabled={busy}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  void handleStartEmptyRoom();
+                }
+              }}
+            />
+            <Button
+              disabled={busy}
+              onClick={() => void handleStartEmptyRoom()}
+              type="button"
+              variant="default"
+              data-testid="adhoc-start-room-button"
+            >
+              {busy ? t("creating") : t("startRoom")}
+            </Button>
+          </div>
+        </div>
+
         {error ? (
           <p className="text-sm font-medium text-destructive" id={errorId} role="alert">{error}</p>
         ) : null}

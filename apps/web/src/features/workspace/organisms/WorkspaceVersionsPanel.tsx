@@ -13,10 +13,12 @@ export function WorkspaceVersionsPanel({
   boardId,
   boardTitle,
   onRestored,
+  refreshKey,
 }: {
   boardId: string;
   boardTitle: string;
   onRestored: () => void;
+  refreshKey?: string;
 }) {
   const t = useTranslations("InstanceWorkspace");
   const format = useFormatter();
@@ -41,7 +43,7 @@ export function WorkspaceVersionsPanel({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
-  }, [load]);
+  }, [load, refreshKey]);
 
   async function restore(revision: number) {
     if (!window.confirm(t("restoreConfirm", { revision }))) return;

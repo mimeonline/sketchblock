@@ -48,6 +48,22 @@ describe("validateBoardUpload", () => {
     expect(result.elements).toHaveLength(2);
   });
 
+  it("accepts empty board with no elements", () => {
+    const board = {
+      type: "excalidraw",
+      version: 2,
+      source: "sketchblock",
+      elements: [],
+      appState: { viewBackgroundColor: "#ffffff" },
+      files: {},
+    };
+    const result = validateBoardUpload(JSON.stringify(board));
+    expect(result.type).toBe("excalidraw");
+    expect(result.elements).toHaveLength(0);
+    expect(result.appState?.viewBackgroundColor).toBe("#ffffff");
+    expect(result.version).toBe(2);
+  });
+
   it("accepts board with version and preserves it", () => {
     const board = {
       type: "excalidraw",

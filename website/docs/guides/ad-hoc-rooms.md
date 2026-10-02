@@ -11,6 +11,8 @@ Use **Upload a file and collaborate** (drag and drop or **Choose file**) to impo
 
 The upload size limit is 10 MB, with a maximum of 20,000 elements. Embedded images are limited to PNG, JPEG, GIF, WebP, or SVG data URLs. Uploads are rate-limited per user.
 
+Alternatively, use **Start an empty room** to create a blank board for immediate collaboration without uploading a file.
+
 ## Sharing and Access
 
 Invite collaborators and viewers using the same dialog as a regular session. Presence, live editing, and role-based access work as usual—owner, collaborator, and viewer roles apply.

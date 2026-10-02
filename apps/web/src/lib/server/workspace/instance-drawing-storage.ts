@@ -38,12 +38,13 @@ export const InstanceDrawingStorage: DrawingStoragePort = {
       status: "indexed" as const,
       repositoryId: repository.id,
       boardId: board.id,
+      title: board.title,
     }));
   },
 
   async open(repository, path) {
     const board = await getWorkspaceBoardByPath(ownerOf(repository), validateDrawingPath(path));
-    return { path: board.path, sha: revisionToSha(board.revision), content: board.content, boardId: board.id };
+    return { path: board.path, sha: revisionToSha(board.revision), content: board.content, boardId: board.id, title: board.title };
   },
 
   async save(repository, input) {

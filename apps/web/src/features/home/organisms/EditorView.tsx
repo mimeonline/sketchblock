@@ -97,7 +97,7 @@ export function EditorView({
     <div className="grid min-w-0 gap-3">
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border bg-background px-3 py-2" aria-label={t("saveStatus")}>
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <span className="max-w-full truncate font-semibold" title={selectedDrawing.path}>{drawingTitle(selectedDrawing.path)}</span>
+          <span className="max-w-full truncate font-semibold" title={selectedDrawing.path}>{selectedDrawing.title ?? drawingTitle(selectedDrawing.path)}</span>
           <Badge variant="outline">{repository?.branch || "–"}</Badge>
           <StatusBadge value={saveState.status} />
           <span className="text-xs text-muted-foreground">{saveState.message}</span>
@@ -148,7 +148,7 @@ export function EditorView({
         })}
       />
       {repository?.provider === "instance" && drawing.boardId ? (
-        <WorkspaceVersionsPanel boardId={drawing.boardId} boardTitle={drawingTitle(selectedDrawing.path)} onRestored={onReload} />
+        <WorkspaceVersionsPanel boardId={drawing.boardId} boardTitle={drawingTitle(selectedDrawing.path)} onRestored={onReload} refreshKey={drawing.sha} />
       ) : null}
       {repository?.provider !== "instance" ? (
         <aside className="min-w-0" aria-label={t("gitDetails")}>
