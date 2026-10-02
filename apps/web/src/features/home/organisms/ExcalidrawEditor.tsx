@@ -143,6 +143,7 @@ export function ExcalidrawEditor({
   const editorRef = useRef<HTMLDivElement>(null);
   const fullscreenButtonRef = useRef<HTMLButtonElement>(null);
   const hasFittedContentRef = useRef(false);
+  const restoreElementsRef = useRef<typeof import("@excalidraw/excalidraw").restoreElements | null>(null);
 
   useEffect(() => {
     if (!fullscreen) {
@@ -217,19 +218,26 @@ export function ExcalidrawEditor({
         // uses fallback metrics and can clip imported text once the real font arrives.
         await document.fonts?.ready;
         const { restoreElements } = await import("@excalidraw/excalidraw");
+        restoreElementsRef.current = restoreElements;
         if (!active || hasUserInteractedRef.current) return;
-        if (!yjsSync?.enabled) {
-          excalidrawApi.updateScene({
-            elements: restoreElements(excalidrawApi.getSceneElements(), null, { refreshDimensions: true, repairBindings: true }),
-            captureUpdate: "NEVER",
-          });
-        }
+        // Re-measure text with the loaded fonts; this is a local render fix and is
+        // not propagated to collaborators because no user interaction happened yet.
+        excalidrawApi.updateScene({
+          elements: restoreElements(excalidrawApi.getSceneElements(), null, { refreshDimensions: true, repairBindings: true }),
+          captureUpdate: "NEVER",
+        });
         fitBoard();
         hasFittedContentRef.current = true;
       })();
     });
     return () => { active = false; cancelAnimationFrame(frame); };
-  }, [excalidrawApi, fitBoard, initialData, yjsSync?.enabled]);
+  }, [excalidrawApi, fitBoard, initialData]);
+
+  const prepareRemoteElements = useCallback((elements: Parameters<NonNullable<Parameters<typeof useExcalidrawYjs>[0]["prepareRemoteElements"]>>[0]) => {
+    const restoreElements = restoreElementsRef.current;
+    if (!restoreElements) return elements;
+    return restoreElements(elements, null, { refreshDimensions: true }) as typeof elements;
+  }, []);
 
   const yjs = useExcalidrawYjs({
     sessionId: yjsSync?.sessionId || "inactive",
@@ -252,6 +260,7 @@ export function ExcalidrawEditor({
         isApplyingRemoteRef.current = false;
       }, 160);
     },
+    prepareRemoteElements,
   });
 
   useEffect(() => {

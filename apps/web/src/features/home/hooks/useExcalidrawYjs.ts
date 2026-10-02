@@ -28,6 +28,8 @@ type UseExcalidrawYjsInput = {
   onSendUpdate: (updateBase64: string) => void;
   onBeforeRemoteApply?: () => void;
   onAfterRemoteApply?: () => void;
+  /** Normalizes remote elements before rendering, e.g. re-measuring text with loaded fonts. */
+  prepareRemoteElements?: (elements: StoredElement[]) => StoredElement[];
 };
 
 type StoredElement = ExcalidrawElement & {
@@ -118,6 +120,7 @@ export function useExcalidrawYjs({
   onSendUpdate,
   onBeforeRemoteApply,
   onAfterRemoteApply,
+  prepareRemoteElements,
 }: UseExcalidrawYjsInput) {
   const docRef = useRef<Y.Doc | null>(null);
   const mapRef = useRef<Y.Map<StoredElement> | null>(null);
@@ -131,6 +134,7 @@ export function useExcalidrawYjs({
   const onSendUpdateRef = useRef(onSendUpdate);
   const onBeforeRemoteApplyRef = useRef(onBeforeRemoteApply);
   const onAfterRemoteApplyRef = useRef(onAfterRemoteApply);
+  const prepareRemoteElementsRef = useRef(prepareRemoteElements);
 
   const initialElements = useMemo(() => sceneElements(initialContent), [initialContent]);
 
@@ -139,7 +143,8 @@ export function useExcalidrawYjs({
     onSendUpdateRef.current = onSendUpdate;
     onBeforeRemoteApplyRef.current = onBeforeRemoteApply;
     onAfterRemoteApplyRef.current = onAfterRemoteApply;
-  }, [initialStateBase64, onAfterRemoteApply, onBeforeRemoteApply, onSendUpdate]);
+    prepareRemoteElementsRef.current = prepareRemoteElements;
+  }, [initialStateBase64, onAfterRemoteApply, onBeforeRemoteApply, onSendUpdate, prepareRemoteElements]);
 
   useEffect(() => {
     if (!enabled || !api || initializedSessionRef.current === sessionId) {
@@ -158,7 +163,8 @@ export function useExcalidrawYjs({
         return;
       }
 
-      const elements = Array.from(elementsMap.values()).sort(compareElementOrder);
+      const sorted = Array.from(elementsMap.values()).sort(compareElementOrder);
+      const elements = prepareRemoteElementsRef.current?.(sorted) ?? sorted;
       isApplyingRemoteRef.current = true;
       onBeforeRemoteApplyRef.current?.();
       api.updateScene({

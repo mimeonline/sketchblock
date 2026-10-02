@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { ArrowRight, FilePenLine, RefreshCcw, UsersRound } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/features/home/atoms/StatusBadge";
 import { ExcalidrawEditor } from "@/features/home/organisms/ExcalidrawEditor";
@@ -20,6 +21,8 @@ export function EditorView({
   onReload,
   onDirty,
   onSave,
+  liveSessionHref,
+  onStartSession,
 }: {
   demoMode: boolean;
   drawing: DrawingContent | null;
@@ -29,8 +32,12 @@ export function EditorView({
   onReload: () => void;
   onDirty: () => void;
   onSave: (content: unknown) => Promise<void>;
+  liveSessionHref?: string | null;
+  onStartSession?: () => Promise<void>;
 }) {
   const t = useTranslations("Workspace");
+  const [startingSession, setStartingSession] = useState(false);
+  const hasUnsavedChanges = saveState.status === "dirty" || saveState.status === "stale" || saveState.status === "conflict";
   if (!selectedDrawing) {
     return (
       <div className="grid min-h-64 place-items-center rounded-xl border border-dashed bg-background/70 px-5 py-10 text-center">
@@ -92,9 +99,34 @@ export function EditorView({
           <StatusBadge value={saveState.status} />
           <span className="text-xs text-muted-foreground">{saveState.message}</span>
         </div>
-        <Link className={cn(buttonVariants({ variant: "outline", size: "sm" }), "shrink-0")} href={`/sessions?path=${encodeURIComponent(selectedDrawing.path)}`}>
-          <UsersRound data-icon="inline-start" />{t("collaborateBoard")}
-        </Link>
+        {liveSessionHref ? (
+          <Link className={cn(buttonVariants({ variant: "outline", size: "sm" }), "shrink-0")} href={liveSessionHref}>
+            <UsersRound data-icon="inline-start" />{t("joinLiveSession")}
+          </Link>
+        ) : onStartSession ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            disabled={startingSession || hasUnsavedChanges}
+            title={hasUnsavedChanges ? t("saveBeforeSession") : undefined}
+            onClick={async () => {
+              setStartingSession(true);
+              try {
+                await onStartSession();
+              } finally {
+                setStartingSession(false);
+              }
+            }}
+          >
+            <UsersRound data-icon="inline-start" />{startingSession ? t("startingSession") : t("collaborateBoard")}
+          </Button>
+        ) : (
+          <Link className={cn(buttonVariants({ variant: "outline", size: "sm" }), "shrink-0")} href={`/sessions?path=${encodeURIComponent(selectedDrawing.path)}`}>
+            <UsersRound data-icon="inline-start" />{t("collaborateBoard")}
+          </Link>
+        )}
       </div>
       <ExcalidrawEditor
         key={`${repository?.id}:${repository?.branch}:${selectedDrawing.path}`}

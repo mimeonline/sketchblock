@@ -128,6 +128,7 @@ type HomeTemplateProps = {
 export function HomeTemplate({ deploymentEnvironment, view, initialPath = "", user }: HomeTemplateProps) {
   const tView = useTranslations("Views");
   const t = useTranslations("Workspace");
+  const router = useRouter();
   const [repositories, setRepositories] = useState<RepositoryRecord[]>([]);
   const [activeRepositoryId, setActiveRepositoryId] = useState("");
   const [switchingRepository, setSwitchingRepository] = useState(false);
@@ -421,7 +422,7 @@ export function HomeTemplate({ deploymentEnvironment, view, initialPath = "", us
     }
   }
 
-  async function handleStartSession(filePath: string) {
+  async function handleStartSession(filePath: string, options: { open?: boolean } = {}) {
     try {
       const response = await fetch("/api/sessions", {
         method: "POST",
@@ -440,6 +441,9 @@ export function HomeTemplate({ deploymentEnvironment, view, initialPath = "", us
 
       setSessions((current) => [payload.session as CollaborationSession, ...current]);
       setNotice({ tone: "success", message: t("sessionStarted") });
+      if (options.open && payload.url) {
+        router.push(payload.url);
+      }
     } catch (error) {
       setNotice({
         tone: "error",
@@ -668,6 +672,8 @@ export function HomeTemplate({ deploymentEnvironment, view, initialPath = "", us
           {view === "editor" && !loaded ? <div className="grid min-h-64 place-items-center rounded-xl border bg-background" role="status" aria-busy="true">{t("loading")}</div> : null}
           {view === "editor" && loaded && (
             <EditorView
+              liveSessionHref={selectedDrawing ? liveSessionHrefFor(sessions, selectedDrawing.path) : null}
+              onStartSession={selectedDrawing ? () => handleStartSession(selectedDrawing.path, { open: true }) : undefined}
               demoMode={demoMode}
               drawing={drawing}
               repository={activeRepository}
@@ -1567,6 +1573,9 @@ function LiveSessionHero({
         <SessionShareDialog
           collaboratorHref={session.shareLinks?.collaborator || ""}
           viewerHref={session.shareLinks?.viewer || ""}
+          collaboratorExpiresAt={session.shareLinks?.collaboratorExpiresAt}
+          viewerExpiresAt={session.shareLinks?.viewerExpiresAt}
+          sessionId={session.id}
         />
         <EndSessionDialog session={session} onEndSession={onEndSession} />
       </CardContent>
@@ -1804,7 +1813,7 @@ function SessionAuditTable({
             ) : null}
             <TableCell className="text-xs font-medium">{sessionAuditTypeLabel(event.type)}</TableCell>
             <TableCell className="hidden max-w-44 font-medium md:table-cell">
-              <TruncatedValue className="font-sans" text={event.actor} />
+              <TruncatedValue className="font-sans" text={auditActorLabel(event.actor, locale)} />
             </TableCell>
             <TableCell className="max-w-[520px] whitespace-normal text-muted-foreground">{sessionAuditMessage(event)}</TableCell>
           </TableRow>
@@ -2587,7 +2596,7 @@ function SessionAuditFeed({ events }: { events: SessionAuditEvent[] }) {
             <span className="text-xs font-semibold">{sessionAuditTypeLabel(event.type)}</span>
             <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{formatTime(event.at, locale)}</span>
           </div>
-          <TruncatedValue className="text-xs text-muted-foreground" text={event.actor} />
+          <TruncatedValue className="text-xs text-muted-foreground" text={auditActorLabel(event.actor, locale)} />
         </div>
       ))}
     </div>
@@ -2645,6 +2654,22 @@ function sessionRoleLabel(role: SessionRole) {
   }
 
   return "Collaborator";
+}
+
+function auditActorLabel(actor: string, locale: string) {
+  const german = locale.startsWith("de");
+  if (actor === "github") return german ? "GitHub-Import" : "GitHub import";
+  if (actor === "web-api" || actor === "server") return "Sketchblock";
+  // Legacy entries stored anonymous browser client ids instead of identities.
+  if (actor.startsWith("client-")) return german ? "Teilnehmer" : "Participant";
+  return actor;
+}
+
+function liveSessionHrefFor(sessions: CollaborationSession[], drawingPath: string) {
+  const live = sessions.find(
+    (session) => session.drawingPath === drawingPath && (session.collab?.sessionStatus || session.status) === "active",
+  );
+  return live ? `/join/${live.id}?owner=1` : null;
 }
 
 function sessionLoadErrorMessage(error: unknown, fallback: string) {

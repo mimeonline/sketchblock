@@ -2,12 +2,13 @@ import "server-only";
 
 import { type Pool, type QueryResult } from "pg";
 
+import { createServerCollabTicket } from "@/lib/server/auth/collab-ticket";
 import { getCollabDatabaseDiagnostics, getCollabServerUrl } from "@/lib/server/collab/collab-server-client";
 import { getAppPostgresPool } from "@/lib/server/database/postgres";
 import { getLastDiagnosticError } from "./error-registry";
 
 const REQUEST_TIMEOUT_MS = 2_000;
-const EXPECTED_APP_SCHEMA_VERSION = 8;
+const EXPECTED_APP_SCHEMA_VERSION = 12;
 
 type MigrationRow = { version: string | null; description: string | null; installed_on: Date | string | null };
 
@@ -87,7 +88,11 @@ async function inspectCollabServer() {
   try {
     const [healthResponse, metricsResponse] = await Promise.all([
       fetch(`${getCollabServerUrl()}/health`, { cache: "no-store", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }),
-      fetch(`${getCollabServerUrl()}/metrics`, { cache: "no-store", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }),
+      fetch(`${getCollabServerUrl()}/metrics`, {
+        cache: "no-store",
+        headers: { authorization: `Bearer ${createServerCollabTicket()}` },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      }),
     ]);
     const health = await healthResponse.json() as { service?: string; status?: string; transport?: string; version?: string };
     const metrics = metricsResponse.ok ? await metricsResponse.json() as {
