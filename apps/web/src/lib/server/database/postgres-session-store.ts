@@ -14,6 +14,7 @@ type SessionRow = QueryResultRow & {
   created_at: Date | string;
   updated_at: Date | string;
   created_by_user_id: string | null;
+  base_sha?: string | null;
 };
 
 type SnapshotRow = QueryResultRow & {
@@ -48,6 +49,7 @@ export async function createPostgresSession(
   repositoryId: string,
   drawingPath: string,
   ownerId: string | null,
+  baseSha: string | null = null,
 ): Promise<CollaborationSession> {
   const now = new Date().toISOString();
   const session: CollaborationSession = {
@@ -57,14 +59,15 @@ export async function createPostgresSession(
     status: "active",
     createdAt: now,
     updatedAt: now,
+    baseSha,
   };
 
   await getAppPostgresPool().query(
     `
-      INSERT INTO app_sessions (id, repository_id, drawing_path, status, created_at, updated_at, created_by_user_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO app_sessions (id, repository_id, drawing_path, status, created_at, updated_at, created_by_user_id, base_sha)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     `,
-    [session.id, session.repositoryId, session.drawingPath, session.status, session.createdAt, session.updatedAt, ownerId],
+    [session.id, session.repositoryId, session.drawingPath, session.status, session.createdAt, session.updatedAt, ownerId, baseSha],
   );
 
   return session;
@@ -126,6 +129,23 @@ export async function updatePostgresSessionStatus(
   return result.rows[0] ? rowToSession(result.rows[0]) : null;
 }
 
+export async function updatePostgresSessionBaseSha(
+  sessionId: string,
+  sha: string,
+  userId: string | null,
+): Promise<CollaborationSession | null> {
+  const result = userId
+    ? await getAppPostgresPool().query<SessionRow>(
+        "UPDATE app_sessions SET base_sha = $2, updated_at = $3 WHERE id = $1 AND created_by_user_id = $4 RETURNING *",
+        [sessionId, sha, new Date().toISOString(), userId],
+      )
+    : await getAppPostgresPool().query<SessionRow>(
+        "UPDATE app_sessions SET base_sha = $2, updated_at = $3 WHERE id = $1 RETURNING *",
+        [sessionId, sha, new Date().toISOString()],
+      );
+  return result.rows[0] ? rowToSession(result.rows[0]) : null;
+}
+
 export async function getPostgresSessionSnapshot(sessionId: string): Promise<CollaborationSessionSnapshot | null> {
   const result = await getAppPostgresPool().query<SnapshotRow>(
     "SELECT * FROM app_session_snapshots WHERE session_id = $1",
@@ -183,6 +203,7 @@ function rowToSession(row: SessionRow): CollaborationSession {
     status: row.status,
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),
+    baseSha: row.base_sha ?? null,
   };
 }
 

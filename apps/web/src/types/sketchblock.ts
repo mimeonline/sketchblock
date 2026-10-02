@@ -87,9 +87,12 @@ export type CollaborationSession = {
   status: SessionLifecycleStatus;
   createdAt: string;
   updatedAt: string;
+  baseSha?: string | null;
   shareLinks?: {
     collaborator: string;
     viewer: string;
+    collaboratorExpiresAt?: string | null;
+    viewerExpiresAt?: string | null;
   };
   participants?: SessionParticipant[];
   collab?: CollabSessionRuntime;

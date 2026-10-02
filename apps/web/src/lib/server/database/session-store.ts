@@ -8,6 +8,7 @@ import {
   getOwnedPostgresSession,
   getPostgresSessionSnapshot,
   listPostgresSessions,
+  updatePostgresSessionBaseSha,
   updatePostgresSessionStatus,
   upsertPostgresSessionSnapshot,
 } from "@/lib/server/database/postgres-session-store";
@@ -16,8 +17,8 @@ export async function listSessions(userId: string | null, repositoryId?: string)
   return listPostgresSessions(userId, repositoryId);
 }
 
-export async function createSession(repositoryId: string, drawingPath: string, ownerId: string | null): Promise<CollaborationSession> {
-  return createPostgresSession(repositoryId, drawingPath, ownerId);
+export async function createSession(repositoryId: string, drawingPath: string, ownerId: string | null, baseSha: string | null = null): Promise<CollaborationSession> {
+  return createPostgresSession(repositoryId, drawingPath, ownerId, baseSha);
 }
 
 export async function getSession(sessionId: string): Promise<CollaborationSession | null> {
@@ -52,4 +53,12 @@ export async function upsertSessionSnapshot(input: {
   revision?: number;
 }): Promise<CollaborationSessionSnapshot> {
   return upsertPostgresSessionSnapshot(input);
+}
+
+export async function updateSessionBaseSha(
+  sessionId: string,
+  sha: string,
+  userId: string | null,
+): Promise<CollaborationSession | null> {
+  return updatePostgresSessionBaseSha(sessionId, sha, userId);
 }

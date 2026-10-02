@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { safeRecordAuditEvent } from "@/lib/server/audit/audit-service";
+import { rejectCrossOriginRequest } from "@/lib/server/auth/request-security";
 import { getRequestId } from "@/lib/server/logging/server-logger";
 
 import { requireLinkedOwnerGitHub, requireOwnerApiAuth } from "@/lib/server/auth/owner-session";
@@ -12,7 +13,7 @@ import {
   registerCollabSession,
 } from "@/lib/server/collab/collab-server-client";
 import { getActiveRepository, requireActiveRepository } from "@/lib/server/database/repository-store";
-import { createSession, listSessions } from "@/lib/server/database/session-store";
+import { createSession, deleteSession, listSessions } from "@/lib/server/database/session-store";
 import { ensureSessionInvites, listSessionParticipants } from "@/lib/server/database/session-invite-store";
 
 export const runtime = "nodejs";
@@ -55,6 +56,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const originError = rejectCrossOriginRequest(request);
+  if (originError) return originError;
   const requestId = getRequestId(request);
   try {
     const auth = await requireOwnerApiAuth();
@@ -69,9 +72,17 @@ export async function POST(request: NextRequest) {
     const drawingPath = validateDrawingPath(body.path);
     const drawing = await openDrawing(repository, drawingPath);
     const userId = auth.owner.id === "dev-owner" ? null : auth.owner.id;
-    const session = await createSession(repository.id, drawingPath, userId);
-    const invites = await ensureSessionInvites(session.id, userId);
+    const session = await createSession(repository.id, drawingPath, userId, drawing.sha);
     const collab = await registerCollabSession(session, drawing.content);
+    if (collab.status === "error" || collab.status === "unreachable") {
+      // Invites are removed via ON DELETE CASCADE (app_session_invites.session_id).
+      await deleteSession(session.id, userId);
+      return NextResponse.json(
+        { error: "The collaboration server could not register the session.", code: "collab_unavailable" },
+        { status: 503 },
+      );
+    }
+    const invites = await ensureSessionInvites(session.id, userId);
     await safeRecordAuditEvent({ actorId: auth.owner.id, actorUsername: auth.owner.username, actorRole: auth.owner.role, action: "session.start", targetType: "session", targetId: session.id, outcome: "success", metadata: { repositoryId: repository.id, drawingPath }, requestId, sessionId: session.id });
     await safeRecordAuditEvent({ actorId: auth.owner.id, actorUsername: auth.owner.username, actorRole: auth.owner.role, action: "session.invite.create", targetType: "session", targetId: session.id, outcome: "success", metadata: { roles: ["collaborator", "viewer"] }, requestId, sessionId: session.id });
     return NextResponse.json({
@@ -93,5 +104,7 @@ function inviteLinks(
   return {
     collaborator: `/join/${sessionId}?invite=${encodeURIComponent(invites.collaborator.token)}`,
     viewer: `/join/${sessionId}?invite=${encodeURIComponent(invites.viewer.token)}`,
+    collaboratorExpiresAt: invites.collaborator.expiresAt,
+    viewerExpiresAt: invites.viewer.expiresAt,
   };
 }

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
+import { rejectCrossOriginRequest } from "@/lib/server/auth/request-security";
 import { safeRecordAuditEvent } from "@/lib/server/audit/audit-service";
 import { getRequestId } from "@/lib/server/logging/server-logger";
 
 import { openDrawing, saveDrawing } from "@/lib/server/application/drawing-use-cases";
 import { requireLinkedOwnerGitHub, requireOwnerApiAuth } from "@/lib/server/auth/owner-session";
 import { getCollabSessionSnapshot, updateCollabSessionStatus } from "@/lib/server/collab/collab-server-client";
-import { getOwnedSession, updateSessionStatus, upsertSessionSnapshot } from "@/lib/server/database/session-store";
+import { getOwnedSession, updateSessionBaseSha, updateSessionStatus, upsertSessionSnapshot } from "@/lib/server/database/session-store";
 import { requireOwnedRepositoryById, requireRepositoryById } from "@/lib/server/database/repository-store";
 import { GitHubApiError } from "@/lib/server/github/github-repository-adapter";
 
@@ -17,8 +18,10 @@ type SessionSaveRouteContext = {
   }>;
 };
 
-export async function POST(_request: Request, { params }: SessionSaveRouteContext) {
-  const requestId = getRequestId(_request);
+export async function POST(request: Request, { params }: SessionSaveRouteContext) {
+  const originError = rejectCrossOriginRequest(request);
+  if (originError) return originError;
+  const requestId = getRequestId(request);
   try {
     const auth = await requireOwnerApiAuth();
     if (auth.response || !auth.owner) {
@@ -42,10 +45,12 @@ export async function POST(_request: Request, { params }: SessionSaveRouteContex
     const repository = userId
       ? await requireOwnedRepositoryById(session.repositoryId, userId)
       : await requireRepositoryById(session.repositoryId);
-    const currentDrawing = await openDrawing(repository, session.drawingPath);
+    // Use the sha recorded at session start so GitHub's optimistic locking detects
+    // changes committed meanwhile; only legacy sessions fall back to the current sha.
+    const baseSha = session.baseSha ?? (await openDrawing(repository, session.drawingPath)).sha;
     const result = await saveDrawing(repository, {
       path: session.drawingPath,
-      sha: currentDrawing.sha,
+      sha: baseSha,
       content: collabState.snapshot.content,
       message: `Save ${session.drawingPath} from Sketchblock session ${session.id}`,
     });
@@ -61,6 +66,7 @@ export async function POST(_request: Request, { params }: SessionSaveRouteContex
       revision: collabState.snapshot.revision,
       updatedBy: "web-api",
     });
+    await updateSessionBaseSha(sessionId, result.contentSha, userId);
     await updateSessionStatus(sessionId, "saved", userId);
     await safeRecordAuditEvent({ actorId: auth.owner.id, actorUsername: auth.owner.username, actorRole: auth.owner.role, action: "board.save", targetType: "drawing", targetId: session.drawingPath, outcome: "success", metadata: { commitSha: result.commitSha, sessionId }, requestId, sessionId });
 
@@ -71,6 +77,15 @@ export async function POST(_request: Request, { params }: SessionSaveRouteContex
       },
     });
   } catch (error) {
+    if (error instanceof GitHubApiError && (error.status === 409 || error.status === 422)) {
+      return NextResponse.json(
+        {
+          error: "The board was changed in GitHub after this session started. Reload the board in a new session or save the session content manually.",
+          code: "github_conflict",
+        },
+        { status: 409 },
+      );
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: error instanceof GitHubApiError && error.status === 409 ? 409 : 400 },
