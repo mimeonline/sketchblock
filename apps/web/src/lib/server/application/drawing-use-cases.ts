@@ -7,28 +7,30 @@ import type {
   SaveDrawingInput,
   SaveDrawingResult,
 } from "@/types/sketchblock";
-import {
-  listGitHubDrawings,
-  readGitHubDrawing,
-  saveGitHubDrawing,
-} from "@/lib/server/github/github-repository-adapter";
+import type { DrawingStoragePort } from "@/lib/server/application/drawing-storage-port";
 import { isDemoAuthMode } from "@/lib/server/auth/auth-mode";
-import { getDemoDrawing, listDemoDrawings, saveDemoDrawing } from "@/lib/server/demo/demo-store";
+import { DemoDrawingStorage } from "@/lib/server/demo/demo-drawing-storage";
+import { GitHubDrawingStorage } from "@/lib/server/github/github-drawing-storage";
+
+export function getDrawingStorage(repository: RepositoryRecord): DrawingStoragePort {
+  // Demo auth mode always uses the demo store, regardless of the repository record.
+  const provider = isDemoAuthMode() ? "demo" : repository.provider;
+  if (provider === "demo") return DemoDrawingStorage;
+  if (provider === "github") return GitHubDrawingStorage;
+  throw new Error(`No storage available for provider "${provider}".`);
+}
 
 export async function listDrawings(repository: RepositoryRecord): Promise<DrawingFile[]> {
-  if (isDemoAuthMode()) return listDemoDrawings();
-  return listGitHubDrawings(repository);
+  return getDrawingStorage(repository).list(repository);
 }
 
 export async function openDrawing(repository: RepositoryRecord, path: string): Promise<DrawingContent> {
-  if (isDemoAuthMode()) return getDemoDrawing(path);
-  return readGitHubDrawing(repository, path);
+  return getDrawingStorage(repository).open(repository, path);
 }
 
 export async function saveDrawing(
   repository: RepositoryRecord,
   input: SaveDrawingInput,
 ): Promise<SaveDrawingResult> {
-  if (isDemoAuthMode()) return saveDemoDrawing(input);
-  return saveGitHubDrawing(repository, input);
+  return getDrawingStorage(repository).save(repository, input);
 }

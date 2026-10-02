@@ -8,7 +8,7 @@ import { requireLinkedOwnerGitHub, requireOwnerApiAuth } from "@/lib/server/auth
 import { getCollabSessionSnapshot, updateCollabSessionStatus } from "@/lib/server/collab/collab-server-client";
 import { getOwnedSession, updateSessionBaseSha, updateSessionStatus, upsertSessionSnapshot } from "@/lib/server/database/session-store";
 import { requireOwnedRepositoryById, requireRepositoryById } from "@/lib/server/database/repository-store";
-import { GitHubApiError } from "@/lib/server/github/github-repository-adapter";
+import { StorageConflictError } from "@/lib/server/application/storage-errors";
 
 import { isRepositorySession } from "@/lib/server/domain/session-lifecycle";
 
@@ -89,18 +89,18 @@ export async function POST(request: Request, { params }: SessionSaveRouteContext
       },
     });
   } catch (error) {
-    if (error instanceof GitHubApiError && error.status === 409) {
+    if (error instanceof StorageConflictError) {
       return NextResponse.json(
         {
-          error: "The board was changed in GitHub after this session started. Reload the board in a new session or save the session content manually.",
-          code: "github_conflict",
+          error: "The board was changed after this session started. Reload the board in a new session or save the session content manually.",
+          code: "storage_conflict",
         },
         { status: 409 },
       );
     }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: error instanceof GitHubApiError && error.status === 409 ? 409 : 400 },
+      { status: 400 },
     );
   }
 }

@@ -3,6 +3,7 @@ import "server-only";
 import type { PoolClient, QueryResultRow } from "pg";
 
 import { getAppPostgresPool } from "@/lib/server/database/postgres";
+import { DEMO_REPOSITORY } from "@/lib/server/demo/demo-store";
 import type { RepositoryRecord } from "@/types/sketchblock";
 
 type RepositoryUserIdentity = {
@@ -352,6 +353,7 @@ async function upsertRepository(client: PoolClient, userId: string, repository: 
 function rowToRepository(row: RepositoryRow): RepositoryRecord {
   return {
     id: row.id,
+    provider: row.id === DEMO_REPOSITORY.id ? "demo" : "github",
     githubRepositoryId: Number(row.github_repository_id),
     owner: row.owner,
     name: row.name,

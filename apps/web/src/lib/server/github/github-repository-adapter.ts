@@ -297,6 +297,7 @@ function availableToRepositoryRecord(
 ): RepositoryRecord {
   return {
     id: `github-${repository.githubRepositoryId}`,
+    provider: "github",
     githubRepositoryId: repository.githubRepositoryId,
     owner: repository.owner,
     name: repository.name,

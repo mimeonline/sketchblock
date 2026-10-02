@@ -7,6 +7,7 @@ import type { DrawingContent, DrawingFile, RepositoryRecord, SaveDrawingInput, S
 
 export const DEMO_REPOSITORY: RepositoryRecord = {
   id: "demo-repository",
+  provider: "demo",
   githubRepositoryId: -1,
   owner: "sketchblock",
   name: "demo-workspace",

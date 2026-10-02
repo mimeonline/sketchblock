@@ -2277,7 +2277,7 @@ export function JoinSessionTemplate({
         code?: string;
       };
 
-      if (payload.code === "github_conflict") {
+      if (payload.code === "github_conflict" || payload.code === "storage_conflict") {
         throw new Error(t("githubConflict"));
       }
       if (!response.ok || !payload.result) {

@@ -8,7 +8,7 @@ import { saveDrawing } from "@/lib/server/application/drawing-use-cases";
 import { requireLinkedOwnerGitHub, requireOwnerApiAuth } from "@/lib/server/auth/owner-session";
 import { requireActiveRepository } from "@/lib/server/database/repository-store";
 import { validateDrawingPath } from "@/lib/server/domain/validate-drawing-path";
-import { GitHubApiError } from "@/lib/server/github/github-repository-adapter";
+import { StorageConflictError } from "@/lib/server/application/storage-errors";
 
 export const runtime = "nodejs";
 
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: error instanceof GitHubApiError && error.status === 409 ? 409 : 400 },
+      { status: error instanceof StorageConflictError ? 409 : 400 },
     );
   }
 }

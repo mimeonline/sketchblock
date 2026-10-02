@@ -23,6 +23,7 @@ const repositoryBase = {
 
 const repositoryRecord = {
   id: "github-101",
+  provider: "github" as const,
   githubRepositoryId: 101,
   owner: "mimeonline",
   name: "software-factory",

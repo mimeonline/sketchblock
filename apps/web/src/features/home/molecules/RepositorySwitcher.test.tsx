@@ -8,6 +8,7 @@ import { RepositorySwitcher } from "./RepositorySwitcher";
 const repositories = [
   {
     id: "github-1",
+    provider: "github" as const,
     githubRepositoryId: 1,
     owner: "mimeonline",
     name: "sketchblock",
@@ -19,6 +20,7 @@ const repositories = [
   },
   {
     id: "github-2",
+    provider: "github" as const,
     githubRepositoryId: 2,
     owner: "mimeonline",
     name: "software-factory",

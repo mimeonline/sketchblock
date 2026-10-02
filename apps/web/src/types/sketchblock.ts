@@ -48,8 +48,11 @@ export type Participant = {
   lastJoined: string;
 };
 
+export type RepositoryProvider = "github" | "demo" | "instance";
+
 export type RepositoryRecord = {
   id: string;
+  provider: RepositoryProvider;
   githubRepositoryId: number;
   owner: string;
   name: string;

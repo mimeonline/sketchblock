@@ -37,6 +37,7 @@ vi.mock("@/lib/server/database/repository-store", () => ({
 }));
 
 import { GitHubApiError } from "@/lib/server/github/github-repository-adapter";
+import { StorageConflictError } from "@/lib/server/application/storage-errors";
 import { POST } from "./route";
 
 const context = { params: Promise.resolve({ sessionId: "s1" }) };
@@ -90,11 +91,11 @@ describe("session save route", () => {
     expect(response.status).toBe(400);
   });
 
-  it.each([409])("maps GitHub %s to 409 github_conflict", async (status) => {
-    mocks.saveDrawing.mockRejectedValue(new GitHubApiError(status, "conflict"));
+  it("maps storage conflict to 409 storage_conflict", async () => {
+    mocks.saveDrawing.mockRejectedValue(new StorageConflictError("conflict"));
     const response = await POST(req(), context);
     expect(response.status).toBe(409);
-    expect(await response.json()).toMatchObject({ code: "github_conflict" });
+    expect(await response.json()).toMatchObject({ code: "storage_conflict" });
     expect(mocks.updateSessionBaseSha).not.toHaveBeenCalled();
   });
 
