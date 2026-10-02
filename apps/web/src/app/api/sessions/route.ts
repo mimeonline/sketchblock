@@ -15,6 +15,7 @@ import {
 import { getActiveRepository, requireActiveRepository } from "@/lib/server/database/repository-store";
 import { createSession, deleteSession, listSessions } from "@/lib/server/database/session-store";
 import { ensureSessionInvites, listSessionParticipants } from "@/lib/server/database/session-invite-store";
+import { purgeExpiredAdhocSessions } from "@/lib/server/application/purge-adhoc-sessions";
 import { isSessionClosed } from "@/lib/server/domain/session-lifecycle";
 
 export const runtime = "nodejs";
@@ -30,6 +31,7 @@ export async function GET() {
       return auth.response;
     }
 
+    void purgeExpiredAdhocSessions({}).catch(() => undefined);
     const userId = auth.owner.id === "dev-owner" ? null : auth.owner.id;
     const activeRepository = await getActiveRepository(auth.owner.id);
     const sessions = await listSessions(userId, activeRepository?.id);

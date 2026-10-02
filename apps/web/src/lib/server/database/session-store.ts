@@ -5,6 +5,7 @@ import {
   createPostgresAdhocSession,
   createPostgresSession,
   deletePostgresSessionsByIds,
+  markExpiredPostgresAdhocSessionsForPurge,
   listPurgeablePostgresAdhocSessions,
   setPostgresParticipantDownload,
   setPostgresSessionPurgeAfter,
@@ -94,4 +95,8 @@ export async function setParticipantDownload(
   userId: string | null,
 ): Promise<CollaborationSession | null> {
   return setPostgresParticipantDownload(sessionId, value, userId);
+}
+
+export async function markExpiredAdhocSessionsForPurge(now: Date, retentionHours: number): Promise<number> {
+  return markExpiredPostgresAdhocSessionsForPurge(now, retentionHours);
 }

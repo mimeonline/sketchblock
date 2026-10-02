@@ -38,6 +38,7 @@ vi.mock("@/lib/server/database/session-store", () => ({
   deleteSession: mocks.deleteSession,
   listSessions: vi.fn(),
 }));
+vi.mock("@/lib/server/application/purge-adhoc-sessions", () => ({ purgeExpiredAdhocSessions: vi.fn() }));
 vi.mock("@/lib/server/database/session-invite-store", () => ({
   ensureSessionInvites: mocks.ensureSessionInvites,
   listSessionParticipants: vi.fn(),

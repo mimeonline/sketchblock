@@ -128,6 +128,16 @@ export async function listPurgeablePostgresAdhocSessions(now: Date, limit: numbe
   return result.rows.map((row) => row.id);
 }
 
+export async function markExpiredPostgresAdhocSessionsForPurge(now: Date, retentionHours: number): Promise<number> {
+  const result = await getAppPostgresPool().query(
+    `UPDATE app_sessions
+     SET purge_after = expires_at + ($2::double precision * interval '1 hour')
+     WHERE source_kind = 'adhoc' AND purge_after IS NULL AND expires_at IS NOT NULL AND expires_at < $1`,
+    [now.toISOString(), retentionHours],
+  );
+  return result.rowCount ?? 0;
+}
+
 export async function deletePostgresSessionsByIds(ids: string[]): Promise<number> {
   if (ids.length === 0) return 0;
   const result = await getAppPostgresPool().query("DELETE FROM app_sessions WHERE id = ANY($1::text[])", [ids]);
