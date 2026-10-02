@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
 
 const sessionMocks = vi.hoisted(() => ({
   clearAuthCookie: vi.fn(),
@@ -30,16 +31,37 @@ describe("logout route", () => {
     sessionMocks.getCurrentOwner.mockResolvedValue(null);
   });
 
-  it.each([
-    ["GET", GET],
-    ["POST", POST],
-  ])("clears auth cookies and redirects %s requests to login", async (_method, handler) => {
-    const response = await handler();
+  it("POST clears auth cookies and redirects to login", async () => {
+    const request = new NextRequest("http://localhost:4512/api/auth/logout", {
+      method: "POST",
+      headers: { origin: "http://localhost:4512" },
+    });
+    const response = await POST(request);
 
     expect(sessionMocks.clearAuthCookie).toHaveBeenCalledOnce();
     expect(sessionMocks.clearOwnerAuthCookie).toHaveBeenCalledOnce();
     expect(sessionMocks.clearSessionGrantCookies).toHaveBeenCalledOnce();
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe("http://localhost:4512/login");
+  });
+
+  it("GET redirects to login without clearing cookies", async () => {
+    const response = await GET();
+
+    expect(sessionMocks.clearAuthCookie).not.toHaveBeenCalled();
+    expect(sessionMocks.clearOwnerAuthCookie).not.toHaveBeenCalled();
+    expect(sessionMocks.clearSessionGrantCookies).not.toHaveBeenCalled();
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe("http://localhost:4512/login");
+  });
+
+  it("POST rejects requests without Origin header", async () => {
+    const request = new NextRequest("http://localhost:4512/api/auth/logout", {
+      method: "POST",
+    });
+    const response = await POST(request);
+
+    expect(response.status).toBe(403);
+    expect(sessionMocks.clearAuthCookie).not.toHaveBeenCalled();
   });
 });

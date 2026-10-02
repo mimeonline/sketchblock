@@ -6,6 +6,7 @@ import { clearOwnerAuthCookie, getCurrentOwner } from "@/lib/server/auth/owner-s
 import { clearSessionGrantCookies } from "@/lib/server/auth/session-grant";
 import { safeRecordAuditEvent } from "@/lib/server/audit/audit-service";
 import { getRequestId } from "@/lib/server/logging/server-logger";
+import { rejectCrossOriginRequest } from "@/lib/server/auth/request-security";
 
 export const runtime = "nodejs";
 
@@ -19,5 +20,13 @@ async function logout(request?: NextRequest) {
   return NextResponse.redirect(new URL("/login", getAppBaseUrl()));
 }
 
-export async function POST(request?: NextRequest) { return logout(request); }
-export async function GET(request?: NextRequest) { return logout(request); }
+export async function POST(request: NextRequest) {
+  const originError = rejectCrossOriginRequest(request);
+  if (originError) return originError;
+
+  return logout(request);
+}
+
+export async function GET() {
+  return NextResponse.redirect(new URL("/login", getAppBaseUrl()));
+}

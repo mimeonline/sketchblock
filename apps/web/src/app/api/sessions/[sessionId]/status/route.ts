@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { safeRecordAuditEvent } from "@/lib/server/audit/audit-service";
 import { getRequestId } from "@/lib/server/logging/server-logger";
+import { rejectCrossOriginRequest } from "@/lib/server/auth/request-security";
 
 import { requireOwnerApiAuth } from "@/lib/server/auth/owner-session";
 import { updateCollabSessionStatus } from "@/lib/server/collab/collab-server-client";
@@ -21,6 +22,9 @@ const statusSchema = z.object({
 });
 
 export async function PATCH(request: NextRequest, { params }: SessionStatusRouteContext) {
+  const originError = rejectCrossOriginRequest(request);
+  if (originError) return originError;
+
   const requestId = getRequestId(request);
   try {
     const auth = await requireOwnerApiAuth();

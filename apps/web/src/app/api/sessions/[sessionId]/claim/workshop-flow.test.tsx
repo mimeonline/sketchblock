@@ -31,6 +31,7 @@ vi.mock("@/lib/server/database/session-invite-store", () => ({
   validateSessionInvite: mocks.validateSessionInvite,
   validateSessionInviteGrant: mocks.validateSessionInviteGrant,
   recordSessionParticipant: mocks.recordSessionParticipant,
+  isParticipantRemoved: async () => false,
 }));
 vi.mock("@/lib/server/collab/collab-server-client", () => ({
   getCollabSessionSnapshot: async () => ({ status: "active", snapshot: { content: { elements: [] } }, audit: [{ actor: "owner" }] }),
@@ -56,7 +57,7 @@ describe("workshop claim and reload contract (signed cookies, mocked database an
     process.env.SKETCHBLOCK_AUTH_MODE = "github";
     process.env.APP_BASE_URL = "https://workshop.example.test";
     process.env.APP_AUTH_SECRET = "workshop-test-secret-long-enough-for-signing";
-    mocks.cookieJar.set("sketchblock_auth", signPayload({ id: 42, login: "guest", name: "Guest", permission: "read", expiresAt: Date.now() + 60_000 }));
+    mocks.cookieJar.set("sketchblock_auth", signPayload({ id: 42, login: "guest", name: "Guest", permission: "read", expiresAt: Date.now() + 60_000 }, "participant-auth"));
     mocks.getCurrentOwner.mockResolvedValue({ id: "foreign-local-user", username: "local" });
     mocks.getOwnedSession.mockResolvedValue(null);
     mocks.validateSessionInviteGrant.mockResolvedValue(true);
@@ -78,9 +79,9 @@ describe("workshop claim and reload contract (signed cookies, mocked database an
     const ticket = await socket("collaborator");
     expect(ticket.status).toBe(200);
     const { token } = await ticket.json();
-    expect(verifySignedPayload<CollabTicketPayload>(token)).toMatchObject({ role, actor: "guest", sessionId: "workshop", permission: "read" });
+    expect(verifySignedPayload<CollabTicketPayload>(token, "collab-ticket")).toMatchObject({ role, actor: "guest", sessionId: "workshop", permission: "read" });
 
-    const patch = await patchState(new NextRequest("https://workshop.example.test/api/sessions/workshop/state", { method: "PATCH", body: JSON.stringify({ clientId: "guest-client", content: { elements: [] } }) }), context);
+    const patch = await patchState(new NextRequest("https://workshop.example.test/api/sessions/workshop/state", { method: "PATCH", headers: { origin: "https://workshop.example.test" }, body: JSON.stringify({ clientId: "guest-client", content: { elements: [] } }) }), context);
     expect(patch.status).toBe(role === "collaborator" ? 200 : 403);
     expect(mocks.upsertCollabSessionSnapshot).toHaveBeenCalledTimes(role === "collaborator" ? 1 : 0);
     expect((await socket("owner")).status).toBe(404);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { safeRecordAuditEvent } from "@/lib/server/audit/audit-service";
+import { rejectCrossOriginRequest } from "@/lib/server/auth/request-security";
 import { requireOwnerApiAuth } from "@/lib/server/auth/owner-session";
 import {
   requireOwnedRepositoryById,
@@ -14,6 +15,9 @@ export const runtime = "nodejs";
 type RouteContext = { params: Promise<{ repositoryId: string }> };
 
 export async function POST(request: NextRequest, context: RouteContext) {
+  const originError = rejectCrossOriginRequest(request);
+  if (originError) return originError;
+
   const requestId = getRequestId(request);
   try {
     const auth = await requireOwnerApiAuth();

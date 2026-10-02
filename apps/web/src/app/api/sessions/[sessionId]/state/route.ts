@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import { rejectCrossOriginRequest } from "@/lib/server/auth/request-security";
 import { openDrawing } from "@/lib/server/application/drawing-use-cases";
 import { authorizeSessionRequest } from "@/lib/server/auth/session-access";
 import {
@@ -96,6 +97,9 @@ export async function GET(_request: NextRequest, { params }: SessionStateRouteCo
 }
 
 export async function PATCH(request: NextRequest, { params }: SessionStateRouteContext) {
+  const originError = rejectCrossOriginRequest(request);
+  if (originError) return originError;
+
   try {
     const { sessionId } = await params;
     const auth = await authorizeSessionRequest(request, sessionId, "edit");

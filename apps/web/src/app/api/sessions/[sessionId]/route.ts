@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { rejectCrossOriginRequest } from "@/lib/server/auth/request-security";
 import { requireOwnerApiAuth } from "@/lib/server/auth/owner-session";
 import { closeCollabSession } from "@/lib/server/collab/collab-server-client";
 import { deleteSession, getOwnedSession } from "@/lib/server/database/session-store";
@@ -28,7 +29,10 @@ export async function GET(_request: NextRequest, { params }: SessionRouteContext
   return NextResponse.json({ session });
 }
 
-export async function DELETE(_request: NextRequest, { params }: SessionRouteContext) {
+export async function DELETE(request: NextRequest, { params }: SessionRouteContext) {
+  const originError = rejectCrossOriginRequest(request);
+  if (originError) return originError;
+
   const auth = await requireOwnerApiAuth();
   if (auth.response) {
     return auth.response;

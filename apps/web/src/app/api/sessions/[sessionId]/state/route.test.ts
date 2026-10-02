@@ -59,6 +59,7 @@ describe("web snapshot fallback revision contract", () => {
 function request(body: object) {
   return new NextRequest("http://localhost:4512/api/sessions/s1/state", {
     method: "PATCH",
+    headers: { origin: "http://localhost:4512" },
     body: JSON.stringify({ clientId: "guest-client", ...body }),
   });
 }

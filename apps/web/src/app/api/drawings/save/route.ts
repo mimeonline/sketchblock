@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { safeRecordAuditEvent } from "@/lib/server/audit/audit-service";
 import { getRequestId } from "@/lib/server/logging/server-logger";
+import { rejectCrossOriginRequest } from "@/lib/server/auth/request-security";
 
 import { saveDrawing } from "@/lib/server/application/drawing-use-cases";
 import { requireLinkedOwnerGitHub, requireOwnerApiAuth } from "@/lib/server/auth/owner-session";
@@ -19,6 +20,9 @@ const saveSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const originError = rejectCrossOriginRequest(request);
+  if (originError) return originError;
+
   const requestId = getRequestId(request);
   try {
     const auth = await requireOwnerApiAuth();

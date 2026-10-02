@@ -1,12 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
+import { rejectCrossOriginRequest } from "@/lib/server/auth/request-security";
 import { isDemoAuthMode } from "@/lib/server/auth/auth-mode";
 import { requireInstanceOwnerApiAuth } from "@/lib/server/auth/owner-session";
 import { resetDemoDrawing } from "@/lib/server/demo/demo-store";
 
 export const runtime = "nodejs";
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  const originError = rejectCrossOriginRequest(request);
+  if (originError) return originError;
+
   const auth = await requireInstanceOwnerApiAuth();
   if (auth.response || !auth.owner) return auth.response!;
   if (!isDemoAuthMode()) {
