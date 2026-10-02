@@ -44,6 +44,7 @@ import { resolveClientIp } from "../../../shared/infrastructure/security/client-
 import { CollabTicketVerifier, type CollabTicketPayload } from "../auth/collab-ticket.verifier.js";
 import { SessionStorePort } from "../../application/ports/session-store.port.js";
 import { DocumentEvictionScheduler } from "./document-eviction.scheduler.js";
+import { SessionParticipantExclusions } from "./session-participant-exclusions.js";
 import { SocketSessionConnections, sessionRoomName } from "./socket-session-connections.js";
 
 type AckCallback = (response: unknown) => void;
@@ -97,6 +98,8 @@ export class RealtimeGateway
     private readonly connections: SocketSessionConnections,
     @Inject(DocumentEvictionScheduler)
     private readonly evictions: DocumentEvictionScheduler,
+    @Inject(SessionParticipantExclusions)
+    private readonly exclusions: SessionParticipantExclusions,
   ) {}
 
   afterInit(server: Server) {
@@ -166,11 +169,40 @@ export class RealtimeGateway
       return;
     }
 
+    const joinAuth = this.socketAuth(socket);
+    if (
+      joinAuth &&
+      joinAuth.role !== "owner" &&
+      joinAuth.role !== "server" &&
+      this.exclusions.isExcluded(payload.sessionId, joinAuth.actor)
+    ) {
+      this.logSocketEvent("session.join.failed", socket, { sessionId: payload.sessionId, error: "participant_removed" });
+      ack?.({ ok: false, error: "participant_removed" });
+      return;
+    }
+
+    // Cancel a pending eviction before any await so a release cannot race this join.
+    this.evictions.cancel(payload.sessionId);
+    let joined = false;
+    try {
+      joined = await this.completeJoin(socket, payload, ack);
+    } finally {
+      if (!joined) {
+        this.evictions.scheduleIfEmpty(payload.sessionId);
+      }
+    }
+  }
+
+  private async completeJoin(
+    socket: AuthenticatedSocket,
+    payload: JoinSessionPayload,
+    ack?: AckCallback,
+  ): Promise<boolean> {
     const capacity = await this.checkSessionCapacity(socket, payload.sessionId);
     if (!capacity.ok) {
       this.logSocketEvent("session.join.failed", socket, { sessionId: payload.sessionId, error: capacity.error });
       ack?.({ ok: false, error: capacity.error });
-      return;
+      return false;
     }
 
     const auth = this.socketAuth(socket);
@@ -181,7 +213,7 @@ export class RealtimeGateway
       if (error instanceof SessionClosed) {
         this.logSocketEvent("session.join.failed", socket, { sessionId: payload.sessionId, error: "session_closed" });
         ack?.({ ok: false, error: "session_closed" });
-        return;
+        return false;
       }
       throw error;
     }
@@ -199,11 +231,10 @@ export class RealtimeGateway
     // presence for a socket that is already gone (ghost participants).
     if (!socket.connected) {
       this.logSocketEvent("session.join.aborted", socket, { sessionId: payload.sessionId, error: "socket_disconnected" });
-      return;
+      return false;
     }
     await socket.join(roomName(payload.sessionId));
     this.presence.addPresence(payload.sessionId, presenceUser);
-    this.evictions.cancel(payload.sessionId);
 
     const presence = this.presence.getPresence(payload.sessionId);
     socket.to(roomName(payload.sessionId)).emit("presence:update", {
@@ -229,6 +260,7 @@ export class RealtimeGateway
       audit: this.canReadAudit(socket) ? session.audit || [] : [],
       presence,
     });
+    return true;
   }
 
   @SubscribeMessage("canvas:update")
@@ -401,6 +433,7 @@ export class RealtimeGateway
     }
 
     const state = await this.getSessionStateUseCase.execute(result.data.sessionId);
+    this.evictions.scheduleIfEmpty(result.data.sessionId);
     this.logSocketEvent("yjs.state.get.succeeded", socket, {
       sessionId: result.data.sessionId,
       yjsRevision: state.yjsRevision,
@@ -436,6 +469,7 @@ export class RealtimeGateway
     }
 
     const state = await this.getSessionStateUseCase.execute(result.data.sessionId);
+    this.evictions.scheduleIfEmpty(result.data.sessionId);
     this.logSocketEvent("session.snapshot.get.succeeded", socket, {
       sessionId: result.data.sessionId,
       snapshotRevision: state.snapshotRevision,
@@ -608,7 +642,7 @@ export class RealtimeGateway
       return;
     }
 
-    const { sessionId, socketId } = result.data;
+    const { sessionId, socketId, excludeActor } = result.data;
     const kickedBy = this.socketAuth(socket)?.actor || result.data.kickedBy;
     if (!this.canAdminSession(socket, sessionId)) {
       this.logSocketEvent("client.kick.failed", socket, { sessionId, targetSocketId: socketId, error: "not_authorized" });
@@ -616,7 +650,8 @@ export class RealtimeGateway
       return;
     }
 
-    const targetPresence = this.presence.getSessionPresence(sessionId)?.get(socketId);
+    const sessionPresence = this.presence.getSessionPresence(sessionId);
+    const targetPresence = sessionPresence?.get(socketId);
 
     if (!targetPresence) {
       this.logSocketEvent("client.kick.failed", socket, { sessionId, targetSocketId: socketId, error: "client_not_found" });
@@ -624,38 +659,29 @@ export class RealtimeGateway
       return;
     }
 
-    const targetSockets = await this.server.in(socketId).fetchSockets();
-    if (targetSockets.length === 0) {
-      const removed = await this.removeClientUseCase.execute({ sessionId, socketId, removedBy: kickedBy });
-      this.server.to(roomName(sessionId)).emit("presence:update", {
-        sessionId,
-        presence: this.presence.getPresence(sessionId),
-      });
+    // Participant removal: exclude the actor and drop every socket of that user (never the owner).
+    const exclude = excludeActor === true && targetPresence.role !== "owner";
+    let targetSocketIds = [socketId];
+    if (exclude) {
+      this.exclusions.exclude(sessionId, targetPresence.userId);
+      targetSocketIds = Array.from(sessionPresence?.values() ?? [])
+        .filter((entry) => entry.userId === targetPresence.userId)
+        .map((entry) => entry.socketId);
+      if (!targetSocketIds.includes(socketId)) {
+        targetSocketIds.push(socketId);
+      }
+    }
+
+    let disconnected = false;
+    for (const targetSocketId of targetSocketIds) {
+      const outcome = await this.kickSocket(sessionId, targetSocketId, kickedBy);
+      if (outcome.ok) {
+        disconnected ||= outcome.disconnected;
+        continue;
+      }
+      this.logSocketEvent("client.kick.failed", socket, { sessionId, targetSocketId, error: outcome.error });
+      ack?.(outcome);
       this.evictions.scheduleIfEmpty(sessionId);
-      this.logSocketEvent("client.kick.succeeded", socket, {
-        sessionId,
-        targetSocketId: socketId,
-        kickedBy,
-        disconnected: false,
-      });
-      ack?.(removed.ok ? { ok: true, sessionId, socketId, disconnected: false } : removed);
-      return;
-    }
-
-    for (const targetSocket of targetSockets) {
-      targetSocket.emit("client:kicked", {
-        sessionId,
-        socketId,
-        kickedBy,
-      });
-      targetSocket.leave(roomName(sessionId));
-      targetSocket.disconnect(true);
-    }
-
-    const removed = await this.removeClientUseCase.execute({ sessionId, socketId, removedBy: kickedBy });
-    if (!removed.ok) {
-      this.logSocketEvent("client.kick.failed", socket, { sessionId, targetSocketId: socketId, error: removed.error });
-      ack?.(removed);
       return;
     }
 
@@ -668,10 +694,27 @@ export class RealtimeGateway
       sessionId,
       targetSocketId: socketId,
       kickedBy,
-      disconnected: true,
+      disconnected,
+      excluded: exclude,
+      removedSockets: targetSocketIds.length,
     });
 
-    ack?.({ ok: true, sessionId, socketId, disconnected: true });
+    ack?.({ ok: true, sessionId, socketId, disconnected, excluded: exclude });
+  }
+
+  private async kickSocket(sessionId: string, socketId: string, kickedBy: string) {
+    const targetSockets = await this.server.in(socketId).fetchSockets();
+    // Remove presence first: disconnecting a socket drops its presence synchronously.
+    const removed = await this.removeClientUseCase.execute({ sessionId, socketId, removedBy: kickedBy });
+    for (const targetSocket of targetSockets) {
+      targetSocket.emit("client:kicked", { sessionId, socketId, kickedBy });
+      targetSocket.leave(roomName(sessionId));
+      targetSocket.disconnect(true);
+    }
+    if (!removed.ok && targetSockets.length === 0) {
+      return removed;
+    }
+    return { ok: true as const, disconnected: targetSockets.length > 0 };
   }
 
   handleDisconnect(socket: AuthenticatedSocket) {

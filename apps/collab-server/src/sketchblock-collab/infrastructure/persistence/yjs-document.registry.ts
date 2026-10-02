@@ -23,6 +23,8 @@ export class YjsDocumentRegistry extends YjsDocumentRegistryPort {
   private readonly pendingPersistence = new Map<string, PendingPersistence>();
   private readonly persistenceTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly persistenceQueues = new Map<string, Promise<void>>();
+  /** Bumped on every access or mutation so releaseDocument can detect activity during its awaits. */
+  private readonly generations = new Map<string, number>();
 
   constructor(
     @Inject(SessionStorePort) private readonly store: SessionStorePort,
@@ -32,7 +34,12 @@ export class YjsDocumentRegistry extends YjsDocumentRegistryPort {
     super();
   }
 
+  private touch(sessionId: string) {
+    this.generations.set(sessionId, (this.generations.get(sessionId) ?? 0) + 1);
+  }
+
   async getDocument(sessionId: string): Promise<Y.Doc> {
+    this.touch(sessionId);
     const existing = this.docs.get(sessionId);
     if (existing) {
       return existing;
@@ -65,6 +72,7 @@ export class YjsDocumentRegistry extends YjsDocumentRegistryPort {
       throw new YjsDocumentTooLarge(projectedBytes, this.config.maxYjsDocumentBytes);
     }
     Y.applyUpdate(doc, update, input.updatedBy);
+    this.touch(input.sessionId);
 
     const stateBase64 = this.encodeState(doc);
     this.schedulePersistence({
@@ -88,6 +96,7 @@ export class YjsDocumentRegistry extends YjsDocumentRegistryPort {
     }
     if (revision !== undefined) this.snapshotRevisions.set(input.sessionId, revision);
 
+    this.touch(input.sessionId);
     doc.transact(() => {
       map.set("snapshot", input.snapshot);
       map.set("updatedAt", new Date().toISOString());
@@ -126,9 +135,15 @@ export class YjsDocumentRegistry extends YjsDocumentRegistryPort {
     doc?.destroy();
     this.docs.delete(sessionId);
     this.snapshotRevisions.delete(sessionId);
+    this.generations.delete(sessionId);
   }
 
-  async releaseDocument(sessionId: string) {
+  /**
+   * Persists pending state and drops the document. Returns false (document kept) when the
+   * session was touched while persistence was awaited, so late updates are never discarded.
+   */
+  async releaseDocument(sessionId: string): Promise<boolean> {
+    const generation = this.generations.get(sessionId) ?? 0;
     const pending = this.pendingPersistence.get(sessionId);
     this.cancelScheduledPersistence(sessionId);
     if (pending) {
@@ -138,7 +153,16 @@ export class YjsDocumentRegistry extends YjsDocumentRegistryPort {
     } else {
       await this.persistenceQueues.get(sessionId)?.catch(() => undefined);
     }
+    if (
+      (this.generations.get(sessionId) ?? 0) !== generation ||
+      this.pendingPersistence.has(sessionId) ||
+      this.persistenceTimers.has(sessionId) ||
+      this.documentLoads.has(sessionId)
+    ) {
+      return false;
+    }
     this.deleteDocument(sessionId);
+    return true;
   }
 
   private schedulePersistence(input: PendingPersistence) {

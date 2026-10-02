@@ -14,6 +14,6 @@ export abstract class YjsDocumentRegistryPort {
   /** Returns the live Excalidraw elements of the collaborative document. */
   abstract getLiveElements(sessionId: string): Promise<unknown[]>;
   abstract deleteDocument(sessionId: string): void;
-  /** Persists pending updates, then drops the in-memory document. */
-  abstract releaseDocument(sessionId: string): Promise<void>;
+  /** Persists pending updates, then drops the in-memory document. Resolves false when activity during the release kept the document. */
+  abstract releaseDocument(sessionId: string): Promise<boolean>;
 }

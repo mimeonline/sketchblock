@@ -12,6 +12,11 @@ function signTicket(role: "owner" | "collaborator" | "viewer", actor: string) {
   return `${payload}.${createHmac("sha256", "socket-test-secret").update(`collab-ticket.${payload}`).digest("base64url")}`;
 }
 
+function signServerTicket() {
+  const payload = Buffer.from(JSON.stringify({ kind: "collab-ticket", sessionId: "*", clientId: "web-api", actor: "web-api", displayName: "web", role: "server", permission: "admin", expiresAt: Date.now() + 60_000 })).toString("base64url");
+  return `${payload}.${createHmac("sha256", "socket-test-secret").update(`collab-ticket.${payload}`).digest("base64url")}`;
+}
+
 // Exercise the real Engine.IO polling transport without another client dependency.
 class PollingClient {
   private sid = "";
@@ -26,6 +31,11 @@ class PollingClient {
   private async send(packet: string) {
     const response = await fetch(this.url(), { method: "POST", body: packet, headers: { "Content-Type": "text/plain" }, signal: AbortSignal.timeout(4000) });
     if (!response.ok) throw new Error(`send failed: ${response.status}`);
+  }
+  async connectAsServer() {
+    this.sid = JSON.parse((await this.read())[0].slice(1)).sid;
+    await this.send(`40${JSON.stringify({ token: signServerTicket() })}`);
+    expect((await this.read()).some((packet) => packet.startsWith("40"))).toBe(true);
   }
   async connect(role: "owner" | "collaborator" | "viewer", actor: string) {
     this.sid = JSON.parse((await this.read())[0].slice(1)).sid;
@@ -113,6 +123,38 @@ describe("Socket.IO multi-client collaboration", () => {
     expect([...recovered.getMap("elements").keys()].sort()).toEqual(["edit-0", "edit-1"]);
     docs.forEach((doc) => doc.destroy()); recovered.destroy();
     expect(ack.presence.filter((presence: { userId: string }) => presence.userId === "second")).toHaveLength(1);
+  });
+
+  it("removes a participant on all sockets and rejects their rejoin without excluding the owner", async () => {
+    const owner = new PollingClient(origin);
+    const first = new PollingClient(origin);
+    const second = new PollingClient(origin);
+    clients.push(owner, first, second);
+    await owner.connect("owner", "owner-kick");
+    await first.connect("collaborator", "removed-user");
+    await second.connect("collaborator", "removed-user");
+    const ownerJoin = await owner.emit("session:join", { sessionId: "socket-test", userId: "owner-kick" });
+    const firstJoin = await first.emit("session:join", { sessionId: "socket-test", userId: "removed-user" });
+    expect(await second.emit("session:join", { sessionId: "socket-test", userId: "removed-user" })).toMatchObject({ ok: true });
+
+    // The web server (role server) issues the kick; owner presence is never excluded.
+    const admin = new PollingClient(origin);
+    clients.push(admin);
+    await admin.connectAsServer();
+    const ownerKick = await admin.emit("client:kick", { sessionId: "socket-test", socketId: ownerJoin.socketId, kickedBy: "web-api", excludeActor: true });  expect(ownerKick).toMatchObject({ ok: true, excluded: false });
+    const ownerAgain = new PollingClient(origin);
+    clients.push(ownerAgain);
+    await ownerAgain.connect("owner", "owner-kick");
+    expect(await ownerAgain.emit("session:join", { sessionId: "socket-test", userId: "owner-kick" })).toMatchObject({ ok: true });
+
+    const kicked = await admin.emit("client:kick", { sessionId: "socket-test", socketId: firstJoin.socketId, kickedBy: "web-api", excludeActor: true });
+    expect(kicked).toMatchObject({ ok: true, excluded: true });
+    await expect(second.emit("session:inspect", { sessionId: "socket-test" })).rejects.toThrow();
+
+    const rejoin = new PollingClient(origin);
+    clients.push(rejoin);
+    await rejoin.connect("collaborator", "removed-user");
+    expect(await rejoin.emit("session:join", { sessionId: "socket-test", userId: "removed-user" })).toMatchObject({ ok: false, error: "participant_removed" });
   });
 
   it("ends live collaboration when the owner closes the session", async () => {

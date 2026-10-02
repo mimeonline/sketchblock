@@ -7,7 +7,7 @@ import { DOCUMENT_EVICTION_GRACE_MS, DocumentEvictionScheduler } from "./documen
 
 function setup() {
   const present = new Set<string>();
-  const documents = { releaseDocument: vi.fn().mockResolvedValue(undefined) };
+  const documents = { releaseDocument: vi.fn().mockResolvedValue(true) };
   const presence = {
     getSessionPresence: (id: string) => (present.has(id) ? new Map([["s", {}]]) : undefined),
   };

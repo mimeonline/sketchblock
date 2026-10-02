@@ -7,10 +7,11 @@ loadEnv();
 @Injectable()
 export class CollabConfigService {
   readonly port = this.readNumberEnv("COLLAB_SERVER_PORT", 4513);
-  readonly allowedOrigins = this.readOrigins();
   readonly maxSnapshotBytes = this.readNumberEnv("COLLAB_MAX_SNAPSHOT_BYTES", 25_000_000);
   readonly maxYjsDocumentBytes = this.readNumberEnv("COLLAB_MAX_YJS_DOCUMENT_BYTES", 25_000_000);
   readonly exposeApiDocs = this.readBooleanEnv("COLLAB_EXPOSE_API_DOCS");
+  readonly isProduction = this.readIsProduction();
+  readonly allowedOrigins = this.readOrigins();
   readonly authSecret = this.readAuthSecret();
   readonly trustProxy = this.readBooleanEnv("COLLAB_TRUST_PROXY");
   readonly logLevel = this.readLogLevel();
@@ -25,9 +26,21 @@ export class CollabConfigService {
   readonly socketEventsPerSocketPerMinute = this.readNumberEnv("COLLAB_SOCKET_EVENTS_PER_SOCKET_PER_MINUTE", 300);
   readonly yjsUpdatesPerSocketPerMinute = this.readNumberEnv("COLLAB_YJS_UPDATES_PER_SOCKET_PER_MINUTE", 1_800);
 
+  /** Mirrors the web app: SKETCHBLOCK_DEPLOYMENT_ENV wins, otherwise NODE_ENV decides. */
+  private readIsProduction(): boolean {
+    const deploymentEnv = process.env.SKETCHBLOCK_DEPLOYMENT_ENV?.trim().toLowerCase();
+    if (deploymentEnv) {
+      if (deploymentEnv !== "local" && deploymentEnv !== "production") {
+        throw new Error('SKETCHBLOCK_DEPLOYMENT_ENV must be "local" or "production"');
+      }
+      return deploymentEnv === "production";
+    }
+    return process.env.NODE_ENV === "production";
+  }
+
   private readAuthSecret(): string | null {
     const secret = process.env.COLLAB_AUTH_SECRET?.trim() || process.env.APP_AUTH_SECRET?.trim() || null;
-    const isProduction = process.env.NODE_ENV === "production";
+    const isProduction = this.isProduction;
 
     if (!secret) {
       if (!isProduction && this.readBooleanEnv("COLLAB_ALLOW_INSECURE_NO_AUTH")) {
@@ -78,7 +91,7 @@ export class CollabConfigService {
       throw new Error("COLLAB_ALLOWED_ORIGINS must contain at least one origin");
     }
 
-    if (process.env.NODE_ENV === "production" && origins.includes("*")) {
+    if (this.isProduction && origins.includes("*")) {
       throw new Error("COLLAB_ALLOWED_ORIGINS must not contain * in production");
     }
 

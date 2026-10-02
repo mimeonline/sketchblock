@@ -17,6 +17,7 @@ import { UpsertSessionSnapshotUseCase } from "../../application/use-cases/upsert
 import { UpdateSessionStatusUseCase } from "../../application/use-cases/update-session-status.use-case.js";
 import { CloseSessionUseCase } from "../../application/use-cases/close-session.use-case.js";
 import { SessionStorePort } from "../../application/ports/session-store.port.js";
+import { DocumentEvictionScheduler } from "../realtime/document-eviction.scheduler.js";
 import { SessionAccessPolicy } from "../../domain/services/session-access-policy.js";
 import { CollabConfigService } from "../../../shared/infrastructure/config/collab-config.service.js";
 import { StructuredLoggerService } from "../../../shared/infrastructure/logging/structured-logger.service.js";
@@ -55,6 +56,8 @@ export class SessionsController {
     private readonly updateSessionStatus: UpdateSessionStatusUseCase,
     @Inject(CloseSessionUseCase)
     private readonly closeSessionUseCase: CloseSessionUseCase,
+    @Inject(DocumentEvictionScheduler)
+    private readonly evictions: DocumentEvictionScheduler,
   ) {}
 
   @Post()
@@ -99,6 +102,7 @@ export class SessionsController {
       }
       throw error;
     }
+    this.evictions.scheduleIfEmpty(session.sessionId);
     this.logSessionEvent("session.register.succeeded", {
       sessionId: session.sessionId,
       status: session.status || "active",
@@ -174,6 +178,7 @@ export class SessionsController {
     }
 
     const state = await this.getSessionState.execute(sessionId);
+    this.evictions.scheduleIfEmpty(sessionId);
     this.logSessionEvent("session.state.get.succeeded", {
       sessionId,
       status: state.status,
@@ -235,6 +240,7 @@ export class SessionsController {
       }
       throw error;
     }
+    this.evictions.scheduleIfEmpty(sessionId);
     this.logSessionEvent("session.state.update.succeeded", {
       sessionId,
       updatedBy: result.data.updatedBy,

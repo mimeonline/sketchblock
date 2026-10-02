@@ -30,6 +30,10 @@ Run exactly one web and one collaboration-server instance per deployment. Sessio
 
 For horizontal scaling, you would need sticky sessions on the load balancer, a Socket.IO adapter (such as Redis), and a mechanism to ensure a single owner per live document. These features are not yet implemented.
 
+## Reverse proxy and client IPs
+
+Behind a reverse proxy, set both `SKETCHBLOCK_TRUST_PROXY=true` (web) and `COLLAB_TRUST_PROXY=true` (collaboration server). Without them every request appears to come from the proxy, so login rate limits degrade to per username and can be used to lock an account out. Leave them `false` when clients connect directly. The collaboration server also reads `SKETCHBLOCK_DEPLOYMENT_ENV` (`local` or `production`, falling back to `NODE_ENV`) to decide whether production secret and origin checks apply.
+
 ## Port binding
 
 By default, ports bind to `127.0.0.1` (loopback only). Set `SKETCHBLOCK_BIND_ADDRESS=0.0.0.0` to expose them on all interfaces, but only when the deployment is behind a TLS-terminating reverse proxy.

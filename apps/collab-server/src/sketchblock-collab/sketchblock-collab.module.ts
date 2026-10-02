@@ -25,6 +25,7 @@ import { YjsDocumentRegistry } from "./infrastructure/persistence/yjs-document.r
 import { DocumentEvictionScheduler } from "./infrastructure/realtime/document-eviction.scheduler.js";
 import { PresenceRegistry } from "./infrastructure/realtime/presence.registry.js";
 import { RealtimeGateway } from "./infrastructure/realtime/realtime.gateway.js";
+import { SessionParticipantExclusions } from "./infrastructure/realtime/session-participant-exclusions.js";
 import { SocketSessionConnections } from "./infrastructure/realtime/socket-session-connections.js";
 
 @Module({
@@ -41,6 +42,7 @@ import { SocketSessionConnections } from "./infrastructure/realtime/socket-sessi
     RemoveClientUseCase,
     RealtimeGateway,
     DocumentEvictionScheduler,
+    SessionParticipantExclusions,
     SocketSessionConnections,
     {
       provide: SessionConnectionsPort,

@@ -26,6 +26,7 @@ describe("CollabConfigService authSecret", () => {
     vi.stubEnv("COLLAB_AUTH_SECRET", "");
     vi.stubEnv("APP_AUTH_SECRET", "");
     vi.stubEnv("COLLAB_ALLOW_INSECURE_NO_AUTH", "");
+    vi.stubEnv("SKETCHBLOCK_DEPLOYMENT_ENV", "");
     vi.stubEnv("NODE_ENV", "test");
   });
   afterEach(() => vi.unstubAllEnvs());
@@ -57,5 +58,37 @@ describe("CollabConfigService authSecret", () => {
     expect(() => new CollabConfigService()).toThrow(/too weak/);
     vi.stubEnv("COLLAB_AUTH_SECRET", "x".repeat(40));
     expect(new CollabConfigService().authSecret).toBe("x".repeat(40));
+  });
+});
+
+describe("CollabConfigService deployment environment", () => {
+  beforeEach(() => {
+    vi.stubEnv("COLLAB_AUTH_SECRET", "local-compose-auth-secret-CHANGE-ME-please");
+    vi.stubEnv("APP_AUTH_SECRET", "");
+    vi.stubEnv("COLLAB_ALLOW_INSECURE_NO_AUTH", "");
+    vi.stubEnv("COLLAB_ALLOWED_ORIGINS", "");
+    vi.stubEnv("SKETCHBLOCK_DEPLOYMENT_ENV", "");
+    vi.stubEnv("NODE_ENV", "production");
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("lets SKETCHBLOCK_DEPLOYMENT_ENV=local override NODE_ENV=production (compose)", () => {
+    vi.stubEnv("SKETCHBLOCK_DEPLOYMENT_ENV", "local");
+    vi.stubEnv("COLLAB_ALLOWED_ORIGINS", "*");
+    const config = new CollabConfigService();
+    expect(config.isProduction).toBe(false);
+    expect(config.authSecret).toContain("CHANGE-ME");
+  });
+
+  it("treats SKETCHBLOCK_DEPLOYMENT_ENV=production as production even with NODE_ENV=test", () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("SKETCHBLOCK_DEPLOYMENT_ENV", "production");
+    expect(() => new CollabConfigService()).toThrow(/too weak/);
+  });
+
+  it("falls back to NODE_ENV and rejects invalid values", () => {
+    expect(() => new CollabConfigService()).toThrow(/too weak/);
+    vi.stubEnv("SKETCHBLOCK_DEPLOYMENT_ENV", "staging");
+    expect(() => new CollabConfigService()).toThrow(/SKETCHBLOCK_DEPLOYMENT_ENV/);
   });
 });

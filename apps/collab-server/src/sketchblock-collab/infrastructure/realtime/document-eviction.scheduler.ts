@@ -28,9 +28,16 @@ export class DocumentEvictionScheduler implements OnModuleDestroy {
       if ((this.presence.getSessionPresence(sessionId)?.size ?? 0) > 0) {
         return;
       }
-      void this.documents.releaseDocument(sessionId).catch((error: unknown) => {
-        this.logger.errorEvent("yjs.document.release.failed", { sessionId, error });
-      });
+      void this.documents
+        .releaseDocument(sessionId)
+        .then((released) => {
+          if (!released) {
+            this.scheduleIfEmpty(sessionId);
+          }
+        })
+        .catch((error: unknown) => {
+          this.logger.errorEvent("yjs.document.release.failed", { sessionId, error });
+        });
     }, DOCUMENT_EVICTION_GRACE_MS);
     timer.unref?.();
     this.timers.set(sessionId, timer);

@@ -106,4 +106,40 @@ describe("YjsDocumentRegistry", () => {
     await expect(registry.applyUpdate({ sessionId: "ok", updateBase64: encodedElementUpdate(), updatedBy: "c" })).resolves.toBeDefined();
     await registry.releaseDocument("ok");
   });
+
+  it("keeps the document and persists an update that arrives while a release is awaiting persistence", async () => {
+    vi.useFakeTimers();
+    let releaseFirstWrite!: () => void;
+    const upserts: string[] = [];
+    const store = {
+      getSession: vi.fn().mockResolvedValue(null),
+      upsertYjsState: vi.fn((input: { stateBase64: string }) => {
+        upserts.push(input.stateBase64);
+        if (upserts.length === 1) {
+          return new Promise((resolve) => { releaseFirstWrite = () => resolve({}); });
+        }
+        return Promise.resolve({});
+      }),
+    } as unknown as SessionStorePort;
+    const registry = new YjsDocumentRegistry(store, { errorEvent: vi.fn() } as unknown as StructuredLoggerService, limits());
+    await registry.applyUpdate({ sessionId: "race", updateBase64: encodedElementUpdate(), updatedBy: "c1" });
+
+    const release = registry.releaseDocument("race");
+    await vi.advanceTimersByTimeAsync(0);
+    const late = new Y.Doc();
+    late.getMap("elements").set("late", { id: "late" });
+    await registry.applyUpdate({ sessionId: "race", updateBase64: Buffer.from(Y.encodeStateAsUpdate(late)).toString("base64"), updatedBy: "c2" });
+    releaseFirstWrite();
+
+    await expect(release).resolves.toBe(false);
+    const doc = (await registry.getDocument("race")) as Y.Doc;
+    expect([...doc.getMap("elements").keys()].sort()).toEqual(["element-1", "late"]);
+
+    await vi.advanceTimersByTimeAsync(250);
+    expect(upserts).toHaveLength(2);
+    const persisted = new Y.Doc();
+    Y.applyUpdate(persisted, Buffer.from(upserts[1], "base64"));
+    expect(persisted.getMap("elements").has("late")).toBe(true);
+    registry.deleteDocument("race");
+  });
 });

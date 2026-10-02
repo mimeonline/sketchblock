@@ -139,7 +139,9 @@ components:
       description: >-
         initialContent and drawingPath are only accepted from owner and server
         tickets. Joining an ended session is acknowledged with ok false and
-        error session_closed.
+        error session_closed. Actors removed via client:kick with excludeActor
+        are acknowledged with error participant_removed (owner and server
+        tickets are never excluded).
       payload:
         $ref: '#/components/schemas/JoinSessionPayload'
     CanvasUpdate:
@@ -387,6 +389,13 @@ components:
           maxLength: 120
         kickedBy:
           $ref: '#/components/schemas/UserId'
+        excludeActor:
+          type: boolean
+          description: >-
+            When true, removes every socket whose presence userId (the authenticated
+            actor) matches the target and blocks that actor from rejoining the session
+            with error participant_removed until the session ends. Ignored when the
+            target presence role is owner.
     ClientKickedPayload:
       type: object
       additionalProperties: false

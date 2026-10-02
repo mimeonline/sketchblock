@@ -52,6 +52,7 @@ export const kickClientPayloadSchema = z.object({
   sessionId: sessionIdSchema,
   socketId: z.string().min(1).max(120),
   kickedBy: userIdSchema,
+  excludeActor: z.boolean().optional(),
 });
 
 export const inspectSessionPayloadSchema = z.object({
