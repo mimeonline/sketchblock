@@ -2516,7 +2516,7 @@ function OwnerSessionPanel({
           <InfoRow label={t("connection")} value={<StatusBadge value={collabPresence.status === "connected" ? "online" : collabPresence.status === "error" ? "error" : "offline"} />} />
           <InfoRow label={t("people")} value={String(collabPresence.presence.length)} mono />
           <InfoRow label="Revision" value={String(snapshot?.revision || "-")} mono />
-          <InfoRow label={t("changedBy")} value={snapshot?.updatedBy || "-"} mono />
+          <InfoRow label={t("changedBy")} value={snapshot?.updatedBy ? auditActorLabel(snapshot.updatedBy, locale) : "-"} />
           <InfoRow label={t("save")} value={<StatusBadge value={sessionSaveState.status} />} />
           {sessionSaveState.message ? <InfoRow label={t("result")} value={sessionSaveState.message} /> : null}
           <InfoRow label="Session-ID" value={session?.id || t("loading")} mono />
