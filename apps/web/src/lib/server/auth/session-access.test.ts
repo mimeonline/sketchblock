@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   validateSessionInvite: vi.fn(),
   recordSessionParticipant: vi.fn(),
+  isParticipantRemoved: vi.fn(),
 }));
 
 vi.mock("@/lib/server/auth/owner-session", () => ({ getCurrentOwner: mocks.getCurrentOwner }));
@@ -18,6 +19,7 @@ vi.mock("@/lib/server/database/session-store", () => ({ getOwnedSession: mocks.g
 vi.mock("@/lib/server/database/session-invite-store", () => ({
   validateSessionInvite: mocks.validateSessionInvite,
   recordSessionParticipant: mocks.recordSessionParticipant,
+  isParticipantRemoved: mocks.isParticipantRemoved,
 }));
 
 import { authorizeSessionRequest } from "./session-access";

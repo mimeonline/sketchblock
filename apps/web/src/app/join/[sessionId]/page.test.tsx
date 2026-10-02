@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   requireOwnerPageAuth: vi.fn(),
   requirePageAuth: vi.fn(),
   validateSessionInvite: vi.fn(),
+  isParticipantRemoved: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -42,6 +43,7 @@ vi.mock("@/lib/server/auth/session-grant", () => ({
 
 vi.mock("@/lib/server/database/session-invite-store", () => ({
   validateSessionInvite: mocks.validateSessionInvite,
+  isParticipantRemoved: mocks.isParticipantRemoved,
 }));
 
 vi.mock("@/lib/server/database/session-store", () => ({
@@ -54,6 +56,7 @@ import JoinSessionPage from "./page";
 describe("join session page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.isParticipantRemoved.mockResolvedValue(false);
     mocks.getSession.mockResolvedValue({ id: "session-123" });
     mocks.getOwnedSession.mockResolvedValue({ id: "session-123" });
     mocks.requireOwnerPageAuth.mockResolvedValue({ id: "owner-1", username: "admin" });
@@ -129,6 +132,18 @@ describe("join session page", () => {
     expect(mocks.getValidSessionGrant).toHaveBeenCalledWith("session-123", 42);
     expect(mocks.notFound).not.toHaveBeenCalled();
     expect(mocks.getOwnedSession).not.toHaveBeenCalled();
+  });
+
+  it("shows not-found to a removed participant", async () => {
+    mocks.getCurrentOwner.mockResolvedValue(null);
+    mocks.getCurrentAuthUser.mockResolvedValue({ id: 42, login: "markus", name: "Markus" });
+    mocks.getValidSessionGrant.mockResolvedValue({ role: "viewer" });
+    mocks.isParticipantRemoved.mockResolvedValue(true);
+
+    await expect(JoinSessionPage({
+      params: Promise.resolve({ sessionId: "session-123" }),
+      searchParams: Promise.resolve({}),
+    })).rejects.toThrow("NEXT_NOT_FOUND");
   });
 
   it("exchanges a valid invite for a session grant after login", async () => {

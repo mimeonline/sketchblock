@@ -162,7 +162,7 @@
     "loadFailed": "Die GitHub-Repositories konnten nicht geladen werden.", "selectFailed": "Das Repository konnte nicht ausgewählt werden.", "add": "Repository hinzufügen", "title": "GitHub-Repository hinzufügen", "description": "Angezeigt werden Repositories, in denen dein GitHub-Konto Änderungen speichern darf.", "search": "Repositories durchsuchen", "loading": "Repositories werden geladen", "defaultBranch": "Standard-Branch: {branch}", "private": "Privat", "scanning": "Repository wird gescannt", "noneWritable": "Keine beschreibbaren Repositories gefunden.", "allConnected": "Alle verfügbaren Repositories sind bereits verbunden.", "noMatch": "Keine Repositories passen zu deiner Suche."
   },
   "Share": {
-    "invite": "Einladen", "title": "Zur Live-Session einladen", "description": "Teile den passenden Link oder lasse den QR-Code direkt vom Bildschirm scannen.", "collaboratorDescription": "Kann das Board während dieser Session bearbeiten.", "viewerDescription": "Kann die Session schreibgeschützt verfolgen.", "qrTitle": "QR-Code für {role}-Session", "copied": "Kopiert", "copy": "Link kopieren", "copyFailed": "Der Link konnte nicht kopiert werden.", "copyAnnouncement": "{role}-Link kopiert."
+    "invite": "Einladen", "title": "Zur Live-Session einladen", "description": "Teile den passenden Link oder lasse den QR-Code direkt vom Bildschirm scannen.", "collaboratorDescription": "Kann das Board während dieser Session bearbeiten.", "viewerDescription": "Kann die Session schreibgeschützt verfolgen.", "qrTitle": "QR-Code für {role}-Session", "copied": "Kopiert", "copy": "Link kopieren", "copyFailed": "Der Link konnte nicht kopiert werden.", "copyAnnouncement": "{role}-Link kopiert.", "close": "Schließen", "expiresAt": "Gültig bis {date}", "renew": "Link erneuern", "renewed": "{role}-Link erneuert. Der alte Link funktioniert nicht mehr.", "renewFailed": "Der Link konnte nicht erneuert werden."
   },
   "Boards": {
     "description": "Deine visuellen Arbeitsflächen im aktiven Repository. Live-Boards stehen zuerst.", "none": "Noch keine Boards", "scanHint": "Scanne dein Repository, damit deine Excalidraw-Boards hier als Vorschau erscheinen.", "configureRepository": "Repository einrichten", "extensionHint": "Sketchblock erkennt Dateien mit der Endung .excalidraw.", "all": "Alle Boards", "shown": "{visible} von {total} Boards werden angezeigt.", "allHint": " Unter Alle Boards findest du die vollständige Ansicht.", "previewLoading": "Vorschau wird vorbereitet", "previewsLoading": "Board-Vorschauen werden geladen", "large": "Großes Board", "empty": "Leeres Board", "unavailable": "Vorschau nicht verfügbar", "open": "Board direkt öffnen", "openEditor": "{title} im Editor öffnen", "largeHint": "Im Editor ansehen", "emptyHint": "Erste Idee festhalten", "oneWorking": "1 Person arbeitet gerade", "manyWorking": "{count} Personen arbeiten gerade", "workingNames": "Arbeiten gerade: {names}"
@@ -187,6 +187,9 @@
     "sessionDataUnavailable": "Die Session-Daten sind gerade nicht erreichbar. Versuche es erneut oder frage den Owner nach dem aktuellen Status."
   },
   "Workspace": {
+    "joinLiveSession": "Live-Session öffnen",
+    "saveBeforeSession": "Speichere deine Änderungen, bevor du eine Live-Session startest.",
+    "startingSession": "Session wird gestartet …",
     "sessionEnded": "Diese Session wurde beendet",
     "sessionEndedDescription": "Der Owner hat diese Live-Session beendet. Das Board wird nicht mehr geteilt; bitte den Owner um eine neue Einladung, wenn du weiter Zugriff brauchst.",
     "sessionEndedLive": "Diese Session wurde beendet. Änderungen werden nicht mehr synchronisiert.",

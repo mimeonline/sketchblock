@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Copy, Eye, Pencil, QrCode } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { Copy, Eye, Pencil, QrCode, RefreshCw, X } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { QRCodeSVG } from "qrcode.react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -22,14 +23,24 @@ type ShareRole = "collaborator" | "viewer";
 type SessionShareDialogProps = {
   collaboratorHref: string;
   viewerHref: string;
+  collaboratorExpiresAt?: string | null;
+  viewerExpiresAt?: string | null;
+  sessionId?: string;
 };
 
 export function SessionShareDialog({
   collaboratorHref,
   viewerHref,
+  collaboratorExpiresAt,
+  viewerExpiresAt,
+  sessionId,
 }: SessionShareDialogProps) {
   const t = useTranslations("Share");
-  const [role, setRole] = useState<ShareRole>("collaborator");
+  const locale = useLocale();
+  const [role, setRole] = useState<ShareRole>("viewer");
+  const [rotated, setRotated] = useState<Partial<Record<ShareRole, { href: string; expiresAt: string | null }>>>({});
+  const [renewing, setRenewing] = useState<ShareRole | null>(null);
+  const [renewState, setRenewState] = useState<ShareRole | "error" | null>(null);
   const [appOrigin, setAppOrigin] = useState("");
   const [copyState, setCopyState] = useState<ShareRole | "error" | null>(null);
 
@@ -38,10 +49,43 @@ export function SessionShareDialog({
     setAppOrigin(window.location.origin);
   }, []);
 
-  const urls: Record<ShareRole, string> = {
-    collaborator: collaboratorHref && appOrigin ? `${appOrigin}${collaboratorHref}` : "",
-    viewer: viewerHref && appOrigin ? `${appOrigin}${viewerHref}` : "",
+  const hrefs: Record<ShareRole, string> = {
+    collaborator: rotated.collaborator?.href ?? collaboratorHref,
+    viewer: rotated.viewer?.href ?? viewerHref,
   };
+  const expiries: Record<ShareRole, string | null | undefined> = {
+    collaborator: rotated.collaborator ? rotated.collaborator.expiresAt : collaboratorExpiresAt,
+    viewer: rotated.viewer ? rotated.viewer.expiresAt : viewerExpiresAt,
+  };
+  const urls: Record<ShareRole, string> = {
+    collaborator: hrefs.collaborator && appOrigin ? `${appOrigin}${hrefs.collaborator}` : "",
+    viewer: hrefs.viewer && appOrigin ? `${appOrigin}${hrefs.viewer}` : "",
+  };
+
+  async function handleRenew(shareRole: ShareRole) {
+    if (!sessionId) return;
+    setRenewing(shareRole);
+    setRenewState(null);
+    try {
+      const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/invites/${shareRole}/rotate`, { method: "POST" });
+      const payload = (await response.json()) as { link?: string; expiresAt?: string | null };
+      if (!response.ok || !payload.link) throw new Error("rotate_failed");
+      setRotated((current) => ({ ...current, [shareRole]: { href: payload.link as string, expiresAt: payload.expiresAt ?? null } }));
+      setRenewState(shareRole);
+      setCopyState(null);
+    } catch {
+      setRenewState("error");
+    } finally {
+      setRenewing(null);
+    }
+  }
+
+  function formatExpiry(value: string | null | undefined) {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return t("expiresAt", { date: new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(date) });
+  }
 
   async function handleCopy(shareRole: ShareRole) {
     const copied = await copyText(urls[shareRole]);
@@ -60,7 +104,13 @@ export function SessionShareDialog({
         <QrCode data-icon="inline-start" />
         {t("invite")}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg" showCloseButton={false}>
+        <DialogClose
+          aria-label={t("close")}
+          render={<Button type="button" variant="ghost" size="icon-sm" className="absolute top-2 right-2" />}
+        >
+          <X aria-hidden="true" />
+        </DialogClose>
         <DialogHeader>
           <DialogTitle>{t("title")}</DialogTitle>
           <DialogDescription>{t("description")}</DialogDescription>
@@ -68,13 +118,13 @@ export function SessionShareDialog({
 
         <Tabs value={role} onValueChange={handleRoleChange}>
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="collaborator">
-              <Pencil data-icon="inline-start" />
-              Collaborator
-            </TabsTrigger>
             <TabsTrigger value="viewer">
               <Eye data-icon="inline-start" />
               Viewer
+            </TabsTrigger>
+            <TabsTrigger value="collaborator">
+              <Pencil data-icon="inline-start" />
+              Collaborator
             </TabsTrigger>
           </TabsList>
           {(["collaborator", "viewer"] as const).map((shareRole) => (
@@ -101,16 +151,28 @@ export function SessionShareDialog({
                 <div className="min-w-0">
                   <Badge variant="secondary">{label}</Badge>
                   <p className="mt-1 text-sm text-muted-foreground">{t(shareRole === "collaborator" ? "collaboratorDescription" : "viewerDescription")}</p>
+                  {formatExpiry(expiries[shareRole]) ? (
+                    <p className="mt-1 text-xs text-muted-foreground">{formatExpiry(expiries[shareRole])}</p>
+                  ) : null}
                 </div>
-                <Button type="button" variant="outline" onClick={() => void handleCopy(shareRole)}>
-                  <Copy data-icon="inline-start" />
-                  {copyState === shareRole ? t("copied") : t("copy")}
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  {sessionId ? (
+                    <Button type="button" variant="outline" disabled={renewing !== null} onClick={() => void handleRenew(shareRole)}>
+                      <RefreshCw data-icon="inline-start" />
+                      {t("renew")}
+                    </Button>
+                  ) : null}
+                  <Button type="button" variant="outline" onClick={() => void handleCopy(shareRole)}>
+                    <Copy data-icon="inline-start" />
+                    {copyState === shareRole ? t("copied") : t("copy")}
+                  </Button>
+                </div>
               </div>
             );
           })}
         </div>
         <span className="sr-only" aria-live="polite">
+          {renewState === "error" ? t("renewFailed") : renewState ? t("renewed", { role: renewState === "collaborator" ? "Collaborator" : "Viewer" }) : ""}
           {copyState === "error" ? t("copyFailed") : copyState ? t("copyAnnouncement", { role: copyState === "collaborator" ? "Collaborator" : "Viewer" }) : ""}
         </span>
       </DialogContent>

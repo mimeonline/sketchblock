@@ -6,7 +6,7 @@ import { getCurrentOwner } from "@/lib/server/auth/owner-session";
 import { getValidSessionGrant } from "@/lib/server/auth/session-grant";
 import { getCurrentAuthUser } from "@/lib/server/auth/session";
 import { getOwnedSession, getSession } from "@/lib/server/database/session-store";
-import { recordSessionParticipant, validateSessionInvite } from "@/lib/server/database/session-invite-store";
+import { isParticipantRemoved, recordSessionParticipant, validateSessionInvite } from "@/lib/server/database/session-invite-store";
 
 export const runtime = "nodejs";
 
@@ -62,6 +62,9 @@ export async function POST(request: NextRequest) {
       : null;
     if (!authUser || !access) {
       return NextResponse.json({ error: "Valid session invitation and GitHub login required." }, { status: 401 });
+    }
+    if (await isParticipantRemoved(body.sessionId, authUser.id)) {
+      return NextResponse.json({ error: "You were removed from this session.", code: "participant_removed" }, { status: 403 });
     }
     await recordSessionParticipant({
       sessionId: body.sessionId,

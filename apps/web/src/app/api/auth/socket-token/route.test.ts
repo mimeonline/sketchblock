@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   getOwnedSession: vi.fn(),
   validateSessionInvite: vi.fn(),
   recordSessionParticipant: vi.fn(),
+  isParticipantRemoved: vi.fn(),
 }));
 
 vi.mock("@/lib/server/auth/collab-ticket", () => ({ createCollabTicket: mocks.createCollabTicket }));
@@ -20,6 +21,7 @@ vi.mock("@/lib/server/database/session-store", () => ({ getSession: mocks.getSes
 vi.mock("@/lib/server/database/session-invite-store", () => ({
   validateSessionInvite: mocks.validateSessionInvite,
   recordSessionParticipant: mocks.recordSessionParticipant,
+  isParticipantRemoved: mocks.isParticipantRemoved,
 }));
 
 import { POST } from "./route";
@@ -149,6 +151,20 @@ describe("socket auth token route", () => {
     const response = await POST(request({ sessionId: "session-1", role: "viewer", clientId: "client-1" }));
 
     expect(response.status).toBe(401);
+    expect(mocks.createCollabTicket).not.toHaveBeenCalled();
+  });
+
+  it("rejects a removed participant with 403 participant_removed", async () => {
+    mocks.getCurrentAuthUser.mockResolvedValue({ id: 42, login: "markus" });
+    mocks.getValidSessionGrant.mockResolvedValue({ role: "viewer" });
+    mocks.isParticipantRemoved.mockResolvedValue(true);
+
+    const response = await POST(request({ sessionId: "session-1", role: "viewer", clientId: "client-1" }));
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ code: "participant_removed" });
+    expect(mocks.isParticipantRemoved).toHaveBeenCalledWith("session-1", 42);
+    expect(mocks.recordSessionParticipant).not.toHaveBeenCalled();
     expect(mocks.createCollabTicket).not.toHaveBeenCalled();
   });
 

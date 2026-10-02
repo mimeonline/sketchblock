@@ -162,7 +162,7 @@
     "loadFailed": "GitHub repositories could not be loaded.", "selectFailed": "The repository could not be selected.", "add": "Add repository", "title": "Add GitHub repository", "description": "Repositories where your GitHub account may save changes are shown.", "search": "Search repositories", "loading": "Loading repositories", "defaultBranch": "Default branch: {branch}", "private": "Private", "scanning": "Scanning repository", "noneWritable": "No writable repositories found.", "allConnected": "All available repositories are already connected.", "noMatch": "No repositories match your search."
   },
   "Share": {
-    "invite": "Invite", "title": "Invite to live session", "description": "Share the appropriate link or scan the QR code directly from the screen.", "collaboratorDescription": "Can edit the board during this session.", "viewerDescription": "Can follow the session read-only.", "qrTitle": "QR code for {role} session", "copied": "Copied", "copy": "Copy link", "copyFailed": "The link could not be copied.", "copyAnnouncement": "{role} link copied."
+    "invite": "Invite", "title": "Invite to live session", "description": "Share the appropriate link or scan the QR code directly from the screen.", "collaboratorDescription": "Can edit the board during this session.", "viewerDescription": "Can follow the session read-only.", "qrTitle": "QR code for {role} session", "copied": "Copied", "copy": "Copy link", "copyFailed": "The link could not be copied.", "copyAnnouncement": "{role} link copied.", "close": "Close", "expiresAt": "Valid until {date}", "renew": "Renew link", "renewed": "{role} link renewed. The old link no longer works.", "renewFailed": "The link could not be renewed."
   },
   "Boards": {
     "description": "Your visual workspaces in the active repository. Live boards are shown first.", "none": "No boards yet", "scanHint": "Scan your repository to show Excalidraw boards as previews.", "configureRepository": "Configure repository", "extensionHint": "Sketchblock detects files with the .excalidraw extension.", "all": "All boards", "shown": "Showing {visible} of {total} boards.", "allHint": " Find the complete view under All boards.", "previewLoading": "Preparing preview", "previewsLoading": "Loading board previews", "large": "Large board", "empty": "Empty board", "unavailable": "Preview unavailable", "open": "Open board directly", "openEditor": "Open {title} in editor", "largeHint": "View in editor", "emptyHint": "Capture the first idea", "oneWorking": "1 person is working", "manyWorking": "{count} people are working", "workingNames": "Working now: {names}"
@@ -187,6 +187,9 @@
     "sessionDataUnavailable": "Session data is currently unavailable. Try again or ask the owner for the current status."
   },
   "Workspace": {
+    "joinLiveSession": "Open live session",
+    "saveBeforeSession": "Save your changes before starting a live session.",
+    "startingSession": "Starting session…",
     "sessionEnded": "This session has ended",
     "sessionEndedDescription": "The owner ended this live session. The board is no longer shared; ask the owner for a new invitation if you need access.",
     "sessionEndedLive": "This session has ended. Changes are no longer synchronized.",

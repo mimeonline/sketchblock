@@ -5,7 +5,7 @@ import { SessionEndedNotice } from "@/features/join/organisms/SessionEndedNotice
 import { getCurrentOwner, requireOwnerPageAuth } from "@/lib/server/auth/owner-session";
 import { getValidSessionGrant } from "@/lib/server/auth/session-grant";
 import { getCurrentAuthUser, requirePageAuth } from "@/lib/server/auth/session";
-import { validateSessionInvite } from "@/lib/server/database/session-invite-store";
+import { isParticipantRemoved, validateSessionInvite } from "@/lib/server/database/session-invite-store";
 import { getOwnedSession, getSession } from "@/lib/server/database/session-store";
 
 type JoinSessionPageProps = {
@@ -55,6 +55,7 @@ export default async function JoinSessionPage({ params, searchParams }: JoinSess
     const user = await getCurrentAuthUser();
     const grant = user ? await getValidSessionGrant(sessionId, user.id) : null;
     if (user && grant) {
+      if (await isParticipantRemoved(sessionId, user.id)) notFound();
       return (
         <JoinSessionTemplate
           identity={{ login: user.login, displayName: user.name || user.login }}
@@ -74,6 +75,7 @@ export default async function JoinSessionPage({ params, searchParams }: JoinSess
   if (!validatedInvite) notFound();
 
   const returnTo = `/join/${sessionId}?invite=${encodeURIComponent(invite)}`;
-  await requirePageAuth(returnTo, "read");
+  const authUser = await requirePageAuth(returnTo, "read");
+  if (await isParticipantRemoved(sessionId, authUser.id)) notFound();
   redirect(`/api/sessions/${sessionId}/claim?invite=${encodeURIComponent(invite)}`);
 }

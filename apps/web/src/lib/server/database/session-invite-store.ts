@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 
-import type { QueryResultRow } from "pg";
+import type { QueryResult, QueryResultRow } from "pg";
 
 import { decryptSecret, encryptSecret } from "@/lib/server/auth/crypto";
 import { getAppPostgresPool } from "@/lib/server/database/postgres";
@@ -185,13 +185,91 @@ async function listActiveInvites(sessionId: string) {
   return result.rows.map(rowToInvite).filter((invite): invite is SessionInvite => Boolean(invite));
 }
 
-async function createInvite(sessionId: string, role: InviteRole, ownerId: string | null) {
+type InviteQueryable = {
+  query: <R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) => Promise<QueryResult<R>>;
+};
+
+export async function rotateSessionInvite(sessionId: string, role: InviteRole, ownerId: string | null) {
+  const client = await getAppPostgresPool().connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `
+        UPDATE app_session_invites
+        SET revoked_at = now()
+        WHERE session_id = $1
+          AND role = $2
+          AND revoked_at IS NULL
+      `,
+      [sessionId, role],
+    );
+    const created = await createInvite(sessionId, role, ownerId, client);
+    if (!created) throw new Error("Could not create the replacement invitation.");
+    await client.query("COMMIT");
+    return created;
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function markParticipantRemoved(sessionId: string, githubUserId: number, removedByUserId: string | null) {
+  const result = await getAppPostgresPool().query(
+    `
+      UPDATE app_session_participants
+      SET removed_at = COALESCE(removed_at, now()),
+          removed_by_user_id = COALESCE(removed_by_user_id, $3)
+      WHERE session_id = $1
+        AND github_user_id = $2
+    `,
+    [sessionId, githubUserId, removedByUserId],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+export async function isParticipantRemoved(sessionId: string, githubUserId: number) {
+  const result = await getAppPostgresPool().query<{ removed_at: Date | string | null } & QueryResultRow>(
+    `
+      SELECT removed_at
+      FROM app_session_participants
+      WHERE session_id = $1
+        AND github_user_id = $2
+      LIMIT 1
+    `,
+    [sessionId, githubUserId],
+  );
+  return Boolean(result.rows[0]?.removed_at);
+}
+
+export async function findParticipantUserIdByLogin(sessionId: string, githubLogin: string) {
+  const result = await getAppPostgresPool().query<{ github_user_id: string | number } & QueryResultRow>(
+    `
+      SELECT github_user_id
+      FROM app_session_participants
+      WHERE session_id = $1
+        AND lower(github_login) = lower($2)
+      ORDER BY last_joined_at DESC
+      LIMIT 1
+    `,
+    [sessionId, githubLogin],
+  );
+  return result.rows[0] ? Number(result.rows[0].github_user_id) : null;
+}
+
+async function createInvite(
+  sessionId: string,
+  role: InviteRole,
+  ownerId: string | null,
+  db: InviteQueryable = getAppPostgresPool(),
+) {
   const token = randomBytes(32).toString("base64url");
   const ttlHours = Number.parseInt(process.env.SKETCHBLOCK_SESSION_INVITE_TTL_HOURS || "168", 10);
   const expiresAt = Number.isFinite(ttlHours) && ttlHours > 0
     ? new Date(Date.now() + ttlHours * 60 * 60 * 1000).toISOString()
     : null;
-  const result = await getAppPostgresPool().query<InviteRow>(
+  const result = await db.query<InviteRow>(
     `
       INSERT INTO app_session_invites (
         id, session_id, role, token_hash, token_ciphertext, expires_at, created_by_user_id

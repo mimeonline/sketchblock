@@ -6,6 +6,7 @@ import { getCurrentOwner } from "@/lib/server/auth/owner-session";
 import { getValidSessionGrant } from "@/lib/server/auth/session-grant";
 import { getCurrentAuthUser } from "@/lib/server/auth/session";
 import {
+  isParticipantRemoved,
   recordSessionParticipant,
   validateSessionInvite,
 } from "@/lib/server/database/session-invite-store";
@@ -72,6 +73,7 @@ export async function authorizeSessionRequest(
           : NextResponse.json({ error: "Valid session access required." }, { status: 401 }),
       };
     }
+    if (await isParticipantRemoved(sessionId, user.id)) return { access: null, response: participantRemovedResponse() };
     if (required === "owner" || (required === "edit" && grant.role !== "collaborator")) {
       return {
         access: null,
@@ -104,6 +106,7 @@ export async function authorizeSessionRequest(
       response: NextResponse.json({ error: "Valid session invitation and GitHub login required." }, { status: 401 }),
     };
   }
+  if (await isParticipantRemoved(sessionId, user.id)) return { access: null, response: participantRemovedResponse() };
   if (required === "owner" || (required === "edit" && invite.role !== "collaborator")) {
     return {
       access: null,
@@ -133,4 +136,8 @@ export async function authorizeSessionRequest(
 
 function sessionClosedResponse() {
   return NextResponse.json({ error: "This session has ended.", code: "session_closed" }, { status: 410 });
+}
+
+function participantRemovedResponse() {
+  return NextResponse.json({ error: "You were removed from this session.", code: "participant_removed" }, { status: 403 });
 }
