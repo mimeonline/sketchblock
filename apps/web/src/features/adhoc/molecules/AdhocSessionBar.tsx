@@ -4,7 +4,7 @@ import { Menu } from "@base-ui/react/menu";
 import { Switch } from "@base-ui/react/switch";
 import { Download } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useState } from "react";
+import { useState, useId } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -41,6 +41,7 @@ export function AdhocSessionBar({
   onParticipantDownloadChange?: (value: boolean) => void;
 }) {
   const t = useTranslations("Adhoc");
+  const downloadLabelId = useId();
   const locale = useLocale();
   const [allowed, setAllowed] = useState(Boolean(participantDownload));
   const [error, setError] = useState<string | null>(null);
@@ -109,14 +110,14 @@ export function AdhocSessionBar({
         {isOwner ? (
           <label className="flex items-center gap-2">
             <Switch.Root
-              aria-label={t("participantDownload")}
+              aria-labelledby={downloadLabelId}
               checked={allowed}
               onCheckedChange={(value) => void toggle(value)}
               className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full bg-input transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[checked]:bg-primary motion-reduce:transition-none"
             >
               <Switch.Thumb className="block size-4 translate-x-0.5 rounded-full bg-background transition-transform data-[checked]:translate-x-4 motion-reduce:transition-none" />
             </Switch.Root>
-            <span>{t("participantDownload")}</span>
+            <span id={downloadLabelId}>{t("participantDownload")}</span>
           </label>
         ) : null}
         {canDownload ? (

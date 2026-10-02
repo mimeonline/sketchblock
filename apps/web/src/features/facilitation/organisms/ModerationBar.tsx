@@ -2,7 +2,7 @@
 
 import { Switch } from "@base-ui/react/switch";
 import { useTranslations } from "next-intl";
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 
@@ -25,6 +25,8 @@ export function ModerationBar({
   children?: ReactNode;
 }) {
   const t = useTranslations("Facilitation");
+  const followLabelId = useId();
+  const lockLabelId = useId();
   const [votes, setVotes] = useState(moderation.voting.votesPerParticipant);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,16 +42,16 @@ export function ModerationBar({
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("moderationTitle")}</h2>
         <label className="flex items-center gap-2">
-          <Switch.Root aria-label={t("followMe")} checked={moderation.followOwner} onCheckedChange={(value) => void send({ followOwner: value })} className={switchRoot}>
+          <Switch.Root aria-labelledby={followLabelId} checked={moderation.followOwner} onCheckedChange={(value) => void send({ followOwner: value })} className={switchRoot}>
             <Switch.Thumb className={switchThumb} />
           </Switch.Root>
-          <span>{t("followMe")}</span>
+          <span id={followLabelId}>{t("followMe")}</span>
         </label>
         <label className="flex items-center gap-2">
-          <Switch.Root aria-label={t("lockEditing")} checked={moderation.editingLocked} onCheckedChange={(value) => void send({ editingLocked: value })} className={switchRoot}>
+          <Switch.Root aria-labelledby={lockLabelId} checked={moderation.editingLocked} onCheckedChange={(value) => void send({ editingLocked: value })} className={switchRoot}>
             <Switch.Thumb className={switchThumb} />
           </Switch.Root>
-          <span>{t("lockEditing")}</span>
+          <span id={lockLabelId}>{t("lockEditing")}</span>
         </label>
       </div>
 

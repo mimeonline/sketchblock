@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Switch } from "@base-ui/react/switch";
 import { Copy, Eye, Pencil, QrCode, RefreshCw, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -40,6 +40,7 @@ export function SessionShareDialog({
 }: SessionShareDialogProps) {
   const t = useTranslations("Share");
   const tGuest = useTranslations("Guest");
+  const guestLabelId = useId();
   const [guestsAllowed, setGuestsAllowed] = useState(allowAnonymousViewers);
   const [guestError, setGuestError] = useState(false);
   const locale = useLocale();
@@ -182,14 +183,14 @@ export function SessionShareDialog({
                     <div className="mt-3">
                       <label className="flex items-center gap-2 text-sm">
                         <Switch.Root
-                          aria-label={tGuest("allowToggle")}
+                          aria-labelledby={guestLabelId}
                           checked={guestsAllowed}
                           onCheckedChange={(value) => void toggleGuests(value)}
                           className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full bg-input transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[checked]:bg-primary motion-reduce:transition-none"
                         >
                           <Switch.Thumb className="block size-4 translate-x-0.5 rounded-full bg-background transition-transform data-[checked]:translate-x-4 motion-reduce:transition-none" />
                         </Switch.Root>
-                        <span>{tGuest("allowToggle")}</span>
+                        <span id={guestLabelId}>{tGuest("allowToggle")}</span>
                       </label>
                       <p className="mt-1 text-xs text-muted-foreground">{tGuest("allowHelp")}</p>
                       {guestError ? <p className="mt-1 text-xs text-destructive" role="alert">{tGuest("settingsFailed")}</p> : null}
