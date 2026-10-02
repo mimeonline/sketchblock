@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { reactionEmojis, timerDurationRange, timerLabelMaxLength, votesPerParticipantRange } from "../../domain/services/facilitation-state.js";
 import { sessionLifecycleStatuses, type SessionLifecycleStatus } from "../../domain/types/session-lifecycle-status.js";
 
 export const sessionIdSchema = z
@@ -71,6 +72,44 @@ export const cursorUpdatePayloadSchema = z.object({
   selectedElementIds: z.array(z.string().max(120)).max(1000).optional(),
   displayName: z.string().min(1).max(120).optional(),
   color: z.string().max(32).optional(),
+});
+
+export const moderationUpdatePayloadSchema = z.object({
+  sessionId: sessionIdSchema,
+  followOwner: z.boolean().optional(),
+  editingLocked: z.boolean().optional(),
+  timer: z
+    .object({
+      durationSeconds: z.number().int().min(timerDurationRange.min).max(timerDurationRange.max),
+      label: z.string().max(timerLabelMaxLength).optional(),
+    })
+    .nullable()
+    .optional(),
+  voting: z
+    .object({
+      open: z.boolean().optional(),
+      votesPerParticipant: z.number().int().min(votesPerParticipantRange.min).max(votesPerParticipantRange.max).optional(),
+    })
+    .optional(),
+  resetVotes: z.literal(true).optional(),
+});
+
+export const viewportUpdatePayloadSchema = z.object({
+  sessionId: sessionIdSchema,
+  scrollX: z.number().finite(),
+  scrollY: z.number().finite(),
+  zoom: z.number().finite().min(0.1).max(30),
+});
+
+export const voteTogglePayloadSchema = z.object({
+  sessionId: sessionIdSchema,
+  elementId: z.string().min(1).max(120),
+});
+
+export const reactionSendPayloadSchema = z.object({
+  sessionId: sessionIdSchema,
+  emoji: z.enum(reactionEmojis),
+  pointer: z.object({ x: z.number().finite(), y: z.number().finite() }).optional(),
 });
 
 export type JoinSessionPayload = z.infer<typeof joinSessionPayloadSchema>;

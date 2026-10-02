@@ -21,6 +21,7 @@ function signServerTicket() {
 class PollingClient {
   private sid = "";
   private sequence = 0;
+  private readonly events: Array<{ event: string; payload: any }> = [];
   constructor(private readonly origin: string) {}
   private url() { return `${this.origin}/socket.io/?EIO=4&transport=polling${this.sid ? `&sid=${this.sid}` : ""}`; }
   private async read() {
@@ -48,10 +49,28 @@ class PollingClient {
     for (let attempt = 0; attempt < 10; attempt++) {
       for (const packet of await this.read()) {
         if (packet === "2") await this.send("3");
+        this.bufferEvent(packet);
         if (packet.startsWith(`43${id}[`)) return JSON.parse(packet.slice(2 + String(id).length))[0];
       }
     }
     throw new Error("ack missing");
+  }
+  private bufferEvent(packet: string) {
+    if (!packet.startsWith("42[")) return;
+    const [event, payload] = JSON.parse(packet.slice(2));
+    this.events.push({ event, payload });
+  }
+  /** Waits for a broadcast event, reading from the buffer first. */
+  async waitForEvent(name: string): Promise<any> {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const index = this.events.findIndex((entry) => entry.event === name);
+      if (index >= 0) return this.events.splice(index, 1)[0].payload;
+      for (const packet of await this.read()) {
+        if (packet === "2") await this.send("3");
+        this.bufferEvent(packet);
+      }
+    }
+    throw new Error(`event ${name} missing`);
   }
   async close() { await this.send("1"); }
 }
@@ -155,6 +174,63 @@ describe("Socket.IO multi-client collaboration", () => {
     clients.push(rejoin);
     await rejoin.connect("collaborator", "removed-user");
     expect(await rejoin.emit("session:join", { sessionId: "socket-test", userId: "removed-user" })).toMatchObject({ ok: false, error: "participant_removed" });
+  });
+
+  it("supports facilitation: moderation, editing lock, voting and reactions", async () => {
+    const owner = new PollingClient(origin);
+    const collaborator = new PollingClient(origin);
+    const viewer = new PollingClient(origin);
+    clients.push(owner, collaborator, viewer);
+    await owner.connect("owner", "fac-owner");
+    await collaborator.connect("collaborator", "fac-collab");
+    await viewer.connect("viewer", "fac-viewer");
+    const ownerJoin = await owner.emit("session:join", { sessionId: "socket-test", userId: "fac-owner" });
+    expect(ownerJoin).toMatchObject({ ok: true, moderation: { followOwner: false, editingLocked: false, timer: null, voting: { open: false, votesPerParticipant: 3 } }, votes: {} });
+    for (const [client, userId] of [[collaborator, "fac-collab"], [viewer, "fac-viewer"]] as const) {
+      expect(await client.emit("session:join", { sessionId: "socket-test", userId })).toMatchObject({ ok: true });
+    }
+    const sessionId = "socket-test";
+    const update = { sessionId, updatedBy: "x", updateBase64: Buffer.from(Y.encodeStateAsUpdate(new Y.Doc())).toString("base64") };
+
+    expect(await collaborator.emit("moderation:update", { sessionId, editingLocked: true })).toMatchObject({ ok: false, error: "not_authorized" });
+    expect(await owner.emit("moderation:update", { sessionId, timer: { durationSeconds: 5 } })).toMatchObject({ ok: false, error: "invalid_moderation_update_payload" });
+
+    // Voting is closed by default.
+    expect(await viewer.emit("vote:toggle", { sessionId, elementId: "e1" })).toMatchObject({ ok: false, error: "voting_closed" });
+
+    // Editing lock blocks collaborators but not the owner.
+    const locked = await owner.emit("moderation:update", { sessionId, editingLocked: true, timer: { durationSeconds: 60, label: "Think" } });
+    expect(locked).toMatchObject({ ok: true, moderation: { editingLocked: true, timer: { durationSeconds: 60, label: "Think" } } });
+    expect((await collaborator.waitForEvent("moderation:state")).moderation.editingLocked).toBe(true);
+    expect(await collaborator.emit("yjs:update", update)).toMatchObject({ ok: false, error: "editing_locked" });
+    expect(await collaborator.emit("canvas:update", { sessionId, updatedBy: "x", content: "locked" })).toMatchObject({ ok: false, error: "editing_locked" });
+    expect(await owner.emit("yjs:update", update)).toMatchObject({ ok: true });
+    await owner.emit("moderation:update", { sessionId, editingLocked: false, timer: null });
+    expect(await collaborator.emit("yjs:update", update)).toMatchObject({ ok: true });
+
+    // Voting: toggle, limit, viewers may vote.
+    expect(await owner.emit("moderation:update", { sessionId, voting: { open: true, votesPerParticipant: 2 } })).toMatchObject({ ok: true, moderation: { voting: { open: true, votesPerParticipant: 2 } } });
+    expect(await viewer.emit("vote:toggle", { sessionId, elementId: "e1" })).toMatchObject({ ok: true, votes: { e1: ["fac-viewer"] } });
+    expect(await viewer.emit("vote:toggle", { sessionId, elementId: "e2" })).toMatchObject({ ok: true });
+    expect(await viewer.emit("vote:toggle", { sessionId, elementId: "e3" })).toMatchObject({ ok: false, error: "vote_limit_reached" });
+    expect(await collaborator.emit("vote:toggle", { sessionId, elementId: "e1" })).toMatchObject({ ok: true, votes: { e1: ["fac-viewer", "fac-collab"], e2: ["fac-viewer"] } });
+    expect(await viewer.emit("vote:toggle", { sessionId, elementId: "e2" })).toMatchObject({ ok: true, votes: { e1: ["fac-viewer", "fac-collab"] } });
+    expect(await owner.emit("moderation:update", { sessionId, resetVotes: true })).toMatchObject({ ok: true });
+    let lastVotes: unknown;
+    do { lastVotes = (await collaborator.waitForEvent("votes:state")).votes; } while (Object.keys(lastVotes as object).length > 0);
+    expect(lastVotes).toEqual({});
+
+    // Reactions and follow-owner viewport reach the other participants.
+    expect(await viewer.emit("reaction:send", { sessionId, emoji: "🎉", pointer: { x: 1, y: 2 } })).toMatchObject({ ok: true });
+    expect(await owner.waitForEvent("reaction")).toMatchObject({ sessionId, emoji: "🎉", pointer: { x: 1, y: 2 }, displayName: "fac-viewer" });
+    expect(await viewer.emit("reaction:send", { sessionId, emoji: "💩" })).toMatchObject({ ok: false, error: "invalid_reaction_payload" });
+    expect(await viewer.emit("viewport:update", { sessionId, scrollX: 1, scrollY: 2, zoom: 1 })).toMatchObject({ ok: false, error: "not_authorized" });
+    await owner.emit("moderation:update", { sessionId, followOwner: true });
+    expect(await owner.emit("viewport:update", { sessionId, scrollX: 10, scrollY: 20, zoom: 2 })).toMatchObject({ ok: true });
+    expect(await collaborator.waitForEvent("viewport:update")).toEqual({ sessionId, scrollX: 10, scrollY: 20, zoom: 2 });
+    const limited = [];
+    for (let i = 0; i < 10; i++) limited.push(await viewer.emit("reaction:send", { sessionId, emoji: "👀" }));
+    expect(limited.some((ack) => ack.error === "reaction_rate_limited")).toBe(true);
   });
 
   it("ends live collaboration when the owner closes the session", async () => {

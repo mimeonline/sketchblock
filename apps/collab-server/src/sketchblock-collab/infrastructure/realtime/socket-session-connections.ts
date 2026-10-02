@@ -4,6 +4,7 @@ import type { Server } from "socket.io";
 import { PresenceStorePort } from "../../application/ports/presence-store.port.js";
 import { SessionConnectionsPort } from "../../application/ports/session-connections.port.js";
 import { YjsDocumentRegistryPort } from "../../application/ports/yjs-document-registry.port.js";
+import { FacilitationRegistry } from "./facilitation.registry.js";
 import { SessionParticipantExclusions } from "./session-participant-exclusions.js";
 
 export function sessionRoomName(sessionId: string) {
@@ -18,6 +19,7 @@ export class SocketSessionConnections extends SessionConnectionsPort {
     @Inject(PresenceStorePort) private readonly presence: PresenceStorePort,
     @Inject(YjsDocumentRegistryPort) private readonly yjsDocuments: YjsDocumentRegistryPort,
     @Inject(SessionParticipantExclusions) private readonly exclusions: SessionParticipantExclusions,
+    @Inject(FacilitationRegistry) private readonly facilitation: FacilitationRegistry,
   ) {
     super();
   }
@@ -34,6 +36,7 @@ export class SocketSessionConnections extends SessionConnectionsPort {
     }
     this.presence.deleteSession(sessionId);
     this.exclusions.clear(sessionId);
+    this.facilitation.clear(sessionId);
     await this.yjsDocuments.releaseDocument(sessionId);
   }
 }

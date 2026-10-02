@@ -2,6 +2,7 @@ import { Inject, Injectable, type OnModuleDestroy } from "@nestjs/common";
 
 import { PresenceStorePort } from "../../application/ports/presence-store.port.js";
 import { YjsDocumentRegistryPort } from "../../application/ports/yjs-document-registry.port.js";
+import { FacilitationRegistry } from "./facilitation.registry.js";
 import { StructuredLoggerService } from "../../../shared/infrastructure/logging/structured-logger.service.js";
 
 export const DOCUMENT_EVICTION_GRACE_MS = 60_000;
@@ -15,6 +16,7 @@ export class DocumentEvictionScheduler implements OnModuleDestroy {
     @Inject(YjsDocumentRegistryPort) private readonly documents: YjsDocumentRegistryPort,
     @Inject(PresenceStorePort) private readonly presence: PresenceStorePort,
     @Inject(StructuredLoggerService) private readonly logger: StructuredLoggerService,
+    @Inject(FacilitationRegistry) private readonly facilitation: FacilitationRegistry,
   ) {}
 
   /** Schedules eviction if the session currently has no presence; keeps an existing timer. */
@@ -33,7 +35,9 @@ export class DocumentEvictionScheduler implements OnModuleDestroy {
         .then((released) => {
           if (!released) {
             this.scheduleIfEmpty(sessionId);
+            return;
           }
+          this.facilitation.clear(sessionId);
         })
         .catch((error: unknown) => {
           this.logger.errorEvent("yjs.document.release.failed", { sessionId, error });

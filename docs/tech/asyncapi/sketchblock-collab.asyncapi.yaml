@@ -122,6 +122,62 @@ channels:
       summary: Server broadcasts the current session presence list.
       message:
         $ref: '#/components/messages/PresenceUpdate'
+  moderation:update:
+    subscribe:
+      operationId: receiveModerationUpdate
+      summary: Owner or server updates the session moderation state.
+      description: >-
+        Partial update. Requires a joined admin socket (owner or server). The ack is
+        ok true with the full moderation state; errors are not_authorized,
+        session_not_joined and invalid_moderation_update_payload.
+      message:
+        $ref: '#/components/messages/ModerationUpdate'
+  moderation:state:
+    publish:
+      operationId: publishModerationState
+      summary: Server broadcasts the full moderation state to the whole room including the sender.
+      message:
+        $ref: '#/components/messages/ModerationState'
+  votes:state:
+    publish:
+      operationId: publishVotesState
+      summary: Server broadcasts all votes after a vote toggle or resetVotes.
+      message:
+        $ref: '#/components/messages/VotesState'
+  viewport:update:
+    subscribe:
+      operationId: receiveViewportUpdate
+      summary: Owner submits its viewport (rate limited to 20 per second per socket).
+      message:
+        $ref: '#/components/messages/ViewportUpdate'
+    publish:
+      operationId: publishViewportUpdate
+      summary: Server relays the owner viewport to the other sockets, only while followOwner is on.
+      message:
+        $ref: '#/components/messages/ViewportBroadcast'
+  vote:toggle:
+    subscribe:
+      operationId: receiveVoteToggle
+      summary: Any joined role sets or removes its vote on an element while voting is open.
+      description: >-
+        Ack is ok true with all votes. Errors: voting_closed, vote_limit_reached,
+        session_not_joined, not_authorized.
+      message:
+        $ref: '#/components/messages/VoteToggle'
+  reaction:send:
+    subscribe:
+      operationId: receiveReactionSend
+      summary: Any joined role sends an ephemeral emoji reaction (10 per 10 seconds per socket).
+      description: >-
+        Errors: reaction_rate_limited, session_not_joined, not_authorized, invalid_reaction_payload.
+      message:
+        $ref: '#/components/messages/ReactionSend'
+  reaction:
+    publish:
+      operationId: publishReaction
+      summary: Server relays an ephemeral reaction to the other sockets in the room.
+      message:
+        $ref: '#/components/messages/ReactionBroadcast'
 components:
   securitySchemes:
     collabTicket:
@@ -132,6 +188,54 @@ components:
         Browser clients pass the signed collab ticket as Socket.IO handshake
         auth token. Server-side clients use a server-role collab ticket.
   messages:
+    ModerationUpdate:
+      messageId: receiveModerationUpdateMessage
+      name: ModerationUpdate
+      title: moderation:update payload
+      payload:
+        $ref: '#/components/schemas/ModerationUpdatePayload'
+    ModerationState:
+      messageId: publishModerationStateMessage
+      name: ModerationState
+      title: moderation:state broadcast
+      payload:
+        $ref: '#/components/schemas/ModerationStatePayload'
+    VotesState:
+      messageId: publishVotesStateMessage
+      name: VotesState
+      title: votes:state broadcast
+      payload:
+        $ref: '#/components/schemas/VotesStatePayload'
+    ViewportUpdate:
+      messageId: receiveViewportUpdateMessage
+      name: ViewportUpdate
+      title: viewport:update payload
+      payload:
+        $ref: '#/components/schemas/ViewportUpdatePayload'
+    ViewportBroadcast:
+      messageId: publishViewportUpdateMessage
+      name: ViewportBroadcast
+      title: viewport:update broadcast
+      payload:
+        $ref: '#/components/schemas/ViewportUpdatePayload'
+    VoteToggle:
+      messageId: receiveVoteToggleMessage
+      name: VoteToggle
+      title: vote:toggle payload
+      payload:
+        $ref: '#/components/schemas/VoteTogglePayload'
+    ReactionSend:
+      messageId: receiveReactionSendMessage
+      name: ReactionSend
+      title: reaction:send payload
+      payload:
+        $ref: '#/components/schemas/ReactionSendPayload'
+    ReactionBroadcast:
+      messageId: publishReactionMessage
+      name: ReactionBroadcast
+      title: reaction broadcast
+      payload:
+        $ref: '#/components/schemas/ReactionBroadcastPayload'
     JoinSession:
       messageId: receiveSessionJoinMessage
       name: JoinSession
@@ -141,7 +245,8 @@ components:
         tickets. Joining an ended session is acknowledged with ok false and
         error session_closed. Actors removed via client:kick with excludeActor
         are acknowledged with error participant_removed (owner and server
-        tickets are never excluded).
+        tickets are never excluded). The ack additionally carries moderation
+        (current moderation state) and votes (Record of elementId to actor ids).
       payload:
         $ref: '#/components/schemas/JoinSessionPayload'
     CanvasUpdate:
@@ -237,6 +342,162 @@ components:
       payload:
         $ref: '#/components/schemas/SessionSnapshot'
   schemas:
+    Moderation:
+      type: object
+      additionalProperties: false
+      required: [followOwner, editingLocked, timer, voting]
+      properties:
+        followOwner:
+          type: boolean
+        editingLocked:
+          type: boolean
+          description: While true, yjs:update and canvas:update from non-owner/non-server sockets get error editing_locked.
+        timer:
+          oneOf:
+            - type: 'null'
+            - type: object
+              additionalProperties: false
+              required: [endsAt, durationSeconds]
+              properties:
+                endsAt:
+                  type: string
+                  format: date-time
+                durationSeconds:
+                  type: integer
+                  minimum: 10
+                  maximum: 3600
+                label:
+                  type: string
+                  maxLength: 60
+        voting:
+          type: object
+          additionalProperties: false
+          required: [open, votesPerParticipant]
+          properties:
+            open:
+              type: boolean
+            votesPerParticipant:
+              type: integer
+              minimum: 1
+              maximum: 10
+    Votes:
+      type: object
+      description: Actor ids per element id.
+      additionalProperties:
+        type: array
+        items:
+          type: string
+    ModerationUpdatePayload:
+      type: object
+      additionalProperties: false
+      required: [sessionId]
+      properties:
+        sessionId:
+          $ref: '#/components/schemas/SessionId'
+        followOwner:
+          type: boolean
+        editingLocked:
+          type: boolean
+        timer:
+          oneOf:
+            - type: 'null'
+            - type: object
+              additionalProperties: false
+              required: [durationSeconds]
+              properties:
+                durationSeconds:
+                  type: integer
+                  minimum: 10
+                  maximum: 3600
+                label:
+                  type: string
+                  maxLength: 60
+        voting:
+          type: object
+          additionalProperties: false
+          properties:
+            open:
+              type: boolean
+            votesPerParticipant:
+              type: integer
+              minimum: 1
+              maximum: 10
+        resetVotes:
+          type: boolean
+          enum: [true]
+    ModerationStatePayload:
+      type: object
+      additionalProperties: false
+      required: [sessionId, moderation]
+      properties:
+        sessionId:
+          $ref: '#/components/schemas/SessionId'
+        moderation:
+          $ref: '#/components/schemas/Moderation'
+    VotesStatePayload:
+      type: object
+      additionalProperties: false
+      required: [sessionId, votes]
+      properties:
+        sessionId:
+          $ref: '#/components/schemas/SessionId'
+        votes:
+          $ref: '#/components/schemas/Votes'
+    ViewportUpdatePayload:
+      type: object
+      additionalProperties: false
+      required: [sessionId, scrollX, scrollY, zoom]
+      properties:
+        sessionId:
+          $ref: '#/components/schemas/SessionId'
+        scrollX:
+          type: number
+        scrollY:
+          type: number
+        zoom:
+          type: number
+          minimum: 0.1
+          maximum: 30
+    VoteTogglePayload:
+      type: object
+      additionalProperties: false
+      required: [sessionId, elementId]
+      properties:
+        sessionId:
+          $ref: '#/components/schemas/SessionId'
+        elementId:
+          type: string
+          minLength: 1
+          maxLength: 120
+    ReactionSendPayload:
+      type: object
+      additionalProperties: false
+      required: [sessionId, emoji]
+      properties:
+        sessionId:
+          $ref: '#/components/schemas/SessionId'
+        emoji:
+          type: string
+          enum: ["👍", "❤️", "😂", "🎉", "❓", "👀"]
+        pointer:
+          type: object
+          additionalProperties: false
+          required: [x, y]
+          properties:
+            x:
+              type: number
+            y:
+              type: number
+    ReactionBroadcastPayload:
+      allOf:
+        - $ref: '#/components/schemas/ReactionSendPayload'
+        - type: object
+          required: [displayName, socketId]
+          properties:
+            displayName:
+              type: string
+            socketId:
+              type: string
     SessionId:
       type: string
       minLength: 3

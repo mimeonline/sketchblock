@@ -21,7 +21,11 @@ import {
   inspectSessionPayloadSchema,
   joinSessionPayloadSchema,
   kickClientPayloadSchema,
+  moderationUpdatePayloadSchema,
+  reactionSendPayloadSchema,
   updateSessionStatusPayloadSchema,
+  viewportUpdatePayloadSchema,
+  voteTogglePayloadSchema,
   yjsUpdatePayloadSchema,
   type JoinSessionPayload,
   type PresenceUser,
@@ -44,6 +48,7 @@ import { resolveClientIp } from "../../../shared/infrastructure/security/client-
 import { CollabTicketVerifier, type CollabTicketPayload } from "../auth/collab-ticket.verifier.js";
 import { SessionStorePort } from "../../application/ports/session-store.port.js";
 import { DocumentEvictionScheduler } from "./document-eviction.scheduler.js";
+import { FacilitationRegistry } from "./facilitation.registry.js";
 import { SessionParticipantExclusions } from "./session-participant-exclusions.js";
 import { SocketSessionConnections, sessionRoomName } from "./socket-session-connections.js";
 
@@ -100,6 +105,8 @@ export class RealtimeGateway
     private readonly evictions: DocumentEvictionScheduler,
     @Inject(SessionParticipantExclusions)
     private readonly exclusions: SessionParticipantExclusions,
+    @Inject(FacilitationRegistry)
+    private readonly facilitation: FacilitationRegistry,
   ) {}
 
   afterInit(server: Server) {
@@ -259,6 +266,8 @@ export class RealtimeGateway
       yjsRevision: session.yjsRevision || 0,
       audit: this.canReadAudit(socket) ? session.audit || [] : [],
       presence,
+      moderation: this.facilitation.getModeration(payload.sessionId),
+      votes: this.facilitation.getVotes(payload.sessionId),
     });
     return true;
   }
@@ -289,6 +298,12 @@ export class RealtimeGateway
     if (!this.hasJoined(socket, payload.sessionId)) {
       this.logSocketEvent("canvas.update.failed", socket, { sessionId: payload.sessionId, error: "session_not_joined" });
       ack?.({ ok: false, error: "session_not_joined" });
+      return;
+    }
+
+    if (this.isEditingLockedFor(socket, payload.sessionId)) {
+      this.logSocketEvent("canvas.update.failed", socket, { sessionId: payload.sessionId, error: "editing_locked" });
+      ack?.({ ok: false, error: "editing_locked" });
       return;
     }
 
@@ -377,6 +392,12 @@ export class RealtimeGateway
       return;
     }
 
+    if (this.isEditingLockedFor(socket, payload.sessionId)) {
+      this.logSocketEvent("yjs.update.failed", socket, { sessionId: payload.sessionId, error: "editing_locked" });
+      ack?.({ ok: false, error: "editing_locked" });
+      return;
+    }
+
     const updatedBy = this.socketAuth(socket)?.actor || payload.updatedBy;
     let update;
     try {
@@ -407,6 +428,156 @@ export class RealtimeGateway
       sessionId: payload.sessionId,
       yjsStateBase64: update.stateBase64,
     });
+  }
+
+  @SubscribeMessage("moderation:update")
+  moderationUpdate(
+    @MessageBody() rawPayload: unknown,
+    @ConnectedSocket() socket: AuthenticatedSocket,
+    @SocketAck() ack?: AckCallback,
+  ) {
+    if (!this.consumeSocketEvent(socket, "moderation.update", ack)) {
+      return;
+    }
+
+    const result = moderationUpdatePayloadSchema.safeParse(rawPayload);
+    if (!result.success) {
+      this.logSocketEvent("moderation.update.failed", socket, { error: "invalid_moderation_update_payload" });
+      ack?.({ ok: false, error: "invalid_moderation_update_payload" });
+      return;
+    }
+
+    const { sessionId, ...update } = result.data;
+    if (!this.canAdminSession(socket, sessionId)) {
+      this.logSocketEvent("moderation.update.failed", socket, { sessionId, error: "not_authorized" });
+      ack?.({ ok: false, error: "not_authorized" });
+      return;
+    }
+    if (!this.hasJoined(socket, sessionId)) {
+      this.logSocketEvent("moderation.update.failed", socket, { sessionId, error: "session_not_joined" });
+      ack?.({ ok: false, error: "session_not_joined" });
+      return;
+    }
+
+    const next = this.facilitation.update(sessionId, update);
+    this.server.to(roomName(sessionId)).emit("moderation:state", { sessionId, moderation: next.moderation });
+    if (next.votesReset) {
+      this.server.to(roomName(sessionId)).emit("votes:state", { sessionId, votes: next.votes });
+    }
+    this.logSocketEvent("moderation.update.succeeded", socket, {
+      sessionId,
+      followOwner: next.moderation.followOwner,
+      editingLocked: next.moderation.editingLocked,
+      votingOpen: next.moderation.voting.open,
+      votesReset: next.votesReset,
+    });
+    ack?.({ ok: true, moderation: next.moderation });
+  }
+
+  @SubscribeMessage("viewport:update")
+  viewportUpdate(
+    @MessageBody() rawPayload: unknown,
+    @ConnectedSocket() socket: AuthenticatedSocket,
+    @SocketAck() ack?: AckCallback,
+  ) {
+    const result = viewportUpdatePayloadSchema.safeParse(rawPayload);
+    if (!result.success) {
+      ack?.({ ok: false, error: "invalid_viewport_update_payload" });
+      return;
+    }
+
+    const { sessionId, scrollX, scrollY, zoom } = result.data;
+    if (!this.canAdminSession(socket, sessionId) || !this.hasJoined(socket, sessionId)) {
+      ack?.({ ok: false, error: "not_authorized" });
+      return;
+    }
+    // High-frequency ephemeral relay: own lightweight limiter, no per-event logging.
+    if (!this.rateLimits.consumeViewportUpdate(socket.id).allowed) {
+      ack?.({ ok: false, error: "viewport_rate_limited" });
+      return;
+    }
+
+    if (this.facilitation.getModeration(sessionId).followOwner) {
+      socket.to(roomName(sessionId)).emit("viewport:update", { sessionId, scrollX, scrollY, zoom });
+    }
+    ack?.({ ok: true });
+  }
+
+  @SubscribeMessage("vote:toggle")
+  voteToggle(
+    @MessageBody() rawPayload: unknown,
+    @ConnectedSocket() socket: AuthenticatedSocket,
+    @SocketAck() ack?: AckCallback,
+  ) {
+    if (!this.consumeSocketEvent(socket, "vote.toggle", ack)) {
+      return;
+    }
+
+    const result = voteTogglePayloadSchema.safeParse(rawPayload);
+    if (!result.success) {
+      this.logSocketEvent("vote.toggle.failed", socket, { error: "invalid_vote_toggle_payload" });
+      ack?.({ ok: false, error: "invalid_vote_toggle_payload" });
+      return;
+    }
+
+    const { sessionId, elementId } = result.data;
+    if (!this.canAccessSession(socket, sessionId)) {
+      this.logSocketEvent("vote.toggle.failed", socket, { sessionId, error: "not_authorized" });
+      ack?.({ ok: false, error: "not_authorized" });
+      return;
+    }
+    if (!this.hasJoined(socket, sessionId)) {
+      this.logSocketEvent("vote.toggle.failed", socket, { sessionId, error: "session_not_joined" });
+      ack?.({ ok: false, error: "session_not_joined" });
+      return;
+    }
+
+    const actorId = this.socketAuth(socket)?.actor || `socket:${socket.id}`;
+    const toggled = this.facilitation.toggleVote(sessionId, actorId, elementId);
+    if (!toggled.ok) {
+      this.logSocketEvent("vote.toggle.failed", socket, { sessionId, error: toggled.error });
+      ack?.({ ok: false, error: toggled.error });
+      return;
+    }
+
+    this.server.to(roomName(sessionId)).emit("votes:state", { sessionId, votes: toggled.votes });
+    this.logSocketEvent("vote.toggle.succeeded", socket, { sessionId });
+    ack?.({ ok: true, votes: toggled.votes });
+  }
+
+  @SubscribeMessage("reaction:send")
+  reactionSend(
+    @MessageBody() rawPayload: unknown,
+    @ConnectedSocket() socket: AuthenticatedSocket,
+    @SocketAck() ack?: AckCallback,
+  ) {
+    const result = reactionSendPayloadSchema.safeParse(rawPayload);
+    if (!result.success) {
+      ack?.({ ok: false, error: "invalid_reaction_payload" });
+      return;
+    }
+
+    const { sessionId, emoji, pointer } = result.data;
+    if (!this.canAccessSession(socket, sessionId)) {
+      ack?.({ ok: false, error: "not_authorized" });
+      return;
+    }
+    if (!this.hasJoined(socket, sessionId)) {
+      ack?.({ ok: false, error: "session_not_joined" });
+      return;
+    }
+    if (!this.rateLimits.consumeReaction(socket.id).allowed) {
+      ack?.({ ok: false, error: "reaction_rate_limited" });
+      return;
+    }
+
+    const displayName =
+      this.presence.getSessionPresence(sessionId)?.get(socket.id)?.displayName ||
+      this.socketAuth(socket)?.displayName ||
+      "";
+    // Ephemeral broadcast to the others; the sender renders its own reaction locally.
+    socket.to(roomName(sessionId)).emit("reaction", { sessionId, emoji, pointer, displayName, socketId: socket.id });
+    ack?.({ ok: true });
   }
 
   @SubscribeMessage("yjs:state:get")
@@ -782,6 +953,14 @@ export class RealtimeGateway
     const auth = this.socketAuth(socket);
 
     return SessionAccessPolicy.canEdit(auth, sessionId, Boolean(this.config.authSecret));
+  }
+
+  /** Editing lock applies to everyone except the owner and the web server. */
+  private isEditingLockedFor(socket: AuthenticatedSocket, sessionId: string) {
+    return (
+      this.facilitation.getModeration(sessionId).editingLocked &&
+      !this.canAdminSession(socket, sessionId)
+    );
   }
 
   private canAdminSession(socket: AuthenticatedSocket, sessionId: string) {

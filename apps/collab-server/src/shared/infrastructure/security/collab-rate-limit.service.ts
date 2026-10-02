@@ -11,6 +11,8 @@ export class CollabRateLimitService {
   private readonly socketConnects: FixedWindowRateLimiter;
   private readonly socketEvents: FixedWindowRateLimiter;
   private readonly yjsUpdates: FixedWindowRateLimiter;
+  private readonly viewportUpdates = new FixedWindowRateLimiter(20, 1000);
+  private readonly reactions = new FixedWindowRateLimiter(10, 10_000);
 
   constructor(@Inject(CollabConfigService) private readonly config: CollabConfigService) {
     this.httpRequests = new FixedWindowRateLimiter(config.httpRequestsPerIpPerMinute, oneMinuteMs);
@@ -33,6 +35,14 @@ export class CollabRateLimitService {
 
   consumeYjsUpdate(socketId: string) {
     return this.yjsUpdates.consume(socketId);
+  }
+
+  consumeViewportUpdate(socketId: string) {
+    return this.viewportUpdates.consume(socketId);
+  }
+
+  consumeReaction(socketId: string) {
+    return this.reactions.consume(socketId);
   }
 
   snapshot() {
