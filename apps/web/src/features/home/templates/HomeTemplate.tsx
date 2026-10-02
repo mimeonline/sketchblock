@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   CheckCircle2,
@@ -1862,6 +1863,7 @@ function SettingsView({
   demoMode: boolean;
 }) {
   const t = useTranslations("Settings");
+  const router = useRouter();
   const [resettingDemo, setResettingDemo] = useState(false);
 
   async function resetDemo() {
@@ -1869,7 +1871,8 @@ function SettingsView({
     try {
       const response = await fetch("/api/demo/reset", { method: "POST" });
       if (!response.ok) throw new Error("The demo workspace could not be reset.");
-      window.location.assign("/");
+      router.push("/");
+      router.refresh();
     } finally {
       setResettingDemo(false);
     }

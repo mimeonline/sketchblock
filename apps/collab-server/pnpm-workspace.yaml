@@ -16,3 +16,7 @@ minimumReleaseAgeExclude:
   - '@nestjs/websockets@11.1.28'
 overrides:
   '@babel/core': ^7.29.7
+  'socket.io-parser@<4.2.7': ^4.2.7
+  'engine.io@<6.6.10': ^6.6.10
+  'qs@<6.16.0': ^6.16.0
+  'js-yaml@>=5.0.0 <5.4.1': ^5.4.1
