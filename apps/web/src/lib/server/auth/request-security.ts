@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
 import { getAppBaseUrl } from "@/lib/server/auth/session";
 
@@ -8,7 +8,7 @@ type AttemptWindow = { count: number; resetAt: number };
 const attempts = new Map<string, AttemptWindow>();
 const WINDOW_MS = 15 * 60 * 1000;
 
-export function hasValidRequestOrigin(request: NextRequest) {
+export function hasValidRequestOrigin(request: Pick<Request, "headers">) {
   const origin = request.headers.get("origin");
   if (!origin) return false;
   try {
@@ -16,6 +16,15 @@ export function hasValidRequestOrigin(request: NextRequest) {
   } catch {
     return false;
   }
+}
+
+/**
+ * CSRF guard for state-changing route handlers: returns a 403 response unless the
+ * request carries an Origin header that matches APP_BASE_URL.
+ */
+export function rejectCrossOriginRequest(request: Pick<Request, "headers">): NextResponse | null {
+  if (hasValidRequestOrigin(request)) return null;
+  return NextResponse.json({ error: "Invalid request origin.", code: "invalid_origin" }, { status: 403 });
 }
 
 export function isProxyTrusted() {

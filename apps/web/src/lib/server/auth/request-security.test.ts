@@ -20,3 +20,13 @@ describe("getClientAddress", () => {
     expect(getClientAddress(request({}))).toBe("direct");
   });
 });
+
+describe("rejectCrossOriginRequest", () => {
+  it("accepts same-origin requests and rejects missing or foreign origins", async () => {
+    const { rejectCrossOriginRequest } = await import("./request-security");
+    const base = process.env.APP_BASE_URL || "http://localhost:4512";
+    expect(rejectCrossOriginRequest(new Request(`${base}/api/x`, { method: "POST", headers: { origin: base } }))).toBeNull();
+    expect(rejectCrossOriginRequest(new Request(`${base}/api/x`, { method: "POST" }))?.status).toBe(403);
+    expect(rejectCrossOriginRequest(new Request(`${base}/api/x`, { method: "POST", headers: { origin: "https://evil.example" } }))?.status).toBe(403);
+  });
+});
