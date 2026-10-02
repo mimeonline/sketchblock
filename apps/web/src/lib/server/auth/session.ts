@@ -71,7 +71,7 @@ export async function getCurrentAuthUser(): Promise<AuthUser | null> {
 
 export async function getStoredAuthUser(): Promise<AuthUser | null> {
   const cookieStore = await cookies();
-  const payload = verifySignedPayload<AuthUser>(cookieStore.get(AUTH_COOKIE)?.value);
+  const payload = verifySignedPayload<AuthUser>(cookieStore.get(AUTH_COOKIE)?.value, "participant-auth");
 
   if (!payload || payload.expiresAt < Date.now()) {
     return null;
@@ -84,7 +84,7 @@ export async function setAuthCookie(user: Omit<AuthUser, "expiresAt">) {
   const cookieStore = await cookies();
   const expiresAt = Date.now() + AUTH_MAX_AGE_SECONDS * 1000;
 
-  cookieStore.set(AUTH_COOKIE, signPayload({ ...user, expiresAt }), {
+  cookieStore.set(AUTH_COOKIE, signPayload({ ...user, expiresAt }, "participant-auth"), {
     httpOnly: true,
     sameSite: "lax",
     secure: getAppBaseUrl().startsWith("https://"),
@@ -160,7 +160,7 @@ export async function setOAuthStateCookie(input: Pick<OAuthState, "state" | "ret
   const cookieStore = await cookies();
   const expiresAt = Date.now() + OAUTH_STATE_MAX_AGE_SECONDS * 1000;
 
-  cookieStore.set(OAUTH_STATE_COOKIE, signPayload({ ...input, expiresAt }), {
+  cookieStore.set(OAUTH_STATE_COOKIE, signPayload({ ...input, expiresAt }, "oauth-state"), {
     httpOnly: true,
     sameSite: "lax",
     secure: getAppBaseUrl().startsWith("https://"),
@@ -171,7 +171,7 @@ export async function setOAuthStateCookie(input: Pick<OAuthState, "state" | "ret
 
 export async function consumeOAuthStateCookie(): Promise<OAuthState | null> {
   const cookieStore = await cookies();
-  const payload = verifySignedPayload<OAuthState>(cookieStore.get(OAUTH_STATE_COOKIE)?.value);
+  const payload = verifySignedPayload<OAuthState>(cookieStore.get(OAUTH_STATE_COOKIE)?.value, "oauth-state");
   cookieStore.delete(OAUTH_STATE_COOKIE);
 
   if (!payload || payload.expiresAt < Date.now()) {

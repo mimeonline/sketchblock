@@ -9,6 +9,8 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 
+import { getSketchblockDeploymentEnvironment } from "@/lib/server/auth/auth-mode";
+
 const ENCRYPTED_SECRET_VERSION = "v1";
 
 function base64UrlEncode(value: Buffer | string) {
@@ -24,6 +26,27 @@ function base64UrlDecode(value: string) {
   return Buffer.from(padded.replace(/-/g, "+").replace(/_/g, "/"), "base64");
 }
 
+export type SignedPayloadPurpose =
+  | "participant-auth"
+  | "owner-auth"
+  | "oauth-state"
+  | "session-grant"
+  | "collab-ticket";
+
+const MIN_PRODUCTION_SECRET_LENGTH = 32;
+
+function assertProductionSecretStrength(name: string, secret: string) {
+  if (getSketchblockDeploymentEnvironment() !== "production") {
+    return;
+  }
+
+  if (secret.length < MIN_PRODUCTION_SECRET_LENGTH || secret.toLowerCase().includes("change-me")) {
+    throw new Error(
+      `${name} is too weak for production. Use at least ${MIN_PRODUCTION_SECRET_LENGTH} random characters and no placeholder values.`,
+    );
+  }
+}
+
 function getAuthSecret() {
   const secret = process.env.APP_AUTH_SECRET?.trim();
 
@@ -31,17 +54,36 @@ function getAuthSecret() {
     throw new Error("Missing APP_AUTH_SECRET. Set a long random value in apps/web/.env.local.");
   }
 
+  assertProductionSecretStrength("APP_AUTH_SECRET", secret);
   return secret;
 }
 
-export function signPayload(payload: object) {
-  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
-  const signature = createHmac("sha256", getAuthSecret()).update(encodedPayload).digest();
+function getSigningSecret(purpose: SignedPayloadPurpose) {
+  if (purpose === "collab-ticket") {
+    const collabSecret = process.env.COLLAB_AUTH_SECRET?.trim();
+    if (collabSecret) {
+      assertProductionSecretStrength("COLLAB_AUTH_SECRET", collabSecret);
+      return collabSecret;
+    }
+  }
 
-  return `${encodedPayload}.${base64UrlEncode(signature)}`;
+  return getAuthSecret();
 }
 
-export function verifySignedPayload<T extends object>(token?: string | null): T | null {
+function computeSignature(purpose: SignedPayloadPurpose, encodedPayload: string) {
+  return createHmac("sha256", getSigningSecret(purpose)).update(`${purpose}.${encodedPayload}`).digest();
+}
+
+export function signPayload(payload: object, purpose: SignedPayloadPurpose) {
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+
+  return `${encodedPayload}.${base64UrlEncode(computeSignature(purpose, encodedPayload))}`;
+}
+
+export function verifySignedPayload<T extends object>(
+  token: string | null | undefined,
+  purpose: SignedPayloadPurpose,
+): T | null {
   if (!token) {
     return null;
   }
@@ -51,7 +93,7 @@ export function verifySignedPayload<T extends object>(token?: string | null): T 
     return null;
   }
 
-  const expected = createHmac("sha256", getAuthSecret()).update(encodedPayload).digest();
+  const expected = computeSignature(purpose, encodedPayload);
   const actual = base64UrlDecode(encodedSignature);
 
   if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {

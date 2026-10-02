@@ -11,7 +11,7 @@ export class CollabConfigService {
   readonly maxSnapshotBytes = this.readNumberEnv("COLLAB_MAX_SNAPSHOT_BYTES", 25_000_000);
   readonly maxYjsDocumentBytes = this.readNumberEnv("COLLAB_MAX_YJS_DOCUMENT_BYTES", 25_000_000);
   readonly exposeApiDocs = this.readBooleanEnv("COLLAB_EXPOSE_API_DOCS");
-  readonly authSecret = process.env.COLLAB_AUTH_SECRET?.trim() || process.env.APP_AUTH_SECRET?.trim() || null;
+  readonly authSecret = this.readAuthSecret();
   readonly trustProxy = this.readBooleanEnv("COLLAB_TRUST_PROXY");
   readonly logLevel = this.readLogLevel();
   readonly logFormat = this.readLogFormat();
@@ -24,6 +24,29 @@ export class CollabConfigService {
   readonly socketConnectsPerIpPerMinute = this.readNumberEnv("COLLAB_SOCKET_CONNECTS_PER_IP_PER_MINUTE", 60);
   readonly socketEventsPerSocketPerMinute = this.readNumberEnv("COLLAB_SOCKET_EVENTS_PER_SOCKET_PER_MINUTE", 300);
   readonly yjsUpdatesPerSocketPerMinute = this.readNumberEnv("COLLAB_YJS_UPDATES_PER_SOCKET_PER_MINUTE", 1_800);
+
+  private readAuthSecret(): string | null {
+    const secret = process.env.COLLAB_AUTH_SECRET?.trim() || process.env.APP_AUTH_SECRET?.trim() || null;
+    const isProduction = process.env.NODE_ENV === "production";
+
+    if (!secret) {
+      if (!isProduction && this.readBooleanEnv("COLLAB_ALLOW_INSECURE_NO_AUTH")) {
+        return null;
+      }
+
+      throw new Error(
+        "COLLAB_AUTH_SECRET or APP_AUTH_SECRET must be set. COLLAB_ALLOW_INSECURE_NO_AUTH=true disables auth for local experiments only (never in production).",
+      );
+    }
+
+    if (isProduction && (secret.length < 32 || secret.toLowerCase().includes("change-me"))) {
+      throw new Error(
+        "COLLAB_AUTH_SECRET/APP_AUTH_SECRET is too weak for production: use at least 32 random characters and no placeholder values.",
+      );
+    }
+
+    return secret;
+  }
 
   private readBooleanEnv(name: string): boolean {
     const value = process.env[name]?.trim().toLowerCase();

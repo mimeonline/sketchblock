@@ -9,12 +9,20 @@ Key settings include:
 | `SKETCHBLOCK_AUTH_MODE` | `demo`, `dev`, or `github` |
 | `SKETCHBLOCK_WEB_PORT` | Published web port, default `4512` |
 | `SKETCHBLOCK_COLLAB_PORT` | Published collaboration port, default `4513` |
-| `APP_AUTH_SECRET` | Signs app sessions and collaboration tickets |
+| `APP_AUTH_SECRET` | Signs app sessions and collaboration tickets. In production: at least 32 random characters, no `change-me` placeholders |
+| `COLLAB_AUTH_SECRET` | Optional separate secret for collaboration tickets. Must be identical for the web app and the collaboration server; falls back to `APP_AUTH_SECRET` |
+| `COLLAB_ALLOW_INSECURE_NO_AUTH` | Local experiments only: lets the collaboration server start without a secret. Ignored in production |
 | `POSTGRES_PASSWORD` | Local Postgres password |
 | `GITHUB_OAUTH_CLIENT_ID` | Required in GitHub mode |
 | `GITHUB_OAUTH_CLIENT_SECRET` | Required in GitHub mode |
 
 Do not commit `.env`.
+
+## Authentication secrets
+
+Every signed value (sign-in cookies, owner cookies, OAuth state, session grants, collaboration tickets) is bound to its purpose, so one kind of token never validates as another. The collaboration server refuses to start without a secret, and in production it rejects secrets shorter than 32 characters or containing `change-me`; the web app applies the same rule when `SKETCHBLOCK_DEPLOYMENT_ENV` resolves to production. Generate a value with `openssl rand -base64 48`.
+
+Upgrading to this version invalidates existing sign-in cookies once, so everyone has to sign in again.
 
 ## Single-instance operation
 

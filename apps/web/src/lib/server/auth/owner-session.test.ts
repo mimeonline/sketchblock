@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("next/headers", () => ({ cookies: mocks.cookies }));
-vi.mock("@/lib/server/auth/auth-mode", () => ({ isDevAuthMode: () => false, isDemoAuthMode: () => false, getDevAuthUser: vi.fn() }));
+vi.mock("@/lib/server/auth/auth-mode", () => ({ isDevAuthMode: () => false, isDemoAuthMode: () => false, getSketchblockDeploymentEnvironment: () => "local", getDevAuthUser: vi.fn() }));
 vi.mock("@/lib/server/database/user-session-store", () => ({
   getActiveUserSession: mocks.getActiveUserSession,
   createUserSession: vi.fn(),
@@ -30,7 +30,7 @@ describe("local API password-change lock", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     process.env.APP_AUTH_SECRET = "test-secret-long-enough-for-signing";
-    const value = signPayload({ sessionId: "local-session", token: "local-token", expiresAt: Date.now() + 60_000 });
+    const value = signPayload({ sessionId: "local-session", token: "local-token", expiresAt: Date.now() + 60_000 }, "owner-auth");
     mocks.cookies.mockResolvedValue({ get: () => ({ value }) });
     mocks.getActiveUserSession.mockResolvedValue({ user_id: "local-user" });
     mocks.getAppUserById.mockResolvedValue({ id: "local-user", username: "local", role: "user", status: "active", mustChangePassword: true });

@@ -62,6 +62,7 @@ describe("Collab server HTTP integration", () => {
   beforeAll(async () => {
     process.env.COLLAB_AUTH_SECRET = "";
     process.env.APP_AUTH_SECRET = "";
+    process.env.COLLAB_ALLOW_INSECURE_NO_AUTH = "true";
     process.env.COLLAB_ALLOWED_ORIGINS = "http://localhost:4512";
     process.env.COLLAB_MAX_SNAPSHOT_BYTES = "200000";
     process.env.COLLAB_HTTP_REQUESTS_PER_IP_PER_MINUTE = "2";
@@ -190,7 +191,7 @@ describe("Collab server HTTP integration", () => {
 function signTicket(role: "server" | "collaborator", secret: string) {
   const permission = role === "server" ? "admin" : "write";
   const payload = Buffer.from(JSON.stringify({ kind: "collab-ticket", sessionId: role === "server" ? "*" : "s", clientId: role, actor: role, displayName: role, role, permission, expiresAt: Date.now() + 60_000 })).toString("base64url");
-  return `${payload}.${createHmac("sha256", secret).update(payload).digest("base64url")}`;
+  return `${payload}.${createHmac("sha256", secret).update(`collab-ticket.${payload}`).digest("base64url")}`;
 }
 
 describe("Collab server HTTP integration with auth", () => {

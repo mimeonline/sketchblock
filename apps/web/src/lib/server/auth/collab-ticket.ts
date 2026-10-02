@@ -23,7 +23,7 @@ export function createCollabTicket(input: Omit<CollabTicketPayload, "kind" | "ex
     kind: "collab-ticket",
     ...input,
     expiresAt: Date.now() + COLLAB_TICKET_MAX_AGE_MS,
-  });
+  }, "collab-ticket");
 }
 
 export function createServerCollabTicket() {

@@ -106,7 +106,7 @@ export async function getCurrentOwner(): Promise<AuthenticatedOwner | null> {
   }
 
   const cookieStore = await cookies();
-  const payload = verifySignedPayload<OwnerCookiePayload>(cookieStore.get(OWNER_AUTH_COOKIE)?.value);
+  const payload = verifySignedPayload<OwnerCookiePayload>(cookieStore.get(OWNER_AUTH_COOKIE)?.value, "owner-auth");
   if (!payload || payload.expiresAt < Date.now()) {
     return null;
   }
@@ -143,7 +143,7 @@ export async function setOwnerAuthCookie(ownerId: string) {
   const sessionId = randomUUID();
   const token = randomBytes(32).toString("base64url");
   await createUserSession({ id: sessionId, userId: ownerId, token, expiresAt: new Date(expiresAt) });
-  cookieStore.set(OWNER_AUTH_COOKIE, signPayload({ sessionId, token, expiresAt }), {
+  cookieStore.set(OWNER_AUTH_COOKIE, signPayload({ sessionId, token, expiresAt }, "owner-auth"), {
     httpOnly: true,
     sameSite: "lax",
     secure: getAppBaseUrl().startsWith("https://"),
@@ -154,7 +154,7 @@ export async function setOwnerAuthCookie(ownerId: string) {
 
 export async function clearOwnerAuthCookie() {
   const cookieStore = await cookies();
-  const payload = verifySignedPayload<OwnerCookiePayload>(cookieStore.get(OWNER_AUTH_COOKIE)?.value);
+  const payload = verifySignedPayload<OwnerCookiePayload>(cookieStore.get(OWNER_AUTH_COOKIE)?.value, "owner-auth");
   if (payload) await revokeUserSession(payload.sessionId);
   cookieStore.delete(OWNER_AUTH_COOKIE);
 }

@@ -41,7 +41,7 @@ export function createSessionGrantCookie(input: {
 
   return {
     name: sessionGrantCookieName(input.sessionId),
-    value: signPayload(payload),
+    value: signPayload(payload, "session-grant"),
     options: {
       httpOnly: true,
       sameSite: "lax" as const,
@@ -56,6 +56,7 @@ export async function getValidSessionGrant(sessionId: string, githubUserId: numb
   const cookieStore = await cookies();
   const payload = verifySignedPayload<SessionGrantPayload>(
     cookieStore.get(sessionGrantCookieName(sessionId))?.value,
+    "session-grant",
   );
 
   if (!isSessionGrantPayload(payload, sessionId, githubUserId) || payload.expiresAt <= Date.now()) {

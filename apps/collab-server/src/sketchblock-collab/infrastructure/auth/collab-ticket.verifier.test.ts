@@ -4,7 +4,7 @@ import { CollabTicketVerifier, type CollabTicketPayload } from "./collab-ticket.
 
 const secret = "test-secret-value";
 
-function sign(payload: Partial<CollabTicketPayload> = {}) {
+function sign(payload: Partial<CollabTicketPayload> = {}, withPurpose = true) {
   const fullPayload: CollabTicketPayload = {
     kind: "collab-ticket",
     sessionId: "session-1",
@@ -17,7 +17,7 @@ function sign(payload: Partial<CollabTicketPayload> = {}) {
     ...payload,
   };
   const encodedPayload = Buffer.from(JSON.stringify(fullPayload)).toString("base64url");
-  const signature = createHmac("sha256", secret).update(encodedPayload).digest("base64url");
+  const signature = createHmac("sha256", secret).update(withPurpose ? `collab-ticket.${encodedPayload}` : encodedPayload).digest("base64url");
 
   return `${encodedPayload}.${signature}`;
 }
@@ -36,6 +36,12 @@ describe("CollabTicketVerifier", () => {
     const result = verifier.verifyDetailed(sign({ expiresAt: Date.now() - 1_000 }), secret);
 
     expect(result).toEqual({ ok: false, error: "collab_ticket_expired" });
+  });
+
+  it("rejects tickets signed without the collab-ticket purpose prefix", () => {
+    const result = verifier.verifyDetailed(sign({}, false), secret);
+
+    expect(result).toEqual({ ok: false, error: "collab_ticket_invalid_signature" });
   });
 
   it("returns a stable error for invalid signatures", () => {

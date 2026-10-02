@@ -9,7 +9,7 @@ import { SnapshotConflict } from "./sketchblock-collab/application/dtos/snapshot
 
 function signTicket(role: "owner" | "collaborator" | "viewer", actor: string) {
   const payload = Buffer.from(JSON.stringify({ kind: "collab-ticket", sessionId: "socket-test", clientId: actor, actor, displayName: actor, role, permission: role === "viewer" ? "read" : "write", expiresAt: Date.now() + 60_000 })).toString("base64url");
-  return `${payload}.${createHmac("sha256", "socket-test-secret").update(payload).digest("base64url")}`;
+  return `${payload}.${createHmac("sha256", "socket-test-secret").update(`collab-ticket.${payload}`).digest("base64url")}`;
 }
 
 // Exercise the real Engine.IO polling transport without another client dependency.
@@ -124,7 +124,7 @@ describe("Socket.IO multi-client collaboration", () => {
     expect(await owner.emit("session:join", { sessionId: "socket-test", userId: "owner" })).toMatchObject({ ok: true });
     expect(await collaborator.emit("yjs:update", { sessionId: "socket-test", updatedBy: "late", updateBase64: Buffer.from(Y.encodeStateAsUpdate(new Y.Doc())).toString("base64") })).toMatchObject({ ok: false, error: "session_not_joined" });
     const serverPayload = Buffer.from(JSON.stringify({ kind: "collab-ticket", sessionId: "*", clientId: "web-api", actor: "web-api", displayName: "web", role: "server", permission: "admin", expiresAt: Date.now() + 60_000 })).toString("base64url");
-    const serverTicket = `${serverPayload}.${createHmac("sha256", "socket-test-secret").update(serverPayload).digest("base64url")}`;
+    const serverTicket = `${serverPayload}.${createHmac("sha256", "socket-test-secret").update(`collab-ticket.${serverPayload}`).digest("base64url")}`;
     const closed = await fetch(`${origin}/sessions/socket-test/close`, { method: "POST", headers: { Authorization: `Bearer ${serverTicket}`, "Content-Type": "application/json" }, body: JSON.stringify({ closedBy: "web-api" }) });
     expect(await closed.json()).toMatchObject({ ok: true, status: "closed" });
     expect(session?.status).toBe("closed");

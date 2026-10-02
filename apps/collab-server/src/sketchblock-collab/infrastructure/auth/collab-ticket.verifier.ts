@@ -49,7 +49,7 @@ export class CollabTicketVerifier {
       return { ok: false, error: "collab_ticket_malformed" };
     }
 
-    const expected = createHmac("sha256", secret).update(encodedPayload).digest();
+    const expected = createHmac("sha256", secret).update(`collab-ticket.${encodedPayload}`).digest();
     const actual = base64UrlDecode(encodedSignature);
 
     if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
