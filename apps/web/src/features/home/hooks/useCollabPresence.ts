@@ -86,6 +86,11 @@ export function useCollabPresence(input: {
     () => input.displayName || `Guest ${input.clientId.slice(0, 4)}`,
     [input.clientId, input.displayName],
   );
+  // Identity changes must not tear down a live socket (each reconnect is a new join).
+  const displayNameRef = useRef(displayName);
+  useEffect(() => {
+    displayNameRef.current = displayName;
+  }, [displayName]);
 
   useEffect(() => {
     if (!input.clientId) {
@@ -171,8 +176,7 @@ export function useCollabPresence(input: {
             {
               sessionId: input.sessionId,
               userId: input.clientId,
-              displayName,
-              drawingPath: input.drawingPath,
+              displayName: displayNameRef.current,
             },
             (ack: {
               ok?: boolean;
@@ -359,7 +363,7 @@ export function useCollabPresence(input: {
         socketRef.current = null;
       }
     };
-  }, [collabServerUrl, displayName, input.clientId, input.drawingPath, input.inviteToken, input.role, input.sessionId]);
+  }, [collabServerUrl, input.clientId, input.inviteToken, input.role, input.sessionId]);
 
   async function pushSnapshot(content: unknown) {
     const socket = socketRef.current;
