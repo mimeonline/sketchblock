@@ -38,6 +38,7 @@ type BoardGalleryProps = {
   title?: string;
   description?: string;
   limit?: number | null;
+  provider?: string;
 };
 
 export function BoardGallery({
@@ -48,8 +49,10 @@ export function BoardGallery({
   title = "Boards",
   description,
   limit = DASHBOARD_BOARD_LIMIT,
+  provider,
 }: BoardGalleryProps) {
   const t = useTranslations("Boards");
+  const tInstance = useTranslations("InstanceWorkspace");
   const effectiveDescription = description || t("description");
   const presenceByDrawing = activePresenceByDrawing(sessions);
   const orderedDrawings = [...drawings].sort(
@@ -110,19 +113,23 @@ export function BoardGallery({
             <div className="grid gap-1">
               <div className="text-base font-semibold">{t("none")}</div>
               <p className="text-sm leading-relaxed text-muted-foreground">
-                {t("scanHint")}
+                {provider === "instance" ? tInstance("emptyStateHint") : t("scanHint")}
               </p>
             </div>
-            <Link
-              className={cn(buttonVariants({ variant: "default", size: "lg" }), "mt-1")}
-              href="/repositories"
-            >
-              {t("configureRepository")}
-              <ArrowRight aria-hidden="true" data-icon="inline-end" />
-            </Link>
-            <p className="text-xs text-muted-foreground">
-              {t("extensionHint")}
-            </p>
+            {provider !== "instance" ? (
+              <>
+                <Link
+                  className={cn(buttonVariants({ variant: "default", size: "lg" }), "mt-1")}
+                  href="/repositories"
+                >
+                  {t("configureRepository")}
+                  <ArrowRight aria-hidden="true" data-icon="inline-end" />
+                </Link>
+                <p className="text-xs text-muted-foreground">
+                  {t("extensionHint")}
+                </p>
+              </>
+            ) : null}
           </div>
         </div>
       ) : (

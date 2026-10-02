@@ -183,4 +183,12 @@ describe("BoardGallery", () => {
     expect(screen.getByText("Board direkt öffnen")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "System map im Editor öffnen" })).toBeInTheDocument();
   });
+
+  it("shows instance workspace empty state without configure repository link", () => {
+    render(<BoardGallery drawings={[]} provider="instance" />);
+
+    expect(screen.getByText("Noch keine Boards")).toBeInTheDocument();
+    expect(screen.getByText("Lege ein neues Board an oder lade eine Excalidraw-Datei hoch.")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Repository einrichten" })).not.toBeInTheDocument();
+  });
 });

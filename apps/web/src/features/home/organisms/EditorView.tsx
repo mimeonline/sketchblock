@@ -38,6 +38,7 @@ export function EditorView({
   onStartSession?: () => Promise<void>;
 }) {
   const t = useTranslations("Workspace");
+  const tInstance = useTranslations("InstanceWorkspace");
   const [startingSession, setStartingSession] = useState(false);
   const hasUnsavedChanges = saveState.status === "dirty" || saveState.status === "stale" || saveState.status === "conflict";
   if (!selectedDrawing) {
@@ -141,32 +142,38 @@ export function EditorView({
           }
         }}
         onSave={onSave}
+        {...(repository?.provider === "instance" && {
+          saveLabel: tInstance("saveButtonLabel"),
+          hint: tInstance("saveHint"),
+        })}
       />
       {repository?.provider === "instance" && drawing.boardId ? (
         <WorkspaceVersionsPanel boardId={drawing.boardId} boardTitle={drawingTitle(selectedDrawing.path)} onRestored={onReload} />
       ) : null}
-      <aside className="min-w-0" aria-label={t("gitDetails")}>
-        <div>
-          {saveState.status === "stale" || saveState.status === "conflict" || saveState.status === "error" ? (
-            <Button className="mb-3" type="button" variant="outline" onClick={onReload}>
-              <RefreshCcw data-icon="inline-start" />
-              {t("reloadRemote")}
-            </Button>
-          ) : null}
-        </div>
-        <Accordion>
-          <AccordionItem value="git-details" className="border-b-0">
-            <AccordionTrigger className="border-t pt-4 hover:no-underline">{t("gitDetails")}</AccordionTrigger>
-            <AccordionContent className="grid gap-3 pt-2">
-              <InfoRow label={t("target")} value={t(demoMode ? "demoSaveTarget" : "commitPush")} />
-              {saveState.commitSha && !demoMode ? <InfoRow label={t("lastCommit")} value={saveState.commitSha.slice(0, 7)} mono /> : null}
-              <InfoRow label="Board" value={selectedDrawing.path} mono />
-              <InfoRow label="Base SHA" value={saveState.baseSha || selectedDrawing.sha} mono />
-              <InfoRow label="Remote SHA" value={saveState.remoteSha || selectedDrawing.sha} mono />
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      </aside>
+      {repository?.provider !== "instance" ? (
+        <aside className="min-w-0" aria-label={t("gitDetails")}>
+          <div>
+            {saveState.status === "stale" || saveState.status === "conflict" || saveState.status === "error" ? (
+              <Button className="mb-3" type="button" variant="outline" onClick={onReload}>
+                <RefreshCcw data-icon="inline-start" />
+                {t("reloadRemote")}
+              </Button>
+            ) : null}
+          </div>
+          <Accordion>
+            <AccordionItem value="git-details" className="border-b-0">
+              <AccordionTrigger className="border-t pt-4 hover:no-underline">{t("gitDetails")}</AccordionTrigger>
+              <AccordionContent className="grid gap-3 pt-2">
+                <InfoRow label={t("target")} value={t(demoMode ? "demoSaveTarget" : "commitPush")} />
+                {saveState.commitSha && !demoMode ? <InfoRow label={t("lastCommit")} value={saveState.commitSha.slice(0, 7)} mono /> : null}
+                <InfoRow label="Board" value={selectedDrawing.path} mono />
+                <InfoRow label="Base SHA" value={saveState.baseSha || selectedDrawing.sha} mono />
+                <InfoRow label="Remote SHA" value={saveState.remoteSha || selectedDrawing.sha} mono />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </aside>
+      ) : null}
     </div>
   );
 }

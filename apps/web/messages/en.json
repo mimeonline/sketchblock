@@ -290,7 +290,12 @@
     "delete": "Delete",
     "deleteConfirm": "Delete this board and all its versions? Running sessions of the board are ended. This cannot be undone.",
     "deleteFailed": "The board could not be deleted.",
-    "createdBy": "by {user}"
+    "createdBy": "by {user}",
+    "editorSubtitle": "Work on the canvas and save versions in your instance workspace.",
+    "boardLoadedMessage": "Current version loaded from the instance workspace.",
+    "saveHint": "Your changes are kept locally until you save a new version.",
+    "saveButtonLabel": "Save version",
+    "emptyStateHint": "Create a new board or upload an Excalidraw file above."
   },
   "Guest": {
     "joinTitle": "Join as a guest",

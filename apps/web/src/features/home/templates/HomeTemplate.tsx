@@ -180,9 +180,10 @@ export function HomeTemplate({ deploymentEnvironment, view, initialPath = "", us
 
     return saveState;
   }, [saveState, selectedDrawingSha, t, view]);
+  const tInstance = useTranslations("InstanceWorkspace");
   const labels = {
     title: tView(`${view}.title`),
-    subtitle: view === "editor" && demoMode ? t("demoEditorSubtitle") : tView(`${view}.subtitle`),
+    subtitle: view === "editor" && demoMode ? t("demoEditorSubtitle") : view === "editor" && activeRepository?.provider === "instance" ? tInstance("editorSubtitle") : tView(`${view}.subtitle`),
   };
 
   async function refreshState() {
@@ -325,7 +326,7 @@ export function HomeTemplate({ deploymentEnvironment, view, initialPath = "", us
           status: "saved",
           baseSha: payload.drawing.sha,
           remoteSha: payload.drawing.sha,
-          message: t(demoMode ? "demoBoardLoaded" : "boardLoaded"),
+          message: demoMode ? t("demoBoardLoaded") : activeRepository?.provider === "instance" ? tInstance("boardLoadedMessage") : t("boardLoaded"),
         });
       } catch (error) {
         if (controller.signal.aborted) return;
@@ -341,7 +342,7 @@ export function HomeTemplate({ deploymentEnvironment, view, initialPath = "", us
 
     void loadDrawing();
     return () => controller.abort();
-  }, [activeRepository?.id, activeRepository?.branch, demoMode, editorReloadKey, selectedDrawingPath, switchingRepository, t, view]);
+  }, [activeRepository?.id, activeRepository?.branch, activeRepository?.provider, demoMode, editorReloadKey, selectedDrawingPath, switchingRepository, t, tInstance, view]);
 
   async function handleRepositoryConfigured(repository: RepositoryRecord, nextDrawings: DrawingFile[]) {
     setRepositories((current) => [repository, ...current.filter((item) => item.id !== repository.id)]);
@@ -659,7 +660,7 @@ export function HomeTemplate({ deploymentEnvironment, view, initialPath = "", us
             />
           )}
           {view === "drawings" && (
-            <DrawingsView drawings={drawings} sessions={sessions} selectedPath={selectedDrawing?.path || ""} />
+            <DrawingsView drawings={drawings} sessions={sessions} selectedPath={selectedDrawing?.path || ""} provider={activeRepository?.provider} />
           )}
           {view === "sessions" && (
             <SessionsView
@@ -946,7 +947,7 @@ function DashboardView({
         repository={repository}
       />
 
-      <BoardGallery drawings={drawings} sessions={sessions} />
+      <BoardGallery drawings={drawings} sessions={sessions} provider={repository?.provider} />
     </div>
   );
 }
@@ -1308,10 +1309,12 @@ function DrawingsView({
   drawings,
   sessions,
   selectedPath,
+  provider,
 }: {
   drawings: DrawingFile[];
   sessions: CollaborationSession[];
   selectedPath: string;
+  provider?: string;
 }) {
   const t = useTranslations("Workspace");
   const [query, setQuery] = useState("");
@@ -1345,6 +1348,7 @@ function DrawingsView({
         sessions={sessions}
         showAllLink={false}
         title={t("allBoards")}
+        provider={provider}
       />
     );
   }
@@ -1403,6 +1407,7 @@ function DrawingsView({
             sessions={sessions}
             showAllLink={false}
             title={t("allBoards")}
+            provider={provider}
           />
         )}
       </TabsContent>
