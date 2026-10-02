@@ -1583,6 +1583,7 @@ function LiveSessionHero({
           collaboratorExpiresAt={session.shareLinks?.collaboratorExpiresAt}
           viewerExpiresAt={session.shareLinks?.viewerExpiresAt}
           sessionId={session.id}
+          allowAnonymousViewers={session.allowAnonymousViewers}
         />
         <EndSessionDialog session={session} onEndSession={onEndSession} />
       </CardContent>
@@ -2509,6 +2510,7 @@ function OwnerSessionPanel({
   snapshot: CollaborationSessionSnapshot | null;
 }) {
   const t = useTranslations("Workspace");
+  const tGuest = useTranslations("Guest");
   const locale = useLocale();
   return (
     <>
@@ -2575,6 +2577,7 @@ function OwnerSessionPanel({
                       tooltip={`${client.displayName} (@${client.userId}) · ${client.socketId}`}
                     />
                     {client.role ? <span className="shrink-0"><StatusBadge value={client.role} /></span> : null}
+                    {client.userId.startsWith("guest-") ? <Badge variant="outline" className="shrink-0">{tGuest("badge")}</Badge> : null}
                   </span>
                   <Button
                     type="button"

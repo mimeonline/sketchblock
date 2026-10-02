@@ -257,5 +257,24 @@
     "downloadDisabled": "Downloads are disabled for participants.",
     "participantDownload": "Participants may download",
     "settingsFailed": "The setting could not be saved."
+  },
+  "Guest": {
+    "joinTitle": "Join as a guest",
+    "nameLabel": "Your display name",
+    "namePlaceholder": "e.g. Alex",
+    "privacy": "No account needed. Your name is visible to other participants. You can only view the board.",
+    "submit": "Watch board",
+    "submitting": "Joining …",
+    "signIn": "Sign in with GitHub instead",
+    "errorinvalid_name": "Please enter a name with 1 to 40 characters.",
+    "errorguests_disabled": "The owner has not allowed viewing without an account.",
+    "errorinvalid_invite": "This invitation link is invalid or has expired.",
+    "errorsession_closed": "This session has ended.",
+    "errorrate_limited": "Too many attempts. Please try again later.",
+    "errorgeneric": "Joining failed. Please try again.",
+    "allowToggle": "Allow viewing without an account",
+    "allowHelp": "Anyone with the viewer link can watch with a display name. Guests can only view.",
+    "settingsFailed": "The setting could not be saved.",
+    "badge": "Guest"
   }
 }

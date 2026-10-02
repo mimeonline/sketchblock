@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Switch } from "@base-ui/react/switch";
 import { Copy, Eye, Pencil, QrCode, RefreshCw, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { QRCodeSVG } from "qrcode.react";
@@ -26,6 +27,7 @@ type SessionShareDialogProps = {
   collaboratorExpiresAt?: string | null;
   viewerExpiresAt?: string | null;
   sessionId?: string;
+  allowAnonymousViewers?: boolean;
 };
 
 export function SessionShareDialog({
@@ -34,8 +36,12 @@ export function SessionShareDialog({
   collaboratorExpiresAt,
   viewerExpiresAt,
   sessionId,
+  allowAnonymousViewers = false,
 }: SessionShareDialogProps) {
   const t = useTranslations("Share");
+  const tGuest = useTranslations("Guest");
+  const [guestsAllowed, setGuestsAllowed] = useState(allowAnonymousViewers);
+  const [guestError, setGuestError] = useState(false);
   const locale = useLocale();
   const [role, setRole] = useState<ShareRole>("viewer");
   const [rotated, setRotated] = useState<Partial<Record<ShareRole, { href: string; expiresAt: string | null }>>>({});
@@ -77,6 +83,24 @@ export function SessionShareDialog({
       setRenewState("error");
     } finally {
       setRenewing(null);
+    }
+  }
+
+  async function toggleGuests(next: boolean) {
+    if (!sessionId) return;
+    const previous = guestsAllowed;
+    setGuestsAllowed(next);
+    setGuestError(false);
+    try {
+      const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/settings`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ allowAnonymousViewers: next }),
+      });
+      if (!response.ok) throw new Error("settings_failed");
+    } catch {
+      setGuestsAllowed(previous);
+      setGuestError(true);
     }
   }
 
@@ -153,6 +177,22 @@ export function SessionShareDialog({
                   <p className="mt-1 text-sm text-muted-foreground">{t(shareRole === "collaborator" ? "collaboratorDescription" : "viewerDescription")}</p>
                   {formatExpiry(expiries[shareRole]) ? (
                     <p className="mt-1 text-xs text-muted-foreground">{formatExpiry(expiries[shareRole])}</p>
+                  ) : null}
+                  {shareRole === "viewer" && sessionId ? (
+                    <div className="mt-3">
+                      <label className="flex items-center gap-2 text-sm">
+                        <Switch.Root
+                          checked={guestsAllowed}
+                          onCheckedChange={(value) => void toggleGuests(value)}
+                          className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full bg-input transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[checked]:bg-primary motion-reduce:transition-none"
+                        >
+                          <Switch.Thumb className="block size-4 translate-x-0.5 rounded-full bg-background transition-transform data-[checked]:translate-x-4 motion-reduce:transition-none" />
+                        </Switch.Root>
+                        <span>{tGuest("allowToggle")}</span>
+                      </label>
+                      <p className="mt-1 text-xs text-muted-foreground">{tGuest("allowHelp")}</p>
+                      {guestError ? <p className="mt-1 text-xs text-destructive" role="alert">{tGuest("settingsFailed")}</p> : null}
+                    </div>
                   ) : null}
                 </div>
                 <div className="flex flex-wrap gap-2">
