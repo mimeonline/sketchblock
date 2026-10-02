@@ -2,6 +2,8 @@ import { execFileSync } from "node:child_process";
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 
+import { buildSecurityHeaders } from "./src/lib/security-headers";
+
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 function readGitTagVersion() {
@@ -33,6 +35,14 @@ const nextConfig: NextConfig = {
   distDir: process.env.SKETCHBLOCK_DIST_DIR || ".next",
   env: {
     NEXT_PUBLIC_SKETCHBLOCK_VERSION: sketchblockVersion,
+  },
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: buildSecurityHeaders(process.env),
+      },
+    ];
   },
 };
 
