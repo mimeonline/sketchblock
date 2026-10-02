@@ -3,8 +3,10 @@ import { z } from "zod";
 
 import { createCollabTicket } from "@/lib/server/auth/collab-ticket";
 import { getCurrentOwner } from "@/lib/server/auth/owner-session";
+import { getValidGuestGrant } from "@/lib/server/auth/guest-grant";
 import { getValidSessionGrant } from "@/lib/server/auth/session-grant";
 import { getCurrentAuthUser } from "@/lib/server/auth/session";
+import { touchSessionGuest } from "@/lib/server/database/session-guest-store";
 import { getOwnedSession, getSession } from "@/lib/server/database/session-store";
 import { isParticipantRemoved, recordSessionParticipant, validateSessionInvite } from "@/lib/server/database/session-invite-store";
 import { isSessionClosed } from "@/lib/server/domain/session-lifecycle";
@@ -62,6 +64,23 @@ export async function POST(request: NextRequest) {
         : await getValidSessionGrant(body.sessionId, authUser.id)
       : null;
     if (!authUser || !access) {
+      const guest = authUser ? null : await getValidGuestGrant(body.sessionId);
+      if (guest) {
+        if (body.role !== "viewer") {
+          return NextResponse.json({ error: "Session role does not allow this action." }, { status: 403 });
+        }
+        await touchSessionGuest(body.sessionId, guest.guestId).catch(() => undefined);
+        return NextResponse.json({
+          token: createCollabTicket({
+            sessionId: body.sessionId,
+            clientId: body.clientId,
+            actor: `guest-${guest.guestId}`,
+            displayName: guest.displayName,
+            role: "viewer",
+            permission: "read",
+          }),
+        });
+      }
       return NextResponse.json({ error: "Valid session invitation and GitHub login required." }, { status: 401 });
     }
     if (await isParticipantRemoved(body.sessionId, authUser.id)) {

@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   kickCollabClient: vi.fn(),
   findParticipantUserIdByLogin: vi.fn(),
   markParticipantRemoved: vi.fn(),
+  markGuestRemoved: vi.fn(),
 }));
 
 vi.mock("@/lib/server/auth/owner-session", () => ({
@@ -15,6 +16,7 @@ vi.mock("@/lib/server/collab/collab-server-client", () => ({
   inspectCollabSession: mocks.inspectCollabSession,
   kickCollabClient: mocks.kickCollabClient,
 }));
+vi.mock("@/lib/server/database/session-guest-store", () => ({ markGuestRemoved: mocks.markGuestRemoved }));
 vi.mock("@/lib/server/database/session-invite-store", () => ({
   findParticipantUserIdByLogin: mocks.findParticipantUserIdByLogin,
   markParticipantRemoved: mocks.markParticipantRemoved,
@@ -52,5 +54,17 @@ describe("remove session client", () => {
     await call("owner-socket");
     expect(mocks.markParticipantRemoved).not.toHaveBeenCalled();
     expect(mocks.kickCollabClient).toHaveBeenCalledWith("s1", "owner-socket", { excludeActor: false });
+  });
+
+  it("marks a guest removed and excludes the actor", async () => {
+    mocks.inspectCollabSession.mockResolvedValue({
+      presence: [{ socketId: "g-socket", userId: "guest-gabc", role: "viewer" }],
+    });
+    mocks.markGuestRemoved.mockResolvedValue(true);
+    const response = await call("g-socket");
+    expect(response.status).toBe(200);
+    expect(mocks.markGuestRemoved).toHaveBeenCalledWith("s1", "gabc");
+    expect(mocks.findParticipantUserIdByLogin).not.toHaveBeenCalled();
+    expect(mocks.kickCollabClient).toHaveBeenCalledWith("s1", "g-socket", { excludeActor: true });
   });
 });

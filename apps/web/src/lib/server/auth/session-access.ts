@@ -3,8 +3,10 @@ import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentOwner } from "@/lib/server/auth/owner-session";
+import { getValidGuestGrant } from "@/lib/server/auth/guest-grant";
 import { getValidSessionGrant } from "@/lib/server/auth/session-grant";
 import { getCurrentAuthUser } from "@/lib/server/auth/session";
+import { touchSessionGuest } from "@/lib/server/database/session-guest-store";
 import {
   isParticipantRemoved,
   recordSessionParticipant,
@@ -67,6 +69,8 @@ export async function authorizeSessionRequest(
     const user = await getCurrentAuthUser();
     const grant = user ? await getValidSessionGrant(sessionId, user.id) : null;
     if (!user || !grant) {
+      const guestResult = ownerPasswordChangeRequired ? null : await authorizeGuest(sessionId, required);
+      if (guestResult) return guestResult;
       return {
         access: null,
         response: ownerPasswordChangeRequired
@@ -102,6 +106,10 @@ export async function authorizeSessionRequest(
     getCurrentAuthUser(),
   ]);
   if (!invite || !user) {
+    if (!user) {
+      const guestResult = await authorizeGuest(sessionId, required);
+      if (guestResult) return guestResult;
+    }
     return {
       access: null,
       response: NextResponse.json({ error: "Valid session invitation and GitHub login required." }, { status: 401 }),
@@ -129,6 +137,30 @@ export async function authorizeSessionRequest(
       role: invite.role,
       actor: user.login,
       displayName: user.name || user.login,
+      permission: "read",
+    },
+    response: null,
+  };
+}
+
+async function authorizeGuest(
+  sessionId: string,
+  required: "view" | "edit" | "owner",
+): Promise<{ access: SessionAccess | null; response: NextResponse | null } | null> {
+  const guest = await getValidGuestGrant(sessionId);
+  if (!guest) return null;
+  if (required !== "view") {
+    return {
+      access: null,
+      response: NextResponse.json({ error: "Session role does not allow this action." }, { status: 403 }),
+    };
+  }
+  await touchSessionGuest(sessionId, guest.guestId).catch(() => undefined);
+  return {
+    access: {
+      role: "viewer",
+      actor: `guest-${guest.guestId}`,
+      displayName: guest.displayName,
       permission: "read",
     },
     response: null,

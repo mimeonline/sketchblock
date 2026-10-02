@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ getOwnedSession: vi.fn(), setParticipantDownload: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getOwnedSession: vi.fn(), setParticipantDownload: vi.fn(), setAllowAnonymousViewers: vi.fn(), audit: vi.fn() }));
 
 vi.mock("@/lib/server/auth/request-security", () => ({
   rejectCrossOriginRequest: (request: Request) =>
@@ -15,7 +15,9 @@ vi.mock("@/lib/server/auth/owner-session", () => ({
 vi.mock("@/lib/server/database/session-store", () => ({
   getOwnedSession: mocks.getOwnedSession,
   setParticipantDownload: mocks.setParticipantDownload,
+  setAllowAnonymousViewers: mocks.setAllowAnonymousViewers,
 }));
+vi.mock("@/lib/server/audit/audit-service", () => ({ safeRecordAuditEvent: mocks.audit }));
 
 import { PATCH } from "./route";
 
@@ -52,5 +54,22 @@ describe("PATCH /api/sessions/[sessionId]/settings", () => {
     expect((await call("https://evil.example")).status).toBe(403);
     mocks.getOwnedSession.mockResolvedValue({ id: "s1" });
     expect((await call(undefined, { participantDownload: "x" })).status).toBe(400);
+  });
+
+  it("toggles guest viewers and audits the change", async () => {
+    mocks.getOwnedSession.mockResolvedValue({ id: "s1" });
+    mocks.setAllowAnonymousViewers.mockResolvedValue({ id: "s1", allowAnonymousViewers: true });
+    const response = await call(undefined, { allowAnonymousViewers: true });
+    expect(response.status).toBe(200);
+    expect(mocks.setAllowAnonymousViewers).toHaveBeenCalledWith("s1", true, "u1");
+    expect(mocks.setParticipantDownload).not.toHaveBeenCalled();
+    expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "session.guests.enable" }));
+    await call(undefined, { allowAnonymousViewers: false });
+    expect(mocks.audit).toHaveBeenLastCalledWith(expect.objectContaining({ action: "session.guests.disable" }));
+  });
+
+  it("rejects an empty body", async () => {
+    mocks.getOwnedSession.mockResolvedValue({ id: "s1" });
+    expect((await call(undefined, {})).status).toBe(400);
   });
 });

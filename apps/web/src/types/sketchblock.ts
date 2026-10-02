@@ -89,6 +89,7 @@ export type CollaborationSession = {
   title?: string | null;
   expiresAt?: string | null;
   participantDownload?: boolean;
+  allowAnonymousViewers?: boolean;
   drawingPath: string;
   status: SessionLifecycleStatus;
   createdAt: string;

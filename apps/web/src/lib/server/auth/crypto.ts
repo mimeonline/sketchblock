@@ -31,6 +31,7 @@ export type SignedPayloadPurpose =
   | "owner-auth"
   | "oauth-state"
   | "session-grant"
+  | "guest-grant"
   | "collab-ticket";
 
 const MIN_PRODUCTION_SECRET_LENGTH = 32;

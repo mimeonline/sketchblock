@@ -8,6 +8,7 @@ import {
   markExpiredPostgresAdhocSessionsForPurge,
   listPurgeablePostgresAdhocSessions,
   setPostgresParticipantDownload,
+  setPostgresAllowAnonymousViewers,
   setPostgresSessionPurgeAfter,
   deletePostgresSession,
   getPostgresSession,
@@ -95,6 +96,14 @@ export async function setParticipantDownload(
   userId: string | null,
 ): Promise<CollaborationSession | null> {
   return setPostgresParticipantDownload(sessionId, value, userId);
+}
+
+export async function setAllowAnonymousViewers(
+  sessionId: string,
+  value: boolean,
+  userId: string | null,
+): Promise<CollaborationSession | null> {
+  return setPostgresAllowAnonymousViewers(sessionId, value, userId);
 }
 
 export async function markExpiredAdhocSessionsForPurge(now: Date, retentionHours: number): Promise<number> {
