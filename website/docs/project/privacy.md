@@ -13,15 +13,7 @@ The website is hosted by GitHub Pages. When a GitHub Pages site is visited, GitH
 
 ## Self-hosted analytics
 
-Sketchblock uses a self-hosted Rybbit Analytics instance operated by Meierhoff Systems to understand page traffic, referring sites, documentation usage, and outbound links. The website loads the analytics script from:
-
-```text
-https://stats.meierhoff-systems.de/api/script.js
-```
-
-Rybbit processes technical request and browser information to produce aggregated usage statistics. User ID salting is enabled, which rotates the salt daily and prevents a stable analytics identifier from being retained across days. Public access to the analytics dashboard is disabled.
-
-The analytics processing supports the legitimate interest in understanding whether the open-source documentation is useful, finding broken or unclear entry paths, and improving the project’s public information. The website does not use the analytics script to serve advertising.
+For statistical evaluation and improvement of this website, I use the self-hosted analytics software Rybbit. Only anonymous usage statistics are stored. Rybbit does not set analytics cookies. Further information is available in the [Rybbit privacy information](https://rybbit.com/privacy).
 
 ## Contact and complete privacy information
 
