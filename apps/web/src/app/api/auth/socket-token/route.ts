@@ -75,6 +75,7 @@ export async function POST(request: NextRequest) {
             sessionId: body.sessionId,
             clientId: body.clientId,
             actor: `guest-${guest.guestId}`,
+            guest: true,
             displayName: guest.displayName,
             role: "viewer",
             permission: "read",

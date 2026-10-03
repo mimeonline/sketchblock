@@ -19,8 +19,10 @@ Guest access ends when:
 - The owner removes you from participants
 - The session ends or expires
 
+Turning guest access off disconnects current guests immediately. Previously issued collaboration tickets remain revoked after access is re-enabled or the collaboration server restarts. A fresh authorized ticket is required to join again. If live revocation cannot be completed, the settings request reports an error and should be retried.
+
 Guest names are not verified and not persisted after the session ends.
 
 ## Availability
 
-Guest viewers work for both repository sessions and ad-hoc rooms. Requires database migration V14.
+Guest viewers work for both repository sessions and ad-hoc rooms. Requires application database migration V14 and collaboration database migration V2. Upgrade the web app and collaboration server together.

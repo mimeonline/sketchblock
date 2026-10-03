@@ -18,11 +18,13 @@ import { UpsertSessionSnapshotUseCase } from "../../application/use-cases/upsert
 import { UpdateSessionStatusUseCase } from "../../application/use-cases/update-session-status.use-case.js";
 import { CloseSessionUseCase } from "../../application/use-cases/close-session.use-case.js";
 import { SessionStorePort } from "../../application/ports/session-store.port.js";
+import { SocketSessionConnections } from "../realtime/socket-session-connections.js";
+import { SessionParticipantExclusions } from "../realtime/session-participant-exclusions.js";
 import { DocumentEvictionScheduler } from "../realtime/document-eviction.scheduler.js";
 import { SessionAccessPolicy } from "../../domain/services/session-access-policy.js";
 import { CollabConfigService } from "../../../shared/infrastructure/config/collab-config.service.js";
 import { StructuredLoggerService } from "../../../shared/infrastructure/logging/structured-logger.service.js";
-import { CollabTicketVerifier, type CollabTicketErrorCode, type CollabTicketPayload } from "../auth/collab-ticket.verifier.js";
+import { CollabTicketVerifier, isGuestTicket, type CollabTicketErrorCode, type CollabTicketPayload } from "../auth/collab-ticket.verifier.js";
 import { type CollabHttpRequest, readBearerToken } from "../auth/http-auth.js";
 import {
   CloseSessionDto,
@@ -36,6 +38,7 @@ import {
 @ApiBearerAuth("collab-ticket")
 @Controller("sessions")
 export class SessionsController {
+  private readonly guestAccessUpdates = new Map<string, Promise<unknown>>();
   constructor(
     @Inject(CollabConfigService)
     private readonly config: CollabConfigService,
@@ -59,6 +62,8 @@ export class SessionsController {
     private readonly closeSessionUseCase: CloseSessionUseCase,
     @Inject(PurgeSessionUseCase)
     private readonly purgeSessionUseCase: PurgeSessionUseCase,
+    @Inject(SocketSessionConnections) private readonly connections: SocketSessionConnections,
+    @Inject(SessionParticipantExclusions) private readonly exclusions: SessionParticipantExclusions,
     @Inject(DocumentEvictionScheduler)
     private readonly evictions: DocumentEvictionScheduler,
   ) {}
@@ -69,7 +74,7 @@ export class SessionsController {
   @ApiBody({ type: RegisterSessionDto })
   @ApiResponse({ status: 200, description: "Registered session runtime." })
   async registerSession(@Body() body: RegisterSessionDto, @Req() request: CollabHttpRequest) {
-    const authResult = this.readAuth(request);
+    const authResult = await this.readAuth(request);
     if (!authResult.ok) {
       return this.authError("session.register.failed", authResult.error);
     }
@@ -131,7 +136,7 @@ export class SessionsController {
   @ApiResponse({ status: 200, description: "Session inspection result." })
   @ApiResponse({ status: 403, type: ErrorResponseDto })
   async inspectSession(@Param("sessionId") sessionId: string, @Req() request: CollabHttpRequest) {
-    const authResult = this.readAuth(request);
+    const authResult = await this.readAuth(request);
     if (!authResult.ok) {
       return this.authError("session.inspect.failed", authResult.error, sessionId);
     }
@@ -169,7 +174,7 @@ export class SessionsController {
   @ApiParam({ name: "sessionId", example: "demo-session" })
   @ApiResponse({ status: 200, description: "Session state." })
   async getSessionStateRoute(@Param("sessionId") sessionId: string, @Req() request: CollabHttpRequest) {
-    const authResult = this.readAuth(request);
+    const authResult = await this.readAuth(request);
     if (!authResult.ok) {
       return this.authError("session.state.get.failed", authResult.error, sessionId);
     }
@@ -207,7 +212,7 @@ export class SessionsController {
     @Body() body: UpdateSessionStateDto,
     @Req() request: CollabHttpRequest,
   ) {
-    const authResult = this.readAuth(request);
+    const authResult = await this.readAuth(request);
     if (!authResult.ok) {
       return this.authError("session.state.update.failed", authResult.error, sessionId);
     }
@@ -266,7 +271,7 @@ export class SessionsController {
     @Body() body: UpdateSessionStatusDto,
     @Req() request: CollabHttpRequest,
   ) {
-    const authResult = this.readAuth(request);
+    const authResult = await this.readAuth(request);
     if (!authResult.ok) {
       return this.authError("session.status.update.failed", authResult.error, sessionId);
     }
@@ -313,7 +318,7 @@ export class SessionsController {
   @ApiBody({ type: CloseSessionDto })
   @ApiResponse({ status: 200, description: "Closed session." })
   async closeSession(@Param("sessionId") sessionId: string, @Body() body: CloseSessionDto, @Req() request: CollabHttpRequest) {
-    const authResult = this.readAuth(request);
+    const authResult = await this.readAuth(request);
     if (!authResult.ok) {
       return this.authError("session.close.failed", authResult.error, sessionId);
     }
@@ -351,6 +356,40 @@ export class SessionsController {
     };
   }
 
+  @Patch(":sessionId/guest-access")
+  @ApiOperation({ summary: "Update live guest access and disconnect revoked guests (server ticket required)." })
+  async setGuestAccess(@Param("sessionId") sessionId: string, @Body() body: { enabled?: unknown }, @Req() request: CollabHttpRequest) {
+    const auth = await this.readAuth(request);
+    if (!auth.ok) return this.authError("session.guests.update.failed", auth.error, sessionId);
+    if (!this.config.authSecret || auth.payload?.role !== "server" || auth.payload.permission !== "admin") {
+      return { ok: false, error: "not_authorized" };
+    }
+    if (!inspectSessionPayloadSchema.safeParse({ sessionId }).success || typeof body?.enabled !== "boolean") {
+      return { ok: false, error: "invalid_guest_access_payload" };
+    }
+    const previous = this.guestAccessUpdates.get(sessionId) ?? Promise.resolve();
+    const update = previous.catch(() => undefined).then(async () => {
+      const session = await this.sessions.getSession(sessionId);
+      if (!session) return { ok: false, error: "session_not_found" };
+      this.exclusions.restoreGuestPolicy(sessionId, session.audit);
+      const policy = this.exclusions.nextGuestPolicy(sessionId, body.enabled as boolean);
+      // Persist before applying live effects so a crash cannot resurrect revoked tickets.
+      const saved = await this.sessions.appendSessionAudit(sessionId, {
+        type: "guest_access_changed", actor: "web-api", message: policy.enabled ? "Guest access enabled." : "Guest access revoked.",
+        metadata: { ...policy },
+      });
+      if (!saved) return { ok: false, error: "session_not_found" };
+      await this.connections.setGuestAccess(sessionId, policy);
+      this.evictions.scheduleIfEmpty(sessionId);
+      return { ok: true, sessionId, enabled: policy.enabled };
+    });
+    this.guestAccessUpdates.set(sessionId, update);
+    try { return await update; }
+    finally {
+      if (this.guestAccessUpdates.get(sessionId) === update) this.guestAccessUpdates.delete(sessionId);
+    }
+  }
+
   @Post(":sessionId/purge")
   @HttpCode(200)
   @ApiOperation({ summary: "Delete a session and all its data (server admin ticket required)." })
@@ -358,7 +397,7 @@ export class SessionsController {
   @ApiResponse({ status: 200, description: "Purge result; purged is false when the session did not exist." })
   @ApiResponse({ status: 403, type: ErrorResponseDto })
   async purgeSession(@Param("sessionId") sessionId: string, @Req() request: CollabHttpRequest) {
-    const authResult = this.readAuth(request);
+    const authResult = await this.readAuth(request);
     if (!authResult.ok) {
       return this.authError("session.purge.failed", authResult.error, sessionId);
     }
@@ -385,9 +424,9 @@ export class SessionsController {
     return { ok: true, sessionId, purged };
   }
 
-  private readAuth(
+  private async readAuth(
     request: CollabHttpRequest,
-  ): { ok: true; payload: CollabTicketPayload | null } | { ok: false; error: CollabTicketErrorCode } {
+  ): Promise<{ ok: true; payload: CollabTicketPayload | null } | { ok: false; error: CollabTicketErrorCode }> {
     if (!this.config.authSecret) {
       return { ok: true, payload: null };
     }
@@ -398,6 +437,13 @@ export class SessionsController {
       return result;
     }
 
+    if (isGuestTicket(result.payload)) {
+      const session = await this.sessions.getSession(result.payload.sessionId);
+      this.exclusions.restoreGuestPolicy(result.payload.sessionId, session?.audit ?? []);
+    }
+    if (!this.exclusions.canAccessGuest(result.payload.sessionId, result.payload)) {
+      return { ok: false, error: "collab_ticket_invalid" };
+    }
     return { ok: true, payload: result.payload };
   }
 

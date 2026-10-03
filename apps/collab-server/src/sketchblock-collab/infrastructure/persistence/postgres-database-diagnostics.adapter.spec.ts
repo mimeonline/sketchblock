@@ -17,19 +17,26 @@ describe("PostgresDatabaseDiagnosticsAdapter", () => {
 
   it("liefert ausschließlich sichere Schema- und Migrationsdaten", async () => {
     query.mockResolvedValueOnce({ rows: [{ ok: 1 }] });
-    query.mockResolvedValueOnce({ rows: [{ version: "1", description: "collab persistence base", installed_on: new Date("2026-07-12T08:00:00Z") }] });
+    query.mockResolvedValueOnce({ rows: [{ version: "2", description: "guest access audit", installed_on: new Date("2026-07-12T08:00:00Z") }] });
     const adapter = new PostgresDatabaseDiagnosticsAdapter({} as never);
 
     await expect(adapter.inspect()).resolves.toEqual({
       reachable: true,
-      schemaVersion: "1",
+      schemaVersion: "2",
       migrationStatus: "aktuell",
       latestSuccessfulMigration: {
-        version: "1",
-        description: "collab persistence base",
+        version: "2",
+        description: "guest access audit",
         installedAt: "2026-07-12T08:00:00.000Z",
       },
     });
+  });
+
+  it("marks the original schema as pending", async () => {
+    query.mockResolvedValueOnce({ rows: [{ ok: 1 }] });
+    query.mockResolvedValueOnce({ rows: [{ version: "1", description: "collab persistence base", installed_on: null }] });
+    const adapter = new PostgresDatabaseDiagnosticsAdapter({} as never);
+    await expect(adapter.inspect()).resolves.toMatchObject({ schemaVersion: "1", migrationStatus: "ausstehend" });
   });
 
   it("reduziert Datenbankfehler auf einen sicheren Fehlercode", async () => {

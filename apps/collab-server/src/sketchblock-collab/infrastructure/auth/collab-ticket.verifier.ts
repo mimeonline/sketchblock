@@ -11,6 +11,8 @@ export type CollabTicketPayload = {
   avatarUrl?: string | null;
   role: "owner" | "collaborator" | "viewer" | "server";
   permission: "read" | "triage" | "write" | "maintain" | "admin";
+  guest?: boolean;
+  issuedAt?: number;
   expiresAt: number;
 };
 export type CollabTicketErrorCode =
@@ -72,4 +74,10 @@ export class CollabTicketVerifier {
       return { ok: false, error: "collab_ticket_malformed" };
     }
   }
+}
+
+/** Old guest tickets used a reserved actor prefix; new tickets identify guests explicitly. */
+export function isGuestTicket(auth: Pick<CollabTicketPayload, "actor" | "role" | "guest" | "issuedAt"> | null) {
+  return auth?.role === "viewer" && (auth.guest === true ||
+    (auth.guest === undefined && auth.issuedAt === undefined && auth.actor.startsWith("guest-")));
 }

@@ -9,7 +9,7 @@ This roadmap communicates product direction rather than fixed delivery dates. Pr
 - Support English and German, local users, multiple GitHub repositories, live sessions, role-specific invitations, system health, and audit history.
 - Ship reproducible CI, GitHub Pages documentation, multi-architecture container images, and versioned release notes.
 
-## ✅ 0.2 — Collaboration and security hardening
+## ✅ 0.2 — Collaboration and security hardening (released)
 
 - Save the live collaborative board with the session's Git base SHA and report conflicting upstream changes.
 - Enforce session end, participant removal, role-specific invitation renewal, and per-user repository ownership.
@@ -18,6 +18,15 @@ This roadmap communicates product direction rather than fixed delivery dates. Pr
 - Expand regression coverage for authentication, collaboration, repository ownership, and persistence.
 
 Local collaboration has been checked with two separate browser profiles. Production deployment, upgrade, restore, and operational acceptance remain installation-specific checks.
+
+## 🔥 Implemented — GitHub-free collaboration and facilitation (unreleased)
+
+- Start temporary ad-hoc rooms from an empty board or uploaded Excalidraw scene, with downloads and configurable expiry and retention.
+- Let invited guests watch live boards without an account through an owner-controlled, read-only viewer flow.
+- Create, upload, edit, and save boards in a private instance workspace with version history and restore.
+- Facilitate sessions with viewport following, edit locks, shared timers, dot voting, results summaries, and emoji reactions. Facilitation state is live-only.
+
+These features are implemented in the current source. The next gates are a two-account workflow check, multi-client facilitation acceptance, and release and upgrade validation, including application database migrations V13–V15 and collaboration database migration V2. Guest revocation and interrupted reconnects have regression coverage; the two-account browser check must also cover sessions longer than five minutes and interrupted text updates. Production acceptance remains installation-specific.
 
 ## ➡️ Next — Extend the Git workflow
 
@@ -35,7 +44,7 @@ Local collaboration has been checked with two separate browser profiles. Product
 
 ## 🔭 Explore — Visual review, formats, and providers
 
-- Ad-hoc rooms, guest viewers, and an instance workspace enable real-time collaboration without GitHub integration—ideal for ad-hoc teams and local exploration.
+- Breakout boards, durable session results, dedicated read-only result links, and richer exports.
 - Visual diffs and review workflows for changed Excalidraw files.
 - GitLab, Gitea, and other source-of-truth adapters.
 - Format adapters for Markdown and other text-, document-, and diagram-based artifacts that benefit from collaborative visual review.

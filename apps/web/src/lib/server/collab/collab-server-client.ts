@@ -486,3 +486,10 @@ function byteLengthFromBase64(value?: string | null) {
 
   return Buffer.byteLength(value, "base64");
 }
+
+export async function setCollabGuestAccess(sessionId: string, enabled: boolean): Promise<void> {
+  const ack = await collabHttpRequest(`/sessions/${encodeURIComponent(sessionId)}/guest-access`, {
+    method: "PATCH", body: JSON.stringify({ enabled }),
+  });
+  if (ack.ok !== true) throw new Error(ack.error || "Collab guest access update failed.");
+}

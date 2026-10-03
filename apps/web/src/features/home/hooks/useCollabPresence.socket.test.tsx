@@ -4,10 +4,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const mock = vi.hoisted(() => {
   const handlers = new Map<string, (...args: unknown[]) => void>();
   const socket = { connected: true, id: "socket-test", on: vi.fn((event: string, handler: (...args: unknown[]) => void) => handlers.set(event, handler)), emit: vi.fn(), disconnect: vi.fn(), timeout: vi.fn(), emitWithAck: vi.fn() };
+  const ioOptions: Array<{ auth?: (callback: (auth: { token: string }) => void) => Promise<void> }> = [];
+  const io = vi.fn((_url: string, options: { auth?: (callback: (auth: { token: string }) => void) => Promise<void> }) => {
+    ioOptions.push(options);
+    return socket;
+  });
   socket.timeout.mockReturnValue(socket);
-  return { socket, handlers };
+  return { socket, handlers, io, ioOptions };
 });
-vi.mock("socket.io-client", () => ({ io: () => mock.socket }));
+vi.mock("socket.io-client", () => ({ io: mock.io }));
 import { useCollabPresence } from "./useCollabPresence";
 import * as Y from "yjs";
 
@@ -83,6 +88,83 @@ describe("snapshot acknowledgements", () => {
     doc.destroy(); hook.unmount();
   });
 
+  it("replays an in-flight update after reconnect without waiting for another edit", async () => {
+    const hook = await connectedHook();
+    let rejectFirst!: (error: Error) => void;
+    mock.socket.emitWithAck
+      .mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectFirst = reject; }))
+      .mockResolvedValue({ ok: true });
+    const doc = new Y.Doc(); doc.getMap("elements").set("interrupted-edit", true);
+    const update = window.btoa(Array.from(Y.encodeStateAsUpdate(doc), (byte) => String.fromCharCode(byte)).join(""));
+
+    act(() => { hook.result.current.sendYjsUpdate(update); });
+    expect(mock.socket.emitWithAck).toHaveBeenCalledTimes(1);
+    mock.socket.connected = false;
+    act(() => mock.handlers.get("disconnect")!());
+    mock.socket.connected = true;
+    act(() => mock.handlers.get("connect")!());
+    await act(async () => { rejectFirst(new Error("transport closed")); });
+
+    expect(mock.socket.emitWithAck).toHaveBeenCalledTimes(2);
+    expect(mock.socket.emitWithAck.mock.calls[1][1].updateBase64).toBe(update);
+    doc.destroy(); hook.unmount();
+  });
+
+  it("refreshes socket authentication for reconnect handshakes", async () => {
+    const hook = await connectedHook();
+    const auth = mock.ioOptions.at(-1)?.auth;
+    expect(auth).toBeTypeOf("function");
+    const tokens: string[] = [];
+
+    await act(async () => { await auth!((value) => tokens.push(value.token)); });
+    vi.mocked(fetch).mockResolvedValueOnce({ ok: true, json: async () => ({ token: "refreshed" }) } as Response);
+    await act(async () => { await auth!((value) => tokens.push(value.token)); });
+
+    expect(tokens).toEqual(["test", "refreshed"]);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    hook.unmount();
+  });
+
+  it.each([
+    ["session_closed", "closed"],
+    ["participant_removed", undefined],
+  ] as const)("stops reconnecting after terminal %s authentication", async (code, sessionStatus) => {
+    const hook = await connectedHook();
+    const auth = mock.ioOptions.at(-1)?.auth;
+    await act(async () => { await auth!(() => {}); });
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ code, error: code === "session_closed" ? "Ended." : "Removed." }),
+    } as Response);
+
+    const tokens: string[] = [];
+    await act(async () => { await auth!((value) => tokens.push(value.token)); });
+    act(() => mock.handlers.get("connect_error")!(new Error("collab_ticket_missing")));
+
+    expect(tokens).toEqual([""]);
+    expect(mock.socket.disconnect).toHaveBeenCalledTimes(1);
+    expect(hook.result.current.status).toBe("disconnected");
+    expect(hook.result.current.sessionStatus).toBe(sessionStatus);
+    expect(hook.result.current.error).toBe(code === "participant_removed" ? "Removed." : undefined);
+    hook.unmount();
+  });
+
+  it("settles an authentication callback that finishes after unmount", async () => {
+    const hook = await connectedHook();
+    const auth = mock.ioOptions.at(-1)?.auth;
+    await act(async () => { await auth!(() => {}); });
+    let resolveToken!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise((resolve) => { resolveToken = resolve; }));
+    const tokens: string[] = [];
+    const pendingAuth = auth!((value) => tokens.push(value.token));
+
+    hook.unmount();
+    resolveToken({ ok: true, json: async () => ({ token: "late-token" }) } as Response);
+    await pendingAuth;
+
+    expect(tokens).toEqual([""]);
+  });
+
   it("retains both remote updates when React batches socket events", async () => {
     const hook = await connectedHook();
     const docs = [new Y.Doc(), new Y.Doc()];
@@ -138,7 +220,7 @@ describe("facilitation events", () => {
     act(() => mock.handlers.get("connect")!());
     const doc = new Y.Doc(); doc.getMap("e").set("k", 1);
     await act(async () => { hook.result.current.sendYjsUpdate(window.btoa(Array.from(Y.encodeStateAsUpdate(doc), (b) => String.fromCharCode(b)).join(""))); });
-    expect(mock.socket.emitWithAck).toHaveBeenCalled();
+    expect(mock.socket.emitWithAck).toHaveBeenCalledTimes(1);
     expect(hook.result.current.syncError).toBeUndefined();
     hook.unmount();
   });

@@ -30,6 +30,12 @@ type CollabPresenceState = {
 
 const DEFAULT_LOCAL_COLLAB_SERVER_URL = "http://localhost:4513";
 
+class TerminalSocketAuthError extends Error {
+  constructor(readonly code: "session_closed" | "participant_removed", message: string) {
+    super(message);
+  }
+}
+
 function decodeYjsUpdate(value: string) {
   return Uint8Array.from(window.atob(value), (character) => character.charCodeAt(0));
 }
@@ -111,12 +117,19 @@ export function useCollabPresence(input: {
     let cancelled = false;
     let socket: Socket | null = null;
     let yjsInFlight = false;
+    let flushRequested = false;
     let joined = false;
+    let terminalAuthError: TerminalSocketAuthError["code"] | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     let retryAttempts = 0;
     function flushYjs() {
       const pending = pendingYjsRef.current;
-      if (cancelled || !joined || yjsInFlight || !socket?.connected || !pending || pending.sessionId !== input.sessionId) return;
+      if (cancelled || !joined || !socket?.connected || !pending || pending.sessionId !== input.sessionId) return;
+      if (yjsInFlight) {
+        flushRequested = true;
+        return;
+      }
+      flushRequested = false;
       yjsInFlight = true;
       const sendingSocket = socket;
       void sendingSocket.timeout(2500).emitWithAck("yjs:update", {
@@ -142,46 +155,84 @@ export function useCollabPresence(input: {
         // Retain one merged update until acknowledged; Yjs replay is idempotent.
         if (!cancelled && retryAttempts < 8) {
           retryAttempts += 1;
+          // A reconnect or a newer local update already requested another flush.
+          // Let finally replay immediately instead of adding backoff latency.
+          if (flushRequested && joined && socket?.connected) return;
           retryTimer = setTimeout(() => { retryTimer = undefined; flushYjs(); }, Math.min(500 * 2 ** retryAttempts, 10_000));
         }
       }).finally(() => {
         yjsInFlight = false;
-        if (!cancelled && !retryTimer && pendingYjsRef.current?.version !== pending.version) flushYjs();
+        if (
+          !cancelled &&
+          !retryTimer &&
+          (flushRequested || pendingYjsRef.current?.version !== pending.version)
+        ) {
+          flushYjs();
+        }
       });
     }
     flushYjsRef.current = flushYjs;
 
     async function connect() {
       try {
-        const tokenResponse = await fetch("/api/auth/socket-token", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sessionId: input.sessionId,
-            role: input.role,
-            clientId: input.clientId,
-            inviteToken: input.inviteToken,
-          }),
-        });
-        const tokenPayload = (await tokenResponse.json()) as { token?: string; error?: string; code?: string };
+        async function requestSocketToken() {
+          const tokenResponse = await fetch("/api/auth/socket-token", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sessionId: input.sessionId,
+              role: input.role,
+              clientId: input.clientId,
+              inviteToken: input.inviteToken,
+            }),
+          });
+          const tokenPayload = (await tokenResponse.json()) as { token?: string; error?: string; code?: string };
 
-        if (tokenPayload.code === "session_closed") {
-          if (!cancelled) {
-            setState({ status: "disconnected", presence: [], audit: [], moderation: DEFAULT_MODERATION, votes: {}, sessionStatus: "closed" });
+          if (tokenPayload.code === "session_closed" || tokenPayload.code === "participant_removed") {
+            terminalAuthError = tokenPayload.code;
+            if (!cancelled) {
+              setState({
+                status: "disconnected",
+                presence: [],
+                audit: [],
+                moderation: DEFAULT_MODERATION,
+                votes: {},
+                sessionStatus: tokenPayload.code === "session_closed" ? "closed" : undefined,
+                error: tokenPayload.code === "participant_removed"
+                  ? tokenPayload.error || "This client was removed from the session."
+                  : undefined,
+              });
+            }
+            throw new TerminalSocketAuthError(
+              tokenPayload.code,
+              tokenPayload.error || tokenPayload.code,
+            );
           }
-          return;
+          if (!tokenResponse.ok || !tokenPayload.token) {
+            throw new Error(tokenPayload.error || "Could not create socket auth token.");
+          }
+          return tokenPayload.token;
         }
-        if (!tokenResponse.ok || !tokenPayload.token) {
-          throw new Error(tokenPayload.error || "Could not create socket auth token.");
-        }
+
+        let nextToken: string | null = await requestSocketToken();
 
         if (cancelled) {
           return;
         }
 
         socket = io(collabServerUrl, {
-          auth: {
-            token: tokenPayload.token,
+          auth: async (callback) => {
+            try {
+              const token = nextToken || await requestSocketToken();
+              nextToken = null;
+              callback({ token: cancelled ? "" : token });
+            } catch (error) {
+              if (!cancelled && !(error instanceof TerminalSocketAuthError) && error instanceof Error) {
+                setState((current) => ({ ...current, status: "error", error: error.message }));
+              }
+              callback({ token: "" });
+              if (error instanceof TerminalSocketAuthError) socket?.disconnect();
+            }
           },
           transports: ["websocket", "polling"],
           reconnection: true,
@@ -385,6 +436,7 @@ export function useCollabPresence(input: {
         });
 
         socket.on("connect_error", (error) => {
+          if (terminalAuthError) return;
           setState({
             status: "error",
             presence: [],
@@ -395,7 +447,7 @@ export function useCollabPresence(input: {
           });
         });
       } catch (error) {
-        if (!cancelled) {
+        if (!cancelled && !(error instanceof TerminalSocketAuthError)) {
           setState({
             status: "error",
             presence: [],

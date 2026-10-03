@@ -2882,6 +2882,7 @@ function sessionAuditTypeLabel(type: SessionAuditEvent["type"]) {
     session_joined: "Joined",
     snapshot_updated: "Snapshot",
     yjs_updated: "Live-Sync",
+    guest_access_changed: "Guest access",
     client_kicked: "Removed",
     session_status_changed: "Status",
     session_closed: "Closed",

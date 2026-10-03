@@ -5,10 +5,13 @@ import * as Y from "yjs";
 import { AppModule } from "./app.module.js";
 import { SessionStorePort } from "./sketchblock-collab/application/ports/session-store.port.js";
 import type { StoredSession } from "./sketchblock-collab/application/dtos/collab-schemas.js";
+import { SessionsController } from "./sketchblock-collab/infrastructure/http/sessions.controller.js";
+import { SocketSessionConnections } from "./sketchblock-collab/infrastructure/realtime/socket-session-connections.js";
+import { SessionParticipantExclusions } from "./sketchblock-collab/infrastructure/realtime/session-participant-exclusions.js";
 import { SnapshotConflict } from "./sketchblock-collab/application/dtos/snapshot-conflict.js";
 
 function signTicket(role: "owner" | "collaborator" | "viewer", actor: string) {
-  const payload = Buffer.from(JSON.stringify({ kind: "collab-ticket", sessionId: "socket-test", clientId: actor, actor, displayName: actor, role, permission: role === "viewer" ? "read" : "write", expiresAt: Date.now() + 60_000 })).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({ kind: "collab-ticket", sessionId: "socket-test", clientId: actor, actor, displayName: actor, role, permission: role === "viewer" ? "read" : "write", guest: actor.startsWith("guest-"), issuedAt: Date.now(), expiresAt: Date.now() + 60_000 })).toString("base64url");
   return `${payload}.${createHmac("sha256", "socket-test-secret").update(`collab-ticket.${payload}`).digest("base64url")}`;
 }
 
@@ -38,9 +41,9 @@ class PollingClient {
     await this.send(`40${JSON.stringify({ token: signServerTicket() })}`);
     expect((await this.read()).some((packet) => packet.startsWith("40"))).toBe(true);
   }
-  async connect(role: "owner" | "collaborator" | "viewer", actor: string) {
+  async connect(role: "owner" | "collaborator" | "viewer", actor: string, token = signTicket(role, actor)) {
     this.sid = JSON.parse((await this.read())[0].slice(1)).sid;
-    await this.send(`40${JSON.stringify({ token: signTicket(role, actor) })}`);
+    await this.send(`40${JSON.stringify({ token })}`);
     expect((await this.read()).some((packet) => packet.startsWith("40"))).toBe(true);
   }
   async emit(event: string, payload: unknown): Promise<Record<string, any>> {
@@ -95,7 +98,7 @@ describe("Socket.IO multi-client collaboration", () => {
       return snapshot;
     },
     async upsertYjsState(input) { session!.yjsStateBase64 = input.stateBase64; session!.yjsRevision = (session!.yjsRevision ?? 0) + 1; return session!; },
-    async appendSessionAudit() { return session; },
+    async appendSessionAudit(_sessionId, event) { session?.audit.push({ ...event, id: String(session.audit.length), at: new Date().toISOString() }); return session; },
     async updateSessionStatus(input) { if (session) session.status = input.status; return session; },
     async deleteSession() { const previous = session; session = null; return previous; },
   };
@@ -114,6 +117,66 @@ describe("Socket.IO multi-client collaboration", () => {
     await Promise.allSettled(clients.map((client) => client.close()));
     await app?.close();
   });
+  it("revokes connected guests, blocks old tickets after re-enable, and preserves members", async () => {
+    const guest = new PollingClient(origin), member = new PollingClient(origin);
+    const oldTicket = signTicket("viewer", "guest-test");
+    await guest.connect("viewer", "guest-test", oldTicket);
+    await member.connect("collaborator", "member");
+    clients.push(member);
+    for (const client of [guest, member]) {
+      expect(await client.emit("session:join", { sessionId: "socket-test", userId: "test" })).toMatchObject({ ok: true });
+    }
+    const setAccess = (enabled: boolean, token = signServerTicket()) => fetch(`${origin}/sessions/socket-test/guest-access`, {
+      method: "PATCH", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ enabled }),
+    }).then((response) => response.json());
+    expect(await setAccess(false, signTicket("owner", "owner"))).toMatchObject({ ok: false, error: "not_authorized" });
+    expect(await setAccess(false)).toMatchObject({ ok: true });
+    expect(await guest.waitForEvent("client:kicked")).toMatchObject({ sessionId: "socket-test" });
+    const inspected = await fetch(`${origin}/sessions/socket-test`, { headers: { Authorization: `Bearer ${signServerTicket()}` } }).then((r) => r.json()) as { presence: Array<{ userId: string }> };
+    expect(inspected.presence.map((entry: { userId: string }) => entry.userId)).toEqual(["member"]);
+    const stale = new PollingClient(origin); clients.push(stale);
+    await stale.connect("viewer", "guest-test", oldTicket);
+    expect(await stale.emit("session:join", { sessionId: "socket-test", userId: "test" })).toMatchObject({ ok: false, error: "not_authorized" });
+    // Simulate losing process-local exclusions while retaining persisted session data.
+    app.get(SessionParticipantExclusions).clear("socket-test");
+    expect(await stale.emit("session:join", { sessionId: "socket-test", userId: "test" })).toMatchObject({ ok: false, error: "not_authorized" });
+    expect(await setAccess(true)).toMatchObject({ ok: true });
+    expect(await stale.emit("session:join", { sessionId: "socket-test", userId: "test" })).toMatchObject({ ok: false, error: "not_authorized" });
+    const fresh = new PollingClient(origin); clients.push(fresh);
+    await fresh.connect("viewer", "guest-fresh");
+    expect(await fresh.emit("session:join", { sessionId: "socket-test", userId: "test" })).toMatchObject({ ok: true });
+    await member.close(); await fresh.close();
+  });
+
+  it("serializes concurrent guest toggles and persists each immutable policy before applying it", async () => {
+    const controller = app.get(SessionsController);
+    const connections = app.get(SocketSessionConnections);
+    const original = connections.setGuestAccess.bind(connections);
+    const before = session!.audit.filter((event) => event.type === "guest_access_changed").length;
+    let release!: () => void;
+    const barrier = new Promise<void>((resolve) => { release = resolve; });
+    const spy = vi.spyOn(connections, "setGuestAccess").mockImplementationOnce(async (sessionId, policy) => {
+      await barrier;
+      await original(sessionId, policy);
+    });
+    const request = { headers: { authorization: `Bearer ${signServerTicket()}` } };
+    try {
+      const disabling = controller.setGuestAccess("socket-test", { enabled: false }, request);
+      await vi.waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+      const enabling = controller.setGuestAccess("socket-test", { enabled: true }, request);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const pendingAudit = session!.audit.filter((event) => event.type === "guest_access_changed");
+      expect(pendingAudit).toHaveLength(before + 1);
+      expect(pendingAudit.at(-1)?.metadata?.enabled).toBe(false);
+      release();
+      expect(await disabling).toMatchObject({ ok: true, enabled: false });
+      expect(await enabling).toMatchObject({ ok: true, enabled: true });
+      const final = session!.audit.filter((event) => event.type === "guest_access_changed").slice(-2);
+      expect(final.map((event) => event.metadata?.enabled)).toEqual([false, true]);
+      expect(final[1].metadata!.revision).toBe(Number(final[0].metadata!.revision) + 1);
+    } finally { release(); spy.mockRestore(); }
+  });
+
   it("enforces viewer access, rejects concurrent stale snapshots, and resumes authoritative state", async () => {
     const [first, second, viewer] = Array.from({ length: 3 }, () => new PollingClient(origin));
     clients.push(first, second, viewer);

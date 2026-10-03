@@ -15,7 +15,7 @@ export const runtime = "nodejs";
 const RATE_LIMIT = 30;
 const bodySchema = z.object({ invite: z.string().min(1).max(256), displayName: z.string().max(400) });
 
-export function normalizeGuestName(value: string) {
+function normalizeGuestName(value: string) {
   const cleaned = value.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, "").trim();
   return cleaned.length >= 1 && cleaned.length <= 40 ? cleaned : null;
 }

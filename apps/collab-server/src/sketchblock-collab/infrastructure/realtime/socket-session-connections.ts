@@ -4,8 +4,9 @@ import type { Server } from "socket.io";
 import { PresenceStorePort } from "../../application/ports/presence-store.port.js";
 import { SessionConnectionsPort } from "../../application/ports/session-connections.port.js";
 import { YjsDocumentRegistryPort } from "../../application/ports/yjs-document-registry.port.js";
+import { isGuestTicket } from "../auth/collab-ticket.verifier.js";
 import { FacilitationRegistry } from "./facilitation.registry.js";
-import { SessionParticipantExclusions } from "./session-participant-exclusions.js";
+import { SessionParticipantExclusions, type GuestAccessPolicy } from "./session-participant-exclusions.js";
 
 export function sessionRoomName(sessionId: string) {
   return `session:${sessionId}`;
@@ -26,6 +27,25 @@ export class SocketSessionConnections extends SessionConnectionsPort {
 
   attach(server: Server) {
     this.server = server;
+  }
+
+  async setGuestAccess(sessionId: string, policy: GuestAccessPolicy) {
+    // Block joins before awaiting the adapter so concurrent joins cannot slip through.
+    this.exclusions.applyGuestPolicy(sessionId, policy);
+    if (!policy.enabled && this.server) {
+      const sockets = await this.server.in(sessionRoomName(sessionId)).fetchSockets();
+      for (const socket of sockets) {
+        const auth = socket.data.auth;
+        if (!isGuestTicket(auth)) continue;
+        this.presence.removePresence(socket.id);
+        socket.emit("client:kicked", { sessionId, socketId: socket.id, kickedBy: "web-api" });
+        await socket.leave(sessionRoomName(sessionId));
+        socket.disconnect(true);
+      }
+      this.server.to(sessionRoomName(sessionId)).emit("presence:update", {
+        sessionId, presence: this.presence.getPresence(sessionId),
+      });
+    }
   }
 
   async endSession(sessionId: string, input: { closedBy: string }) {

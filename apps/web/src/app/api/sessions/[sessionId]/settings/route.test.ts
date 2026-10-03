@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ getOwnedSession: vi.fn(), setParticipantDownload: vi.fn(), setAllowAnonymousViewers: vi.fn(), audit: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getOwnedSession: vi.fn(), setParticipantDownload: vi.fn(), setAllowAnonymousViewers: vi.fn(), audit: vi.fn(), guestAccess: vi.fn() }));
 
 vi.mock("@/lib/server/auth/request-security", () => ({
   rejectCrossOriginRequest: (request: Request) =>
@@ -19,6 +19,8 @@ vi.mock("@/lib/server/database/session-store", () => ({
 }));
 vi.mock("@/lib/server/audit/audit-service", () => ({ safeRecordAuditEvent: mocks.audit }));
 
+vi.mock("@/lib/server/collab/collab-server-client", () => ({ setCollabGuestAccess: mocks.guestAccess }));
+
 import { PATCH } from "./route";
 
 const call = (origin = "http://localhost:4512", body: unknown = { participantDownload: false }) =>
@@ -32,7 +34,7 @@ const call = (origin = "http://localhost:4512", body: unknown = { participantDow
   );
 
 describe("PATCH /api/sessions/[sessionId]/settings", () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => { vi.resetAllMocks(); mocks.guestAccess.mockResolvedValue(undefined); });
 
   it("updates the flag for the owner", async () => {
     mocks.getOwnedSession.mockResolvedValue({ id: "s1" });
@@ -66,6 +68,33 @@ describe("PATCH /api/sessions/[sessionId]/settings", () => {
     expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "session.guests.enable" }));
     await call(undefined, { allowAnonymousViewers: false });
     expect(mocks.audit).toHaveBeenLastCalledWith(expect.objectContaining({ action: "session.guests.disable" }));
+  });
+
+  it("revokes live guest access and reports failures instead of claiming success", async () => {
+    mocks.getOwnedSession.mockResolvedValue({ id: "s1" });
+    mocks.setAllowAnonymousViewers.mockResolvedValue({ id: "s1", allowAnonymousViewers: false });
+    expect((await call(undefined, { allowAnonymousViewers: false })).status).toBe(200);
+    expect(mocks.guestAccess).toHaveBeenCalledWith("s1", false);
+    mocks.guestAccess.mockRejectedValue(new Error("offline"));
+    mocks.audit.mockClear();
+    expect((await call(undefined, { allowAnonymousViewers: false })).status).toBe(503);
+    expect(mocks.audit).not.toHaveBeenCalled();
+  });
+
+  it("serializes database and live-policy changes for concurrent toggles", async () => {
+    mocks.getOwnedSession.mockResolvedValue({ id: "s1" });
+    mocks.setAllowAnonymousViewers.mockImplementation(async (_id, enabled) => ({ id: "s1", allowAnonymousViewers: enabled }));
+    let release!: () => void;
+    mocks.guestAccess.mockImplementationOnce(() => new Promise<void>((resolve) => { release = resolve; }));
+    const disabling = call(undefined, { allowAnonymousViewers: false });
+    await vi.waitFor(() => expect(mocks.guestAccess).toHaveBeenCalledTimes(1));
+    const enabling = call(undefined, { allowAnonymousViewers: true });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mocks.setAllowAnonymousViewers).toHaveBeenCalledTimes(1);
+    release();
+    expect((await disabling).status).toBe(200);
+    expect((await enabling).status).toBe(200);
+    expect(mocks.guestAccess.mock.calls).toEqual([["s1", false], ["s1", true]]);
   });
 
   it("rejects an empty body", async () => {

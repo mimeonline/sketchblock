@@ -225,6 +225,8 @@ export class RealtimeGateway
       throw error;
     }
 
+    this.exclusions.restoreGuestPolicy(payload.sessionId, session.audit ?? []);
+
     const presenceUser: PresenceUser = {
       socketId: socket.id,
       userId: auth && auth.role !== "server" ? auth.actor : payload.userId,
@@ -240,7 +242,16 @@ export class RealtimeGateway
       this.logSocketEvent("session.join.aborted", socket, { sessionId: payload.sessionId, error: "socket_disconnected" });
       return false;
     }
+    if (!this.canAccessSession(socket, payload.sessionId)) {
+      ack?.({ ok: false, error: "not_authorized" });
+      return false;
+    }
     await socket.join(roomName(payload.sessionId));
+    if (!this.canAccessSession(socket, payload.sessionId)) {
+      await socket.leave(roomName(payload.sessionId));
+      ack?.({ ok: false, error: "not_authorized" });
+      return false;
+    }
     this.presence.addPresence(payload.sessionId, presenceUser);
 
     const presence = this.presence.getPresence(payload.sessionId);
@@ -946,7 +957,7 @@ export class RealtimeGateway
       return SessionAccessPolicy.canAccess(null, sessionId, Boolean(this.config.authSecret));
     }
 
-    return SessionAccessPolicy.canAccess(auth, sessionId, Boolean(this.config.authSecret));
+    return this.exclusions.canAccessGuest(sessionId, auth) && SessionAccessPolicy.canAccess(auth, sessionId, Boolean(this.config.authSecret));
   }
 
   private canEditSession(socket: AuthenticatedSocket, sessionId: string) {

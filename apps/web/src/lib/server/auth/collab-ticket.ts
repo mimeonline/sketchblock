@@ -15,13 +15,17 @@ export type CollabTicketPayload = {
   avatarUrl?: string | null;
   role: SessionRole | "server";
   permission: GitHubRepositoryPermission | "admin";
+  guest?: boolean;
+  issuedAt?: number;
   expiresAt: number;
 };
 
 export function createCollabTicket(input: Omit<CollabTicketPayload, "kind" | "expiresAt">) {
   return signPayload({
     kind: "collab-ticket",
+    guest: false,
     ...input,
+    issuedAt: Date.now(),
     expiresAt: Date.now() + COLLAB_TICKET_MAX_AGE_MS,
   }, "collab-ticket");
 }

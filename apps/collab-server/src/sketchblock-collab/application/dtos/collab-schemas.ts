@@ -123,6 +123,7 @@ export type SessionAuditEvent = {
     | "session_joined"
     | "snapshot_updated"
     | "yjs_updated"
+    | "guest_access_changed"
     | "client_kicked"
     | "session_status_changed"
     | "session_closed";

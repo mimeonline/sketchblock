@@ -5,7 +5,7 @@ import { DatabaseDiagnosticsPort, type DatabaseDiagnostics } from "../../applica
 import { CollabConfigService } from "../../../shared/infrastructure/config/collab-config.service.js";
 import { createCollabPostgresPool } from "../../../shared/infrastructure/database/postgres.js";
 
-const EXPECTED_SCHEMA_VERSION = 1;
+const EXPECTED_SCHEMA_VERSION = 2;
 
 type MigrationRow = QueryResultRow & {
   version: string | null;
