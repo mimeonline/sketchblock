@@ -1,6 +1,26 @@
 # Facilitation
 
+import {ScreenshotFigure} from '@site/src/components/GettingStartedVisuals';
+import {GuideFlow} from '@site/src/components/GuideVisuals';
+
 Session owners can moderate live collaboration with a toolbar offering participant synchronization, edit locks, timers, and voting features.
+
+<ScreenshotFigure
+  src="/img/docs/getting-started/collaboration.png"
+  alt="Local Sketchblock collaboration demo showing the shared canvas and moderation toolbar"
+  caption="Local demo collaboration view: the shared canvas and moderation toolbar stay visible while participants work."
+/>
+
+<GuideFlow
+  label="Facilitation loop"
+  steps={[
+    {title: 'Frame', description: 'Bring participants to the same viewport when the owner introduces a topic.'},
+    {title: 'Focus', description: 'Lock editing or start a timer while the group works on one decision.'},
+    {title: 'Decide', description: 'Run a voting round and review the highest-voted elements.'},
+    {title: 'React', description: 'Use lightweight emoji reactions to keep feedback visible during the session.'},
+  ]}
+  caption="Moderation state, votes, and reactions are live-only and clear when the session ends or the collaboration server restarts."
+/>
 
 ## Moderation Bar
 

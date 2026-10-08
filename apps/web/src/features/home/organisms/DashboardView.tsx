@@ -61,7 +61,7 @@ export function DashboardView({
   const primaryDrawing = activeSession
     ? drawings.find((item) => item.path === activeSession.drawingPath) || drawings[0] || null
     : drawings[0] || null;
-  const repositoryReady = repository.provider === "instance" || githubConnected;
+  const repositoryReady = repository.provider !== "github" || githubConnected;
   const primaryHref = !repositoryReady
     ? GITHUB_RECONNECT_HREF
     : primaryDrawing
@@ -114,7 +114,7 @@ export function DashboardView({
         repository={repository}
       />
 
-      {githubConnected || repository?.provider === "instance" ? (
+      {repositoryReady ? (
         <BoardGallery drawings={drawings} sessions={sessions} provider={repository?.provider} />
       ) : null}
     </div>

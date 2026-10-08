@@ -70,6 +70,31 @@ describe("DashboardView", () => {
     expect(within(boardsStatus).getByText("1")).toBeInTheDocument();
   });
 
+  it("keeps the demo workspace ready without a GitHub connection", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => undefined)));
+
+    render(
+      <DashboardView
+        collabServerStatus={null}
+        drawings={[drawing]}
+        githubConnected={false}
+        loaded
+        repository={{ ...repository, provider: "demo", githubRepositoryId: -1, owner: "sketchblock", name: "demo-workspace" }}
+        sessions={[]}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Architecture map" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Board öffnen" })).toHaveAttribute(
+      "href",
+      `/editor?path=${encodeURIComponent(drawing.path)}`,
+    );
+    expect(screen.queryByText("GitHub-Verbindung erforderlich")).not.toBeInTheDocument();
+    const boardsStatus = screen.getByRole("link", { name: /^Boards 1 / });
+    expect(within(boardsStatus).getByText("1")).toBeInTheDocument();
+  });
+
   it("keeps a disconnected GitHub repository on the reconnect path", () => {
     render(
       <DashboardView

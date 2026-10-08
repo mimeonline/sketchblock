@@ -1,6 +1,19 @@
 # Ad-hoc Rooms
 
+import {GuideFlow} from '@site/src/components/GuideVisuals';
+
 Upload an Excalidraw file (`.excalidraw`, `.json`, or image with embedded scene) from Overview or Collaboration. A temporary live session starts immediately with no GitHub repository required.
+
+<GuideFlow
+  label="Ad-hoc room lifecycle"
+  steps={[
+    {title: 'Create', description: 'Upload a scene or start an empty room from Overview or Collaboration.'},
+    {title: 'Collaborate', description: 'Invite people, edit live, and keep the temporary room focused on one conversation.'},
+    {title: 'Export', description: 'Download Excalidraw, PNG, or SVG while the room is active.'},
+    {title: 'Expire', description: 'Closing or expiry starts cleanup of the web and collaboration records.'},
+  ]}
+  caption="Export the result before closing the room or reaching its expiry time."
+/>
 
 ## Uploading
 
@@ -32,6 +45,9 @@ GitHub save is not available for ad-hoc rooms.
 
 A room expires after `SKETCHBLOCK_ADHOC_TTL_HOURS` (default 168 hours / 7 days). After expiry or when the owner closes the session, content is deleted after `SKETCHBLOCK_ADHOC_RETENTION_HOURS` (default 24 hours) from web and collaboration storage. Cleanup runs opportunistically at most every 10 minutes when sessions are listed or new rooms are created.
 
-## Database
+<details>
+  <summary>Operator note</summary>
 
-Ad-hoc rooms are managed by application database migration V13.
+Ad-hoc rooms use the application schema from migration V13. Upgrade the web and collaboration services together, and keep the retention values aligned with the data you want to retain temporarily.
+
+</details>

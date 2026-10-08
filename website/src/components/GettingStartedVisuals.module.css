@@ -1,0 +1,256 @@
+.figure {
+  margin: 2rem 0;
+  max-width: 100%;
+}
+
+.figureLink {
+  display: block;
+  width: fit-content;
+  margin-inline: auto;
+  overflow: hidden;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 18px;
+  background: var(--ifm-background-surface-color);
+  box-shadow: 0 18px 42px rgb(15 23 42 / 10%);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.figureLink:hover,
+.figureLink:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 24px 54px rgb(15 23 42 / 16%);
+}
+
+.screenshot {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.figure figcaption {
+  margin: .75rem auto 0;
+  max-width: 52rem;
+  color: var(--ifm-color-content-secondary);
+  font-size: .92rem;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.cards {
+  margin: 3.5rem 0;
+  padding: 0;
+}
+
+.sectionHeading {
+  max-width: 42rem;
+  margin-bottom: 1.5rem;
+}
+
+.sectionHeading h2,
+.configHeader h2 {
+  margin: .25rem 0 0;
+  color: var(--ifm-heading-color);
+  font-size: clamp(1.55rem, 3vw, 2.15rem);
+  letter-spacing: -.035em;
+}
+
+.kicker {
+  margin: 0;
+  color: var(--ifm-color-primary-dark);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  display: flex;
+  min-height: 13rem;
+  flex-direction: column;
+  padding: 1.35rem;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 16px;
+  background: var(--ifm-background-surface-color);
+}
+
+.card h3 {
+  margin: 0;
+  font-size: 1.08rem;
+}
+
+.card p {
+  flex: 1;
+  margin: .65rem 0 1.25rem;
+  color: var(--ifm-color-content-secondary);
+  font-size: .92rem;
+  line-height: 1.6;
+}
+
+.cardLink {
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.cardLink span {
+  display: inline-block;
+  margin-left: .25rem;
+  transition: transform 160ms ease;
+}
+
+.cardLink:hover span,
+.cardLink:focus-visible span {
+  transform: translateX(3px);
+}
+
+.workflow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 2.5rem 0 3rem;
+  padding: 0;
+  list-style: none;
+}
+
+.workflowStep {
+  position: relative;
+  margin: 0 !important;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: .9rem;
+  min-height: 9rem;
+  padding: 1.2rem;
+  border-top: 3px solid var(--ifm-color-primary);
+  background: var(--ifm-background-surface-color);
+}
+
+.workflowIcon {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ifm-color-primary);
+  color: #fff;
+  font-size: .72rem;
+  font-weight: 800;
+}
+
+.workflowStep h3 {
+  margin: .15rem 0 .4rem;
+  font-size: 1.05rem;
+}
+
+.workflowStep p {
+  margin: 0;
+  color: var(--ifm-color-content-secondary);
+  font-size: .9rem;
+  line-height: 1.55;
+}
+
+.workflowArrow {
+  position: absolute;
+  top: 1.5rem;
+  right: -.9rem;
+  z-index: 1;
+  color: var(--ifm-color-primary);
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.configExample {
+  margin: 2.5rem 0;
+  padding: clamp(1.35rem, 4vw, 2.25rem);
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 20px;
+  background: var(--ifm-background-surface-color);
+}
+
+.configHeader p:last-child {
+  max-width: 46rem;
+  margin-bottom: 0;
+  color: var(--ifm-color-content-secondary);
+}
+
+.configFields {
+  display: grid;
+  gap: .7rem;
+  margin: 1.5rem 0;
+}
+
+.configField {
+  display: grid;
+  grid-template-columns: minmax(8rem, .35fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: center;
+  padding: .8rem 1rem;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 10px;
+  background: var(--ifm-background-color);
+}
+
+.configField span {
+  color: var(--ifm-color-content-secondary);
+  font-size: .78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.configField code {
+  overflow-wrap: anywhere;
+}
+
+.configNote {
+  margin: 0;
+  color: var(--ifm-color-content-secondary);
+  font-size: .9rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 800px) {
+  .cardGrid,
+  .workflow {
+    grid-template-columns: 1fr;
+  }
+
+  .workflowArrow {
+    top: auto;
+    right: auto;
+    bottom: -.85rem;
+    left: 1.85rem;
+    transform: rotate(90deg);
+  }
+}
+
+@media (max-width: 560px) {
+  .cards,
+  .configExample {
+    border-radius: 16px;
+  }
+
+  .configField {
+    grid-template-columns: 1fr;
+    gap: .35rem;
+  }
+}
+
+[data-theme='dark'] .figureLink {
+  box-shadow: 0 18px 42px rgb(0 0 0 / 24%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .figureLink,
+  .cardLink span {
+    transition: none;
+  }
+}
+
+[data-theme='dark'] .workflowIcon {
+  color: #0f172a;
+}
