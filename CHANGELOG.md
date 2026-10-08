@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 0.3.1 - 2026-10-08
+
+### Changed
+
+- Expand Getting Started and Guides with visual workflows and product screenshots.
+- Clarify configuration, backup and restore, updates, troubleshooting, development, contribution, security, and privacy documentation.
+- Document the system context, runtime building blocks, and the roles of Yjs and Socket.IO with reproducible architecture diagrams and accessible zoom controls.
+- Add a prominent Meierhoff Systems website link to the project profile.
+
+### Fixed
+
+- Keep demo boards and dashboard actions available without a GitHub connection; apply the reconnect requirement to GitHub-backed repositories.
+
 ## 0.3.0 - 2026-10-08
 
 ### Added
