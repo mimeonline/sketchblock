@@ -62,6 +62,39 @@ describe("session grants", () => {
     expect(mocks.validateSessionInviteGrant).toHaveBeenCalledOnce();
   });
 
+  it("binds grants to a negative local session identity", async () => {
+    const cookie = createSessionGrantCookie({
+      sessionId: "session-1",
+      githubUserId: -17,
+      invite: {
+        id: "invite-1",
+        sessionId: "session-1",
+        role: "collaborator",
+        token: "raw-invite-token",
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+    });
+    mocks.cookies.mockResolvedValue({ get: () => ({ value: cookie.value }) });
+    mocks.validateSessionInviteGrant.mockResolvedValue(true);
+
+    await expect(getValidSessionGrant("session-1", -17)).resolves.toMatchObject({ githubUserId: -17 });
+    await expect(getValidSessionGrant("session-1", -18)).resolves.toBeNull();
+  });
+
+  it.each([0, Number.MAX_SAFE_INTEGER + 1])("rejects an unsafe session identity %s", (githubUserId) => {
+    expect(() => createSessionGrantCookie({
+      sessionId: "session-1",
+      githubUserId,
+      invite: {
+        id: "invite-1",
+        sessionId: "session-1",
+        role: "viewer",
+        token: "raw-invite-token",
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+    })).toThrow("Session identity must be a non-zero safe integer.");
+  });
+
   it("rejects a signed grant after its invite is revoked", async () => {
     const cookie = createSessionGrantCookie({
       sessionId: "session-1",

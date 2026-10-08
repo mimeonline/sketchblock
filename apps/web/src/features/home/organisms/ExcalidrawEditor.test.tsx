@@ -5,11 +5,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   apiCallbackCalls: 0,
+  restoreElements: vi.fn((elements: unknown[]) => elements),
+  sceneElements: [] as unknown[],
   scrollToContent: vi.fn(),
   updateScene: vi.fn(),
 }));
 
-vi.mock("@excalidraw/excalidraw", () => ({ restoreElements: (elements: unknown[]) => elements }));
+vi.mock("@excalidraw/excalidraw", () => ({ restoreElements: mocks.restoreElements }));
 
 vi.mock("next/dynamic", () => ({
   default: () =>
@@ -26,7 +28,7 @@ vi.mock("next/dynamic", () => ({
         mocks.apiCallbackCalls += 1;
         excalidrawAPI({
           addFiles: vi.fn(),
-          getSceneElements: () => [],
+          getSceneElements: () => mocks.sceneElements,
           updateScene: mocks.updateScene,
           scrollToContent: mocks.scrollToContent,
         });
@@ -50,6 +52,8 @@ vi.mock("@/features/home/hooks/useExcalidrawYjs", () => ({
 import { ExcalidrawEditor } from "./ExcalidrawEditor";
 import messages from "../../../../messages/de.json";
 
+const originalDocumentFonts = Object.getOwnPropertyDescriptor(document, "fonts");
+
 function render(ui: React.ReactNode) {
   return rtlRender(<NextIntlClientProvider locale="de" messages={messages}>{ui}</NextIntlClientProvider>);
 }
@@ -58,7 +62,13 @@ describe("ExcalidrawEditor", () => {
   afterEach(() => {
     cleanup();
     mocks.apiCallbackCalls = 0;
+    mocks.sceneElements = [];
     vi.clearAllMocks();
+    if (originalDocumentFonts) {
+      Object.defineProperty(document, "fonts", originalDocumentFonts);
+    } else {
+      Reflect.deleteProperty(document, "fonts");
+    }
   });
 
   it("keeps the Excalidraw API callback stable across its state update", () => {
@@ -99,6 +109,27 @@ describe("ExcalidrawEditor", () => {
     fireEvent.click(screen.getByRole("button", { name: messages.Editor.fitBoard }));
     expect(mocks.scrollToContent).toHaveBeenCalledTimes(2);
     expect(mocks.scrollToContent).toHaveBeenLastCalledWith(undefined, { fitToContent: true, maxZoom: 1, animate: false });
+  });
+
+  it("remeasures text after its canvas font finishes loading", async () => {
+    const fonts = new EventTarget();
+    Object.defineProperty(document, "fonts", { configurable: true, value: fonts });
+    const text = { id: "text-1", type: "text", text: "Owner: Text vor dem Wiederbeitritt.", width: 292.705 };
+    mocks.sceneElements = [text];
+
+    render(<ExcalidrawEditor initialContent={{ elements: [] }} />);
+    fonts.dispatchEvent(new Event("loadingdone"));
+
+    await waitFor(() => {
+      expect(mocks.restoreElements).toHaveBeenCalledWith([text], null, {
+        refreshDimensions: true,
+        repairBindings: true,
+      });
+      expect(mocks.updateScene).toHaveBeenCalledWith({
+        elements: [text],
+        captureUpdate: "NEVER",
+      });
+    });
   });
 
   it("isolates fullscreen, closes with Escape and restores keyboard focus", () => {

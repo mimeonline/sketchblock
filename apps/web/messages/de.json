@@ -302,6 +302,8 @@
     "boardLoadedMessage": "Aktuelle Version aus dem Instanz-Workspace geladen.",
     "saveHint": "Deine Änderungen bleiben lokal, bis du eine neue Version speicherst.",
     "saveButtonLabel": "Version speichern",
+    "versionSaving": "Neue Version wird im Instanz-Workspace gespeichert …",
+    "versionSaved": "Version im Instanz-Workspace gespeichert.",
     "emptyStateHint": "Lege ein neues Board an oder lade eine Excalidraw-Datei hoch."
   },
   "Guest": {

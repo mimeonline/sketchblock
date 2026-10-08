@@ -9,10 +9,8 @@ import { SketchblockLogo } from "@/features/home/atoms/SketchblockLogo";
 import { cn } from "@/lib/utils";
 import { isDevAuthMode } from "@/lib/server/auth/auth-mode";
 import { getCurrentOwner } from "@/lib/server/auth/owner-session";
-import {
-  getCurrentAuthUser,
-  sanitizeReturnTo,
-} from "@/lib/server/auth/session";
+import { sanitizeReturnTo } from "@/lib/server/auth/session";
+import { getCurrentSessionUser } from "@/lib/server/auth/session-user";
 import { hasInstanceOwner } from "@/lib/server/database/instance-owner-store";
 
 type LoginPageProps = {
@@ -38,10 +36,13 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   }
 
   const [participant, owner] = await Promise.all([
-    participantLogin ? getCurrentAuthUser() : Promise.resolve(null),
+    participantLogin ? getCurrentSessionUser() : Promise.resolve(null),
     participantLogin ? Promise.resolve(null) : getCurrentOwner(),
   ]);
 
+  if (participant?.mustChangePassword) {
+    redirect(`/change-password?returnTo=${encodeURIComponent(returnTo)}`);
+  }
   if ((participant || owner) && !errorMessage) {
     redirect(returnTo);
   }
@@ -139,16 +140,19 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           ) : null}
 
           {participantLogin ? (
-            <a
-              href={loginHref}
-              className={cn(
-                buttonVariants({ size: "lg" }),
-                "mt-8 h-11 w-full gap-2.5 px-4",
-              )}
-            >
-              <GitBranch aria-hidden="true" className="size-5" />
-              {t("continueGitHub")}
-            </a>
+            <>
+              <LocalCredentialForm mode="login" returnTo={returnTo} />
+              <a
+                href={loginHref}
+                className={cn(
+                  buttonVariants({ size: "lg", variant: "outline" }),
+                  "mt-3 h-11 w-full gap-2.5 px-4",
+                )}
+              >
+                <GitBranch aria-hidden="true" className="size-5" />
+                {t("continueGitHub")}
+              </a>
+            </>
           ) : (
             <LocalCredentialForm mode="login" returnTo={returnTo} />
           )}

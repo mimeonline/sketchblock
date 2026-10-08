@@ -54,7 +54,7 @@ export function LocalCredentialForm(props: LocalCredentialFormProps) {
         body: JSON.stringify(
           props.mode === "setup"
             ? { bootstrapToken, username, password }
-            : { username, password },
+            : { username, password, returnTo: props.returnTo },
         ),
       });
       const payload = (await response.json()) as { error?: string; redirectTo?: string };

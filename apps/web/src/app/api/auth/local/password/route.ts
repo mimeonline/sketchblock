@@ -9,9 +9,10 @@ import { hasValidRequestOrigin } from "@/lib/server/auth/request-security";
 import { getAppPostgresPool } from "@/lib/server/database/postgres";
 import { getAppUserById, replaceAppUserPassword } from "@/lib/server/database/user-store";
 import { revokeAllUserSessions } from "@/lib/server/database/user-session-store";
+import { sanitizeReturnTo } from "@/lib/server/auth/session";
 
 export const runtime = "nodejs";
-const schema = z.object({ currentPassword: z.string().min(1).max(128), newPassword: z.string().min(12).max(128) });
+const schema = z.object({ currentPassword: z.string().min(1).max(128), newPassword: z.string().min(12).max(128), returnTo: z.string().optional() });
 
 export async function POST(request: NextRequest) {
   const requestId = getRequestId(request);
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
     await clearOwnerAuthCookie();
     await setOwnerAuthCookie(user.id);
     await safeRecordAuditEvent({ actorId: user.id, actorUsername: user.username, actorRole: user.role, action: "user.password.change", targetType: "user", targetId: user.id, outcome: "success", requestId });
-    return NextResponse.json({ ok: true, redirectTo: "/" });
+    return NextResponse.json({ ok: true, redirectTo: sanitizeReturnTo(input.returnTo) });
   } catch (error) {
     return NextResponse.json({ error: error instanceof z.ZodError ? "Das neue Passwort erfüllt die Anforderungen nicht." : "Passwort konnte nicht geändert werden." }, { status: 400 });
   }

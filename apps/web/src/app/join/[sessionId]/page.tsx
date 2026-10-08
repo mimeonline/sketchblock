@@ -8,7 +8,9 @@ import { SessionEndedNotice } from "@/features/join/organisms/SessionEndedNotice
 import { getCurrentOwner, requireOwnerPageAuth } from "@/lib/server/auth/owner-session";
 import { getValidGuestGrant } from "@/lib/server/auth/guest-grant";
 import { getValidSessionGrant } from "@/lib/server/auth/session-grant";
-import { getCurrentAuthUser, requirePageAuth } from "@/lib/server/auth/session";
+import { hasRepositoryPermission } from "@/lib/server/auth/permissions";
+import { getLoginPath } from "@/lib/server/auth/session";
+import { getCurrentSessionUser } from "@/lib/server/auth/session-user";
 import { isParticipantRemoved, validateSessionInvite } from "@/lib/server/database/session-invite-store";
 import { getOwnedSession, getSession } from "@/lib/server/database/session-store";
 import { isSessionClosed } from "@/lib/server/domain/session-lifecycle";
@@ -57,7 +59,10 @@ export default async function JoinSessionPage({ params, searchParams }: JoinSess
   }
 
   if (!invite) {
-    const user = await getCurrentAuthUser();
+    const user = await getCurrentSessionUser();
+    if (user?.mustChangePassword) {
+      redirect(passwordChangePath(`/join/${sessionId}`));
+    }
     const grant = user ? await getValidSessionGrant(sessionId, user.id) : null;
     if (user && grant) {
       if (await isParticipantRemoved(sessionId, user.id)) notFound();
@@ -89,7 +94,7 @@ export default async function JoinSessionPage({ params, searchParams }: JoinSess
   const validatedInvite = await validateSessionInvite(sessionId, invite);
   if (!validatedInvite) notFound();
 
-  const currentUser = await getCurrentAuthUser();
+  const currentUser = await getCurrentSessionUser();
   if (!currentUser) {
     const guest = await getValidGuestGrant(sessionId);
     if (guest) {
@@ -107,7 +112,15 @@ export default async function JoinSessionPage({ params, searchParams }: JoinSess
   }
 
   const returnTo = `/join/${sessionId}?invite=${encodeURIComponent(invite)}`;
-  const authUser = await requirePageAuth(returnTo, "read");
-  if (await isParticipantRemoved(sessionId, authUser.id)) notFound();
+  if (!currentUser) redirect(getLoginPath(returnTo));
+  if (currentUser.mustChangePassword) redirect(passwordChangePath(returnTo));
+  if (currentUser.source === "github" && !hasRepositoryPermission(currentUser.permission, "read")) {
+    redirect(getLoginPath(returnTo, "repository_permission"));
+  }
+  if (await isParticipantRemoved(sessionId, currentUser.id)) notFound();
   redirect(`/api/sessions/${sessionId}/claim?invite=${encodeURIComponent(invite)}`);
+}
+
+function passwordChangePath(returnTo: string) {
+  return `/change-password?returnTo=${encodeURIComponent(returnTo)}`;
 }

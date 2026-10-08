@@ -2,16 +2,22 @@
 
 ## Unreleased
 
+## 0.3.0 - 2026-10-08
+
 ### Added
 
 - Facilitation: owners moderate live sessions with viewport following, edit locks, timer presets, voting (1–10 votes per person), emoji reactions, and top-voted elements summary. State clears when sessions end or the server restarts.
 - Guest viewers: enable "Allow viewing without an account" per session in the share dialog; guests enter a display name and watch live boards read-only.
 - Ad-hoc rooms: start with an empty board or upload an Excalidraw file or image with embedded scene to create a temporary live session without GitHub; participants download results as Excalidraw, PNG, or SVG.
 - Instance workspace: every local user has a private workspace for creating boards and managing versions without GitHub integration.
+- A valid role-specific invitation lets collaborators and viewers join any session with a local account or an existing GitHub sign-in. The owner connects GitHub for GitHub-backed repository access and saves.
 - Configuration for ad-hoc room lifetime, retention, and upload size limits (`SKETCHBLOCK_ADHOC_TTL_HOURS`, `SKETCHBLOCK_ADHOC_RETENTION_HOURS`, `SKETCHBLOCK_MAX_UPLOAD_BYTES`), plus a configurable workspace version limit (`SKETCHBLOCK_WORKSPACE_MAX_VERSIONS`).
 
 ### Changed
 
+- Refresh compatible dependencies and pin patched transitive packages; document remaining upstream audit findings and their build/runtime scope.
+- Upgrade application persistence through migrations V13–V16 and collaboration migration V2.
+- Extract dashboard rendering into a route-local component to keep the home template easier to maintain, preserving existing behavior.
 - Large board previews can be loaded on demand while the gallery keeps its automatic rendering limit. Board status filters use the same translated labels as badges; the file list has striped rows and accessible full-path tooltips.
 - Build release images on native AMD64 and ARM64 runners and merge their manifests, avoiding ARM emulation failures. Existing release tags can be rebuilt through a validated manual workflow dispatch.
 
@@ -21,8 +27,12 @@
 - Reconnecting clients fetch fresh collaboration tickets and replay interrupted live edits without requiring another edit.
 - Closed-session and removed-participant states remain visible when reconnect authorization fails.
 - Guest claim routes expose only supported Next.js route exports.
-
 - Workspace version history refreshes after saving, and boards display their stored titles.
+- Instance saves keep the version history visible and report the instance workspace as the save target.
+- Long text and labels remain fully readable in the canvas and board surfaces.
+- Instance editor hints and save labels describe local versioning instead of GitHub commits.
+- Realtime snapshot persistence deduplicates repeated state and skips stale out-of-order mirrors.
+- Removed the obsolete read-only hint from editable workspace views.
 - Moderation switches expose their visible labels to assistive technologies.
 
 ## 0.2.0 - 2026-10-02

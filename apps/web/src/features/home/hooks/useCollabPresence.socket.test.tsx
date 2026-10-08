@@ -149,6 +149,20 @@ describe("snapshot acknowledgements", () => {
     hook.unmount();
   });
 
+  it("keeps a kicked participant terminal after the socket disconnects", async () => {
+    const hook = await connectedHook();
+
+    act(() => {
+      mock.handlers.get("client:kicked")!();
+      mock.handlers.get("disconnect")!();
+    });
+
+    expect(hook.result.current.status).toBe("disconnected");
+    expect(hook.result.current.terminalAuthError).toBe("participant_removed");
+    expect(hook.result.current.error).toBe("This client was removed from the session.");
+    hook.unmount();
+  });
+
   it("settles an authentication callback that finishes after unmount", async () => {
     const hook = await connectedHook();
     const auth = mock.ioOptions.at(-1)?.auth;

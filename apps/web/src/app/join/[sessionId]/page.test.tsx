@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getCurrentOwner: vi.fn(),
-  getCurrentAuthUser: vi.fn(),
+  getCurrentSessionUser: vi.fn(),
   getValidSessionGrant: vi.fn(),
   getValidGuestGrant: vi.fn(),
   getSession: vi.fn(),
@@ -14,7 +14,6 @@ const mocks = vi.hoisted(() => ({
     throw new Error(`NEXT_REDIRECT:${destination}`);
   }),
   requireOwnerPageAuth: vi.fn(),
-  requirePageAuth: vi.fn(),
   validateSessionInvite: vi.fn(),
   isParticipantRemoved: vi.fn(),
 }));
@@ -34,9 +33,10 @@ vi.mock("@/lib/server/auth/owner-session", () => ({
 }));
 
 vi.mock("@/lib/server/auth/session", () => ({
-  getCurrentAuthUser: mocks.getCurrentAuthUser,
-  requirePageAuth: mocks.requirePageAuth,
+  getLoginPath: (returnTo: string) => `/login?returnTo=${encodeURIComponent(returnTo)}`,
 }));
+vi.mock("@/lib/server/auth/session-user", () => ({ getCurrentSessionUser: mocks.getCurrentSessionUser }));
+vi.mock("@/lib/server/auth/permissions", () => ({ hasRepositoryPermission: () => true }));
 
 vi.mock("@/lib/server/auth/guest-grant", () => ({ getValidGuestGrant: mocks.getValidGuestGrant }));
 vi.mock("@/features/join/organisms/GuestJoinForm", () => ({ GuestJoinForm: () => null }));
@@ -64,7 +64,7 @@ describe("join session page", () => {
     mocks.getOwnedSession.mockResolvedValue({ id: "session-123" });
     mocks.requireOwnerPageAuth.mockResolvedValue({ id: "owner-1", username: "admin" });
     mocks.getCurrentOwner.mockResolvedValue(null);
-    mocks.getCurrentAuthUser.mockResolvedValue(null);
+    mocks.getCurrentSessionUser.mockResolvedValue(null);
     mocks.getValidSessionGrant.mockResolvedValue(null);
     mocks.getValidGuestGrant.mockResolvedValue(null);
   });
@@ -119,7 +119,7 @@ describe("join session page", () => {
 
   it("restores participant access from a valid session grant", async () => {
     mocks.getCurrentOwner.mockResolvedValue({ id: "other-user" });
-    mocks.getCurrentAuthUser.mockResolvedValue({ id: 42, login: "markus", name: "Markus" });
+    mocks.getCurrentSessionUser.mockResolvedValue({ id: 42, login: "markus", name: "Markus", source: "github", mustChangePassword: false });
     mocks.getValidSessionGrant.mockResolvedValue({ role: "collaborator" });
 
     await expect(JoinSessionPage({
@@ -140,7 +140,7 @@ describe("join session page", () => {
 
   it("shows not-found to a removed participant", async () => {
     mocks.getCurrentOwner.mockResolvedValue(null);
-    mocks.getCurrentAuthUser.mockResolvedValue({ id: 42, login: "markus", name: "Markus" });
+    mocks.getCurrentSessionUser.mockResolvedValue({ id: 42, login: "markus", name: "Markus", source: "github", mustChangePassword: false });
     mocks.getValidSessionGrant.mockResolvedValue({ role: "viewer" });
     mocks.isParticipantRemoved.mockResolvedValue(true);
 
@@ -152,14 +152,13 @@ describe("join session page", () => {
 
   it("exchanges a valid invite for a session grant after login", async () => {
     mocks.validateSessionInvite.mockResolvedValue({ id: "invite-1", role: "collaborator" });
-    mocks.requirePageAuth.mockResolvedValue({ id: 42, login: "markus" });
+    mocks.getCurrentSessionUser.mockResolvedValue({ id: 42, login: "markus", source: "github", permission: "read", mustChangePassword: false });
 
     await expect(JoinSessionPage({
       params: Promise.resolve({ sessionId: "session-123" }),
       searchParams: Promise.resolve({ invite: "secret" }),
     })).rejects.toThrow("NEXT_REDIRECT:/api/sessions/session-123/claim?invite=secret");
 
-    expect(mocks.requirePageAuth).toHaveBeenCalledWith("/join/session-123?invite=secret", "read");
   });
 
   it("returns an authenticated owner to session management when the session no longer exists", async () => {
@@ -197,24 +196,22 @@ describe("join session page", () => {
     });
 
     expect(result).toMatchObject({ props: { sessionId: "session-123", inviteToken: "tok", boardTitle: "Board" } });
-    expect(mocks.requirePageAuth).not.toHaveBeenCalled();
   });
 
   it("keeps the GitHub login for collaborator invites or disabled guests", async () => {
     mocks.getSession.mockResolvedValue({ id: "session-123", allowAnonymousViewers: true });
     mocks.validateSessionInvite.mockResolvedValue({ id: "i1", role: "collaborator" });
-    mocks.requirePageAuth.mockRejectedValue(new Error("NEXT_REDIRECT:/login"));
     await expect(JoinSessionPage({
       params: Promise.resolve({ sessionId: "session-123" }),
       searchParams: Promise.resolve({ invite: "tok" }),
-    })).rejects.toThrow("NEXT_REDIRECT:/login");
+    })).rejects.toThrow("NEXT_REDIRECT:/login?returnTo=");
 
     mocks.getSession.mockResolvedValue({ id: "session-123", allowAnonymousViewers: false });
     mocks.validateSessionInvite.mockResolvedValue({ id: "i1", role: "viewer" });
     await expect(JoinSessionPage({
       params: Promise.resolve({ sessionId: "session-123" }),
       searchParams: Promise.resolve({ invite: "tok" }),
-    })).rejects.toThrow("NEXT_REDIRECT:/login");
+    })).rejects.toThrow("NEXT_REDIRECT:/login?returnTo=");
   });
 
   it("renders the session for a valid guest grant", async () => {
@@ -223,5 +220,31 @@ describe("join session page", () => {
       params: Promise.resolve({ sessionId: "session-123" }),
       searchParams: Promise.resolve({}),
     })).resolves.toMatchObject({ props: { identity: { login: "guest-gabc", displayName: "Ada" }, role: "viewer" } });
+  });
+
+  it("sends an authenticated local account to claim a valid invite", async () => {
+    mocks.validateSessionInvite.mockResolvedValue({ id: "invite-1", role: "collaborator" });
+    mocks.getCurrentSessionUser.mockResolvedValue({
+      id: -17, login: "local:user-b", name: "User B", source: "local",
+      localUserId: "user-b", mustChangePassword: false,
+    });
+
+    await expect(JoinSessionPage({
+      params: Promise.resolve({ sessionId: "session-123" }),
+      searchParams: Promise.resolve({ invite: "secret" }),
+    })).rejects.toThrow("NEXT_REDIRECT:/api/sessions/session-123/claim?invite=secret");
+  });
+
+  it("requires a password change before a local account can claim an invite", async () => {
+    mocks.validateSessionInvite.mockResolvedValue({ id: "invite-1", role: "collaborator" });
+    mocks.getCurrentSessionUser.mockResolvedValue({
+      id: -17, login: "local:user-b", name: "User B", source: "local",
+      localUserId: "user-b", mustChangePassword: true,
+    });
+
+    await expect(JoinSessionPage({
+      params: Promise.resolve({ sessionId: "session-123" }),
+      searchParams: Promise.resolve({ invite: "secret" }),
+    })).rejects.toThrow("NEXT_REDIRECT:/change-password?returnTo=");
   });
 });

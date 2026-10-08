@@ -9,6 +9,7 @@ export type AppUserStatus = "active" | "disabled";
 
 export type AppUser = {
   id: string;
+  sessionIdentityId: number;
   username: string;
   displayName: string | null;
   passwordHash: string;
@@ -29,12 +30,12 @@ export type AppUserGitHubIdentity = {
 };
 
 type AppUserRow = QueryResultRow & {
-  id: string; username: string; display_name: string | null; password_hash: string;
+  id: string; session_identity_id: string | number; username: string; display_name: string | null; password_hash: string;
   role: AppUserRole; status: AppUserStatus; must_change_password: boolean;
   created_at: Date | string; updated_at: Date | string; last_login_at: Date | string | null;
 };
 
-const columns = `id, username, display_name, password_hash, role, status,
+const columns = `id, session_identity_id, username, display_name, password_hash, role, status,
   must_change_password, created_at, updated_at, last_login_at`;
 
 export async function createAppUser(input: {
@@ -149,7 +150,7 @@ export async function linkAppUserGitHubIdentity(
 }
 
 function rowToAppUser(row: AppUserRow): AppUser {
-  return { id: row.id, username: row.username, displayName: row.display_name,
+  return { id: row.id, sessionIdentityId: Number(row.session_identity_id), username: row.username, displayName: row.display_name,
     passwordHash: row.password_hash, role: row.role, status: row.status,
     mustChangePassword: row.must_change_password, createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at), lastLoginAt: row.last_login_at ? toIso(row.last_login_at) : null };

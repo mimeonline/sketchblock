@@ -7,9 +7,10 @@ import { requireOwnerPageAuth } from "@/lib/server/auth/owner-session";
 
 export const dynamic = "force-dynamic";
 
-export default async function ChangePasswordPage() {
+export default async function ChangePasswordPage({ searchParams }: { searchParams: Promise<{ returnTo?: string }> }) {
   const t = await getTranslations("Common");
   const user = await requireOwnerPageAuth("/change-password");
+  const { returnTo = "/" } = await searchParams;
 
   return <main className="grid min-h-dvh place-items-center bg-muted/30 px-4 py-10">
     <section className="w-full max-w-md rounded-2xl border bg-background p-6 shadow-sm sm:p-8">
@@ -17,7 +18,7 @@ export default async function ChangePasswordPage() {
       <div className="mt-8 flex items-center gap-2 text-sm font-medium text-primary"><KeyRound aria-hidden="true" />{t("firstLogin")}</div>
       <h1 className="mt-3 text-3xl font-semibold tracking-tight">{t("setOwnPassword")}</h1>
       <p className="mt-3 text-sm leading-6 text-muted-foreground">{t("replaceStartPassword")}</p>
-      <PasswordChangeForm />
+      <PasswordChangeForm returnTo={returnTo} />
       <div className="mt-6 flex items-start gap-2 border-t pt-5 text-xs leading-5 text-muted-foreground"><ShieldCheck aria-hidden="true" className="mt-0.5 shrink-0" />{t("startPasswordRevoked")}</div>
     </section>
   </main>;

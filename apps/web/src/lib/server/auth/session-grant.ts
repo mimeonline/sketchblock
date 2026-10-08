@@ -26,6 +26,9 @@ export function createSessionGrantCookie(input: {
   invite: SessionInvite;
   githubUserId: number;
 }) {
+  if (!isSessionIdentityId(input.githubUserId)) {
+    throw new Error("Session identity must be a non-zero safe integer.");
+  }
   const maximumExpiresAt = Date.now() + SESSION_GRANT_MAX_AGE_SECONDS * 1000;
   const inviteExpiresAt = input.invite.expiresAt ? new Date(input.invite.expiresAt).getTime() : maximumExpiresAt;
   const expiresAt = Math.min(maximumExpiresAt, inviteExpiresAt);
@@ -96,7 +99,12 @@ function isSessionGrantPayload(
       && payload.sessionId === sessionId
       && typeof payload.inviteId === "string"
       && (payload.role === "collaborator" || payload.role === "viewer")
+      && isSessionIdentityId(payload.githubUserId)
       && payload.githubUserId === githubUserId
       && typeof payload.expiresAt === "number",
   );
+}
+
+function isSessionIdentityId(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value !== 0;
 }

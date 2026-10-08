@@ -35,6 +35,7 @@ type OwnerCookiePayload = {
 };
 
 export type AuthenticatedOwner = Omit<InstanceOwner, "passwordHash"> & {
+  sessionIdentityId: number;
   displayName: string | null;
   role: AppUserRole;
   mustChangePassword: boolean;
@@ -55,6 +56,7 @@ export async function getCurrentOwner(): Promise<AuthenticatedOwner | null> {
       const now = new Date().toISOString();
       return {
         id: "demo-owner",
+        sessionIdentityId: -1,
         username: devUser.login,
         githubUserId: -1,
         githubLogin: devUser.login,
@@ -76,6 +78,7 @@ export async function getCurrentOwner(): Promise<AuthenticatedOwner | null> {
     if (persistedOwner) {
       return {
         id: persistedOwner.id,
+        sessionIdentityId: persistedOwner.sessionIdentityId,
         username: persistedOwner.username,
         githubUserId: storedUser?.id ?? persistedGitHub?.githubUserId ?? devUser.id,
         githubLogin: storedUser?.login ?? persistedGitHub?.login ?? devUser.login,
@@ -91,6 +94,7 @@ export async function getCurrentOwner(): Promise<AuthenticatedOwner | null> {
     }
     return {
       id: "dev-owner",
+      sessionIdentityId: -1,
       username: devUser.login,
       githubUserId: devUser.id,
       githubLogin: devUser.login,
@@ -123,6 +127,7 @@ export async function getCurrentOwner(): Promise<AuthenticatedOwner | null> {
 
   return {
     id: user.id,
+    sessionIdentityId: user.sessionIdentityId,
     username: user.username,
     githubUserId: github?.githubUserId ?? owner?.githubUserId ?? null,
     githubLogin: github?.login ?? owner?.githubLogin ?? null,

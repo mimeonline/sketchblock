@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-export function PasswordChangeForm() {
+export function PasswordChangeForm({ returnTo }: { returnTo: string }) {
   const t = useTranslations("Auth");
   const currentId = useId();
   const nextId = useId();
@@ -31,7 +31,7 @@ export function PasswordChangeForm() {
       const response = await fetch("/api/auth/local/password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currentPassword, newPassword }),
+        body: JSON.stringify({ currentPassword, newPassword, returnTo }),
       });
       const payload = (await response.json()) as { error?: string; redirectTo?: string };
       if (!response.ok) throw new Error(payload.error || t("passwordChangeFailed"));

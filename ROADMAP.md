@@ -19,14 +19,16 @@ This roadmap communicates product direction rather than fixed delivery dates. Pr
 
 Local collaboration has been checked with two separate browser profiles. Production deployment, upgrade, restore, and operational acceptance remain installation-specific checks.
 
-## 🔥 Implemented — GitHub-free collaboration and facilitation (unreleased)
+## ✅ 0.3 — Local workspaces and facilitation (released)
 
 - Start temporary ad-hoc rooms from an empty board or uploaded Excalidraw scene, with downloads and configurable expiry and retention.
 - Let invited guests watch live boards without an account through an owner-controlled, read-only viewer flow.
 - Create, upload, edit, and save boards in a private instance workspace with version history and restore.
 - Facilitate sessions with viewport following, edit locks, shared timers, dot voting, results summaries, and emoji reactions. Facilitation state is live-only.
+- Let invited collaborators and viewers join any session with a valid role-specific invitation using a local account or an existing GitHub sign-in. Owners connect GitHub for repository-backed access and saves.
+- Apply application migrations V13–V16 and collaboration migration V2.
 
-These features are implemented in the current source. The next gates are a two-account workflow check, multi-client facilitation acceptance, and release and upgrade validation, including application database migrations V13–V15 and collaboration database migration V2. Guest revocation and interrupted reconnects have regression coverage; the two-account browser check must also cover sessions longer than five minutes and interrupted text updates. Production acceptance remains installation-specific.
+Release validation covers local-account and ad-hoc browser workflows, two-account collaboration, multi-client facilitation, guest revocation, interrupted reconnects, and the migration path. The browser evidence does not constitute GitHub OAuth acceptance; production GitHub OAuth, deployment, upgrade, restore, and operational acceptance remain installation-specific.
 
 ## ➡️ Next — Extend the Git workflow
 

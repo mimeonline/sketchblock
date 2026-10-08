@@ -18,6 +18,10 @@ import type { CollabCursor } from "@/types/sketchblock";
 
 const WHITE_CANVAS = "#ffffff";
 
+function elementRevisionKey(elements: readonly OrderedExcalidrawElement[]) {
+  return elements.map((element) => `${element.id}:${element.version}:${element.versionNonce}:${element.index ?? ""}`).join("|");
+}
+
 function EditorLoadingState() {
   const t = useTranslations("Editor");
   return (
@@ -142,6 +146,7 @@ export function ExcalidrawEditor({
   const excalidrawApiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const [excalidrawApi, setExcalidrawApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const sceneRef = useRef<unknown>(null);
+  const elementRevisionKeyRef = useRef<string | null>(null);
   const hasUserInteractedRef = useRef(false);
   const hasReportedDirtyRef = useRef(false);
   const hasAppliedInitialContentRef = useRef(false);
@@ -221,27 +226,52 @@ export function ExcalidrawEditor({
   }, []);
 
   useEffect(() => {
-    if (!excalidrawApi || !initialData.elements?.length || hasFittedContentRef.current) return;
+    if (!excalidrawApi) return;
     let active = true;
+    const loadRestoreElements = async () => {
+      if (!restoreElementsRef.current) {
+        const { restoreElements } = await import("@excalidraw/excalidraw");
+        restoreElementsRef.current = restoreElements;
+      }
+      return restoreElementsRef.current;
+    };
+    const refreshSceneDimensions = async (fitAfterRefresh = false) => {
+      const restoreElements = await loadRestoreElements();
+      if (!active) return;
+      const elements = excalidrawApi.getSceneElements();
+      if (elements.length > 0) {
+        excalidrawApi.updateScene({
+          elements: restoreElements(elements, null, { refreshDimensions: true, repairBindings: true }),
+          captureUpdate: "NEVER",
+        });
+      }
+      if (fitAfterRefresh) {
+        fitBoard();
+        hasFittedContentRef.current = true;
+      }
+    };
+    const handleFontsLoaded = () => {
+      void refreshSceneDimensions();
+    };
+    document.fonts?.addEventListener("loadingdone", handleFontsLoaded);
     const frame = requestAnimationFrame(() => {
       void (async () => {
+        await loadRestoreElements();
+        if (!initialData.elements?.length || hasFittedContentRef.current) return;
         // Excalidraw registers/loads scene fonts during initialization. Measuring earlier
         // uses fallback metrics and can clip imported text once the real font arrives.
         await document.fonts?.ready;
-        const { restoreElements } = await import("@excalidraw/excalidraw");
-        restoreElementsRef.current = restoreElements;
         if (!active || hasUserInteractedRef.current) return;
         // Re-measure text with the loaded fonts; this is a local render fix and is
         // not propagated to collaborators because no user interaction happened yet.
-        excalidrawApi.updateScene({
-          elements: restoreElements(excalidrawApi.getSceneElements(), null, { refreshDimensions: true, repairBindings: true }),
-          captureUpdate: "NEVER",
-        });
-        fitBoard();
-        hasFittedContentRef.current = true;
+        await refreshSceneDimensions(true);
       })();
     });
-    return () => { active = false; cancelAnimationFrame(frame); };
+    return () => {
+      active = false;
+      cancelAnimationFrame(frame);
+      document.fonts?.removeEventListener("loadingdone", handleFontsLoaded);
+    };
   }, [excalidrawApi, fitBoard, initialData]);
 
   const prepareRemoteElements = useCallback((elements: Parameters<NonNullable<Parameters<typeof useExcalidrawYjs>[0]["prepareRemoteElements"]>>[0]) => {
@@ -456,6 +486,9 @@ export function ExcalidrawEditor({
             });
           }}
           onChange={(elements, appState, files) => {
+            const nextElementRevisionKey = elementRevisionKey(elements);
+            const elementsChanged = nextElementRevisionKey !== elementRevisionKeyRef.current;
+            elementRevisionKeyRef.current = nextElementRevisionKey;
             sceneRef.current = {
               type: "excalidraw",
               version: 2,
@@ -475,7 +508,8 @@ export function ExcalidrawEditor({
               !isApplyingRemoteRef.current &&
               !yjs.isApplyingRemoteRef.current &&
               window.performance.now() > suppressLocalChangeUntilRef.current &&
-              hasUserInteractedRef.current
+              hasUserInteractedRef.current &&
+              elementsChanged
             ) {
               yjs.applyLocalScene(elements as readonly OrderedExcalidrawElement[]);
             }
@@ -485,7 +519,8 @@ export function ExcalidrawEditor({
               !isApplyingRemoteRef.current &&
               !yjs.isApplyingRemoteRef.current &&
               window.performance.now() > suppressLocalChangeUntilRef.current &&
-              hasUserInteractedRef.current
+              hasUserInteractedRef.current &&
+              elementsChanged
             ) {
               if (!hasReportedDirtyRef.current) {
                 hasReportedDirtyRef.current = true;

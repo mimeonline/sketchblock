@@ -6,6 +6,7 @@ import { getRequestId } from "@/lib/server/logging/server-logger";
 import { setOwnerAuthCookie } from "@/lib/server/auth/owner-session";
 import { PasswordHashBusyError, verifyPassword, verifyPasswordAgainstDummy } from "@/lib/server/auth/password";
 import { clearGitHubAccessTokenCookie, clearParticipantAndOAuthCookies } from "@/lib/server/auth/session";
+import { sanitizeReturnTo } from "@/lib/server/auth/session";
 import {
   clearAuthAttempts,
   consumeAuthAttempt,
@@ -21,6 +22,7 @@ export const runtime = "nodejs";
 const loginSchema = z.object({
   username: z.string().trim().min(1).max(64),
   password: z.string().min(1).max(128),
+  returnTo: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -31,6 +33,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Ungültiger Request-Ursprung." }, { status: 403 });
     }
     const input = loginSchema.parse(await request.json());
+    const returnTo = sanitizeReturnTo(input.returnTo);
     attemptedUsername = input.username.toLowerCase();
     const attempt = consumeAuthAttempt(request, input.username);
     if (!attempt.allowed) {
@@ -57,7 +60,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       mustChangePassword: user.mustChangePassword,
-      redirectTo: user.mustChangePassword ? "/change-password" : "/",
+      redirectTo: user.mustChangePassword
+        ? `/change-password?returnTo=${encodeURIComponent(returnTo)}`
+        : returnTo,
     });
   } catch (error) {
     if (error instanceof PasswordHashBusyError) {

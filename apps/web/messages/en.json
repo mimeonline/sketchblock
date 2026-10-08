@@ -302,6 +302,8 @@
     "boardLoadedMessage": "Current version loaded from the instance workspace.",
     "saveHint": "Your changes are kept locally until you save a new version.",
     "saveButtonLabel": "Save version",
+    "versionSaving": "Saving a new version in the instance workspace …",
+    "versionSaved": "Version saved in the instance workspace.",
     "emptyStateHint": "Create a new board or upload an Excalidraw file above."
   },
   "Guest": {

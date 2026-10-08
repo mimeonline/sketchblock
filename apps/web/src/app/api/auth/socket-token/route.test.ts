@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   createCollabTicket: vi.fn(() => "signed-ticket"),
   getCurrentOwner: vi.fn(),
-  getCurrentAuthUser: vi.fn(),
+  getCurrentSessionUser: vi.fn(),
   getValidSessionGrant: vi.fn(),
   getValidGuestGrant: vi.fn(),
   touchSessionGuest: vi.fn(),
@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/server/auth/collab-ticket", () => ({ createCollabTicket: mocks.createCollabTicket }));
 vi.mock("@/lib/server/auth/owner-session", () => ({ getCurrentOwner: mocks.getCurrentOwner }));
-vi.mock("@/lib/server/auth/session", () => ({ getCurrentAuthUser: mocks.getCurrentAuthUser }));
+vi.mock("@/lib/server/auth/session-user", () => ({ getCurrentSessionUser: mocks.getCurrentSessionUser }));
 vi.mock("@/lib/server/auth/guest-grant", () => ({ getValidGuestGrant: mocks.getValidGuestGrant }));
 vi.mock("@/lib/server/database/session-guest-store", () => ({ touchSessionGuest: mocks.touchSessionGuest }));
 vi.mock("@/lib/server/auth/session-grant", () => ({ getValidSessionGrant: mocks.getValidSessionGrant }));
@@ -36,6 +36,7 @@ describe("socket auth token route", () => {
     mocks.createCollabTicket.mockReturnValue("signed-ticket");
     mocks.getSession.mockResolvedValue({ id: "session-1" });
     mocks.getOwnedSession.mockResolvedValue({ id: "session-1" });
+    mocks.getCurrentSessionUser.mockResolvedValue(null);
   });
 
   it("issues owner tickets only from the local owner session", async () => {
@@ -86,7 +87,7 @@ describe("socket auth token route", () => {
   });
 
   it("uses the server-side invite role even when the client requests collaborator", async () => {
-    mocks.getCurrentAuthUser.mockResolvedValue({
+    mocks.getCurrentSessionUser.mockResolvedValue({
       id: 42,
       login: "markus",
       name: "Markus",
@@ -110,7 +111,7 @@ describe("socket auth token route", () => {
   });
 
   it("rejects a participant without a valid invite", async () => {
-    mocks.getCurrentAuthUser.mockResolvedValue({ id: 42, login: "markus" });
+    mocks.getCurrentSessionUser.mockResolvedValue({ id: 42, login: "markus" });
     mocks.validateSessionInvite.mockResolvedValue(null);
 
     const response = await POST(request({
@@ -126,7 +127,7 @@ describe("socket auth token route", () => {
 
   it("issues participant tickets from a valid session grant", async () => {
     mocks.getCurrentOwner.mockResolvedValue({ id: "other-user", username: "other" });
-    mocks.getCurrentAuthUser.mockResolvedValue({
+    mocks.getCurrentSessionUser.mockResolvedValue({
       id: 42,
       login: "markus",
       name: "Markus",
@@ -148,8 +149,22 @@ describe("socket auth token route", () => {
     }));
   });
 
+  it("issues a participant ticket for a local account using its namespaced actor", async () => {
+    mocks.getCurrentSessionUser.mockResolvedValue({
+      id: -17, login: "local:user-b", name: "User B", avatarUrl: null,
+      source: "local", localUserId: "user-b", mustChangePassword: false,
+    });
+    mocks.getValidSessionGrant.mockResolvedValue({ role: "collaborator" });
+
+    const response = await POST(request({ sessionId: "session-1", role: "collaborator", clientId: "client-1" }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.getValidSessionGrant).toHaveBeenCalledWith("session-1", -17);
+    expect(mocks.createCollabTicket).toHaveBeenCalledWith(expect.objectContaining({ actor: "local:user-b" }));
+  });
+
   it("rejects participant tickets when the stored grant is invalid", async () => {
-    mocks.getCurrentAuthUser.mockResolvedValue({ id: 42, login: "markus" });
+    mocks.getCurrentSessionUser.mockResolvedValue({ id: 42, login: "markus" });
     mocks.getValidSessionGrant.mockResolvedValue(null);
 
     const response = await POST(request({ sessionId: "session-1", role: "viewer", clientId: "client-1" }));
@@ -159,7 +174,7 @@ describe("socket auth token route", () => {
   });
 
   it("rejects a removed participant with 403 participant_removed", async () => {
-    mocks.getCurrentAuthUser.mockResolvedValue({ id: 42, login: "markus" });
+    mocks.getCurrentSessionUser.mockResolvedValue({ id: 42, login: "markus" });
     mocks.getValidSessionGrant.mockResolvedValue({ role: "viewer" });
     mocks.isParticipantRemoved.mockResolvedValue(true);
 

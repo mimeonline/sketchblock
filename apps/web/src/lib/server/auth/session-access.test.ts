@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getCurrentOwner: vi.fn(),
-  getCurrentAuthUser: vi.fn(),
+  getCurrentSessionUser: vi.fn(),
   getValidSessionGrant: vi.fn(),
   getValidGuestGrant: vi.fn(),
   touchSessionGuest: vi.fn(),
@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/server/auth/owner-session", () => ({ getCurrentOwner: mocks.getCurrentOwner }));
-vi.mock("@/lib/server/auth/session", () => ({ getCurrentAuthUser: mocks.getCurrentAuthUser }));
+vi.mock("@/lib/server/auth/session-user", () => ({ getCurrentSessionUser: mocks.getCurrentSessionUser }));
 vi.mock("@/lib/server/auth/guest-grant", () => ({ getValidGuestGrant: mocks.getValidGuestGrant }));
 vi.mock("@/lib/server/database/session-guest-store", () => ({ touchSessionGuest: mocks.touchSessionGuest }));
 vi.mock("@/lib/server/auth/session-grant", () => ({ getValidSessionGrant: mocks.getValidSessionGrant }));
@@ -34,7 +34,7 @@ describe("session access", () => {
     mocks.getOwnedSession.mockResolvedValue({ id: "s1" });
     mocks.getSession.mockResolvedValue({ id: "s1", status: "active" });
     mocks.getCurrentOwner.mockResolvedValue(null);
-    mocks.getCurrentAuthUser.mockResolvedValue(null);
+    mocks.getCurrentSessionUser.mockResolvedValue(null);
     mocks.getValidSessionGrant.mockResolvedValue(null);
     mocks.getValidGuestGrant.mockResolvedValue(null);
     mocks.touchSessionGuest.mockResolvedValue(undefined);
@@ -43,7 +43,7 @@ describe("session access", () => {
   it("restores collaborator API access from the session grant cookie", async () => {
     mocks.getCurrentOwner.mockResolvedValue({ id: "other-user" });
     mocks.getOwnedSession.mockResolvedValue(null);
-    mocks.getCurrentAuthUser.mockResolvedValue({ id: 42, login: "markus", name: "Markus" });
+    mocks.getCurrentSessionUser.mockResolvedValue({ id: 42, login: "markus", name: "Markus" });
     mocks.getValidSessionGrant.mockResolvedValue({ role: "collaborator" });
 
     const result = await authorizeSessionRequest(
@@ -59,7 +59,7 @@ describe("session access", () => {
   it("rejects a foreign local user requesting owner access even with a guest grant", async () => {
     mocks.getCurrentOwner.mockResolvedValue({ id: "other-user" });
     mocks.getOwnedSession.mockResolvedValue(null);
-    mocks.getCurrentAuthUser.mockResolvedValue({ id: 42, login: "markus" });
+    mocks.getCurrentSessionUser.mockResolvedValue({ id: 42, login: "markus" });
     mocks.getValidSessionGrant.mockResolvedValue({ role: "collaborator" });
 
     const result = await authorizeSessionRequest(new NextRequest("http://localhost:4512/api/sessions/s1/state"), "s1", "owner");
@@ -71,7 +71,7 @@ describe("session access", () => {
   it("rejects a foreign local user with an expired or revoked grant", async () => {
     mocks.getCurrentOwner.mockResolvedValue({ id: "other-user" });
     mocks.getOwnedSession.mockResolvedValue(null);
-    mocks.getCurrentAuthUser.mockResolvedValue({ id: 42, login: "markus" });
+    mocks.getCurrentSessionUser.mockResolvedValue({ id: 42, login: "markus" });
 
     const result = await authorizeSessionRequest(new NextRequest("http://localhost:4512/api/sessions/s1/state"), "s1", "edit");
 
@@ -88,7 +88,7 @@ describe("session access", () => {
 
   it("preserves independently authenticated guest access while local owner access is locked", async () => {
     mocks.getCurrentOwner.mockResolvedValue({ id: "owner-1", mustChangePassword: true });
-    mocks.getCurrentAuthUser.mockResolvedValue({ id: 42, login: "markus" });
+    mocks.getCurrentSessionUser.mockResolvedValue({ id: 42, login: "markus" });
     mocks.getValidSessionGrant.mockResolvedValue({ role: "collaborator" });
     const result = await authorizeSessionRequest(new NextRequest("http://localhost:4512/api/sessions/s1/state"), "s1", "edit");
     expect(result.response).toBeNull();
@@ -115,7 +115,7 @@ describe("session access", () => {
   });
 
   it("derives participant role from the invite and rejects viewer edits", async () => {
-    mocks.getCurrentAuthUser.mockResolvedValue({
+    mocks.getCurrentSessionUser.mockResolvedValue({
       id: 42,
       login: "markus",
       name: "Markus",
@@ -135,7 +135,7 @@ describe("session access", () => {
   });
 
   it("allows collaborator edits and records the GitHub identity", async () => {
-    mocks.getCurrentAuthUser.mockResolvedValue({
+    mocks.getCurrentSessionUser.mockResolvedValue({
       id: 42,
       login: "markus",
       name: "Markus",
@@ -158,9 +158,26 @@ describe("session access", () => {
     }));
   });
 
+  it("authorizes a local collaborator without granting foreign owner authority", async () => {
+    mocks.getCurrentOwner.mockResolvedValue({ id: "user-b", mustChangePassword: false });
+    mocks.getOwnedSession.mockResolvedValue(null);
+    mocks.getCurrentSessionUser.mockResolvedValue({
+      id: -17, login: "local:user-b", name: "User B", avatarUrl: null,
+      source: "local", localUserId: "user-b", mustChangePassword: false,
+    });
+    mocks.getValidSessionGrant.mockResolvedValue({ role: "collaborator" });
+
+    const edit = await authorizeSessionRequest(new NextRequest("http://localhost:4512/api/sessions/s1/state"), "s1", "edit");
+    const owner = await authorizeSessionRequest(new NextRequest("http://localhost:4512/api/sessions/s1/state"), "s1", "owner");
+
+    expect(edit.access).toMatchObject({ role: "collaborator", actor: "local:user-b", localUserId: "user-b" });
+    expect(owner.access).toBeNull();
+    expect(owner.response?.status).toBe(404);
+  });
+
   it("rejects participant access to an ended session even with a valid grant", async () => {
     mocks.getSession.mockResolvedValue({ id: "s1", status: "closed" });
-    mocks.getCurrentAuthUser.mockResolvedValue({ id: 42, login: "markus" });
+    mocks.getCurrentSessionUser.mockResolvedValue({ id: 42, login: "markus" });
     mocks.getValidSessionGrant.mockResolvedValue({ role: "collaborator" });
 
     const viewResult = await authorizeSessionRequest(new NextRequest("http://localhost:4512/api/sessions/s1/state"), "s1", "view");

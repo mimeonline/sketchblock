@@ -58,7 +58,13 @@ describe("workshop claim and reload contract (signed cookies, mocked database an
     process.env.APP_BASE_URL = "https://workshop.example.test";
     process.env.APP_AUTH_SECRET = "workshop-test-secret-long-enough-for-signing";
     mocks.cookieJar.set("sketchblock_auth", signPayload({ id: 42, login: "guest", name: "Guest", permission: "read", expiresAt: Date.now() + 60_000 }, "participant-auth"));
-    mocks.getCurrentOwner.mockResolvedValue({ id: "foreign-local-user", username: "local" });
+    mocks.getCurrentOwner.mockResolvedValue({
+      id: "foreign-local-user",
+      sessionIdentityId: -17,
+      username: "local",
+      displayName: "Local participant",
+      mustChangePassword: false,
+    });
     mocks.getOwnedSession.mockResolvedValue(null);
     mocks.validateSessionInviteGrant.mockResolvedValue(true);
     mocks.upsertCollabSessionSnapshot.mockResolvedValue({ content: { elements: [] } });
@@ -71,7 +77,7 @@ describe("workshop claim and reload contract (signed cookies, mocked database an
     for (const cookie of claim.cookies.getAll()) mocks.cookieJar.set(cookie.name, cookie.value);
     expect(claim.cookies.getAll()[0].value).not.toContain("raw-secret");
 
-    await expect(JoinSessionPage({ params: context.params, searchParams: Promise.resolve({}) })).resolves.toMatchObject({ props: { role, identity: { login: "guest" } } });
+    await expect(JoinSessionPage({ params: context.params, searchParams: Promise.resolve({}) })).resolves.toMatchObject({ props: { role, identity: { login: "local:foreign-local-user" } } });
     const state = await getState(new NextRequest("https://workshop.example.test/api/sessions/workshop/state"), context);
     expect(state.status).toBe(200);
     expect(await state.json()).toMatchObject({ audit: [], snapshot: { content: { elements: [] } } });
@@ -79,7 +85,7 @@ describe("workshop claim and reload contract (signed cookies, mocked database an
     const ticket = await socket("collaborator");
     expect(ticket.status).toBe(200);
     const { token } = await ticket.json();
-    expect(verifySignedPayload<CollabTicketPayload>(token, "collab-ticket")).toMatchObject({ role, actor: "guest", sessionId: "workshop", permission: "read" });
+    expect(verifySignedPayload<CollabTicketPayload>(token, "collab-ticket")).toMatchObject({ role, actor: "local:foreign-local-user", sessionId: "workshop", permission: "read" });
 
     const patch = await patchState(new NextRequest("https://workshop.example.test/api/sessions/workshop/state", { method: "PATCH", headers: { origin: "https://workshop.example.test" }, body: JSON.stringify({ clientId: "guest-client", content: { elements: [] } }) }), context);
     expect(patch.status).toBe(role === "collaborator" ? 200 : 403);

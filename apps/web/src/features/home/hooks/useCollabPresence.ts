@@ -24,6 +24,7 @@ type CollabPresenceState = {
   } | null;
   audit: SessionAuditEvent[];
   error?: string;
+  terminalAuthError?: "session_closed" | "participant_removed";
   moderation: ModerationState;
   votes: VotesState;
 };
@@ -201,6 +202,7 @@ export function useCollabPresence(input: {
                 error: tokenPayload.code === "participant_removed"
                   ? tokenPayload.error || "This client was removed from the session."
                   : undefined,
+                terminalAuthError: tokenPayload.code,
               });
             }
             throw new TerminalSocketAuthError(
@@ -413,6 +415,7 @@ export function useCollabPresence(input: {
             ...current,
             status: "disconnected",
             sessionStatus: "closed",
+            terminalAuthError: "session_closed",
           }));
           socket?.disconnect();
         });
@@ -422,6 +425,7 @@ export function useCollabPresence(input: {
             ...current,
             status: "disconnected",
             error: "This client was removed from the session.",
+            terminalAuthError: "participant_removed",
           }));
           socket?.disconnect();
         });

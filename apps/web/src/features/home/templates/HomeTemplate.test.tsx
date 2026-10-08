@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import de from "../../../../messages/de.json";
 import en from "../../../../messages/en.json";
 import type { DrawingFile } from "@/types/sketchblock";
-import { DrawingTable, DrawingsView } from "./HomeTemplate";
+import { DrawingTable, DrawingsView, saveStatusCopy, shouldShowGitHubReconnect, updateDrawingAfterSave } from "./HomeTemplate";
 
 vi.mock("@/features/home/organisms/ExcalidrawEditor", () => ({ ExcalidrawEditor: () => null }));
 vi.mock("@/features/home/organisms/BoardGallery", () => ({ BoardGallery: () => null }));
@@ -49,5 +49,48 @@ describe("drawing list", () => {
     await waitFor(() => expect(document.querySelector('[data-slot="tooltip-content"]')).toHaveTextContent(drawings[0].path));
     expect(container.querySelector('[data-slot="table"]')?.parentElement?.parentElement).toHaveClass("bg-white");
     expect(screen.getAllByRole("link", { name: de.Workspace.edit })[0]).toHaveAttribute("href", `/editor?path=${encodeURIComponent(drawings[0].path)}`);
+  });
+});
+
+describe("GitHub reconnect banner", () => {
+  it("only requires reconnect for a disconnected GitHub repository", () => {
+    const base = { loaded: true, demoMode: false, githubConnected: false };
+
+    expect(shouldShowGitHubReconnect({ ...base, repository: { provider: "github" } })).toBe(true);
+    expect(shouldShowGitHubReconnect({ ...base, repository: { provider: "instance" } })).toBe(false);
+    expect(shouldShowGitHubReconnect({ ...base, repository: null })).toBe(false);
+  });
+});
+
+describe("saved drawing state", () => {
+  it("keeps instance board metadata for the version history panel", () => {
+    const drawing = {
+      path: "qa-private-history.excalidraw",
+      sha: "revision-1",
+      content: { elements: [] },
+      boardId: "board-123",
+      title: "QA private history",
+    };
+    const content = { elements: [{ id: "updated" }] };
+
+    expect(updateDrawingAfterSave(drawing, content, "revision-2")).toEqual({
+      ...drawing,
+      sha: "revision-2",
+      content,
+    });
+  });
+});
+
+describe("save status copy", () => {
+  it("uses instance workspace wording while saving and after saving", () => {
+    expect(saveStatusCopy("saving", false, "instance")).toEqual({ namespace: "instance", key: "versionSaving" });
+    expect(saveStatusCopy("saved", false, "instance")).toEqual({ namespace: "instance", key: "versionSaved" });
+  });
+
+  it("keeps demo and GitHub workspace wording on their existing paths", () => {
+    expect(saveStatusCopy("saving", true, "instance")).toEqual({ namespace: "workspace", key: "demoBoardSaving" });
+    expect(saveStatusCopy("saved", true, "github")).toEqual({ namespace: "workspace", key: "demoBoardSaved" });
+    expect(saveStatusCopy("saving", false, "github")).toEqual({ namespace: "workspace", key: "boardSaving" });
+    expect(saveStatusCopy("saved", false, "github")).toEqual({ namespace: "workspace", key: "boardSaved" });
   });
 });

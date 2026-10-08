@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentOwner } from "@/lib/server/auth/owner-session";
 import { getValidGuestGrant } from "@/lib/server/auth/guest-grant";
 import { getValidSessionGrant } from "@/lib/server/auth/session-grant";
-import { getCurrentAuthUser } from "@/lib/server/auth/session";
+import { getCurrentSessionUser } from "@/lib/server/auth/session-user";
 import { touchSessionGuest } from "@/lib/server/database/session-guest-store";
 import {
   isParticipantRemoved,
@@ -66,7 +66,10 @@ export async function authorizeSessionRequest(
       return { access: null, response: sessionClosedResponse() };
     }
 
-    const user = await getCurrentAuthUser();
+    const user = await getCurrentSessionUser();
+    if (user?.mustChangePassword) {
+      return { access: null, response: passwordChangeRequiredResponse() };
+    }
     const grant = user ? await getValidSessionGrant(sessionId, user.id) : null;
     if (!user || !grant) {
       const guestResult = ownerPasswordChangeRequired ? null : await authorizeGuest(sessionId, required);
@@ -92,6 +95,7 @@ export async function authorizeSessionRequest(
         actor: user.login,
         displayName: user.name || user.login,
         permission: "read",
+        localUserId: user.localUserId,
       },
       response: null,
     };
@@ -103,8 +107,11 @@ export async function authorizeSessionRequest(
 
   const [invite, user] = await Promise.all([
     validateSessionInvite(sessionId, inviteToken),
-    getCurrentAuthUser(),
+    getCurrentSessionUser(),
   ]);
+  if (user?.mustChangePassword) {
+    return { access: null, response: passwordChangeRequiredResponse() };
+  }
   if (!invite || !user) {
     if (!user) {
       const guestResult = await authorizeGuest(sessionId, required);
@@ -138,6 +145,7 @@ export async function authorizeSessionRequest(
       actor: user.login,
       displayName: user.name || user.login,
       permission: "read",
+      localUserId: user.localUserId,
     },
     response: null,
   };
@@ -173,4 +181,8 @@ function sessionClosedResponse() {
 
 function participantRemovedResponse() {
   return NextResponse.json({ error: "You were removed from this session.", code: "participant_removed" }, { status: 403 });
+}
+
+function passwordChangeRequiredResponse() {
+  return NextResponse.json({ error: "Password change required.", code: "password_change_required" }, { status: 423 });
 }

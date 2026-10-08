@@ -5,7 +5,7 @@ import { createCollabTicket } from "@/lib/server/auth/collab-ticket";
 import { getCurrentOwner } from "@/lib/server/auth/owner-session";
 import { getValidGuestGrant } from "@/lib/server/auth/guest-grant";
 import { getValidSessionGrant } from "@/lib/server/auth/session-grant";
-import { getCurrentAuthUser } from "@/lib/server/auth/session";
+import { getCurrentSessionUser } from "@/lib/server/auth/session-user";
 import { touchSessionGuest } from "@/lib/server/database/session-guest-store";
 import { getOwnedSession, getSession } from "@/lib/server/database/session-store";
 import { isParticipantRemoved, recordSessionParticipant, validateSessionInvite } from "@/lib/server/database/session-invite-store";
@@ -57,7 +57,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const authUser = await getCurrentAuthUser();
+    const authUser = await getCurrentSessionUser();
+    if (authUser?.mustChangePassword) {
+      return NextResponse.json({ error: "Password change required.", code: "password_change_required" }, { status: 423 });
+    }
     const access = authUser
       ? body.inviteToken
         ? await validateSessionInvite(body.sessionId, body.inviteToken)

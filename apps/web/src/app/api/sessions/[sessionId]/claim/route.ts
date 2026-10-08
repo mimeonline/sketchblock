@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { createSessionGrantCookie } from "@/lib/server/auth/session-grant";
-import { getAppBaseUrl, getCurrentAuthUser, getLoginPath } from "@/lib/server/auth/session";
+import { getAppBaseUrl, getLoginPath } from "@/lib/server/auth/session";
+import { getCurrentSessionUser } from "@/lib/server/auth/session-user";
 import { recordSessionParticipant, validateSessionInvite } from "@/lib/server/database/session-invite-store";
 import { getSession } from "@/lib/server/database/session-store";
 import { isSessionClosed } from "@/lib/server/domain/session-lifecycle";
@@ -18,7 +19,7 @@ export async function GET(
   const [session, invite, user] = await Promise.all([
     getSession(sessionId),
     validateSessionInvite(sessionId, inviteToken),
-    getCurrentAuthUser(),
+    getCurrentSessionUser(),
   ]);
 
   if (session && isSessionClosed(session)) {
@@ -29,6 +30,9 @@ export async function GET(
   }
   if (!user) {
     return NextResponse.redirect(new URL(getLoginPath(returnTo), getAppBaseUrl()));
+  }
+  if (user.mustChangePassword) {
+    return NextResponse.json({ error: "Password change required.", code: "password_change_required" }, { status: 423 });
   }
 
   await recordSessionParticipant({
