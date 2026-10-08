@@ -1,6 +1,6 @@
 # Architecture
 
-import useBaseUrl from '@docusaurus/useBaseUrl';
+import ArchitectureDiagram from '@site/src/components/ArchitectureDiagram';
 
 Sketchblock combines a browser-based Excalidraw editor, a Next.js application, and a NestJS collaboration service. The browser uses the web application for identity, board management, session access, and explicit saves. It connects directly to the collaboration service for live editing and presence.
 
@@ -8,21 +8,13 @@ Board storage is selected by provider. GitHub repositories are one option; local
 
 ## System context · C4 level 1
 
-<a href={useBaseUrl('/img/docs/architecture/system-context.svg')} target="_blank" rel="noopener noreferrer" aria-label="Open the system context diagram at full size">
-  <img src={useBaseUrl('/img/docs/architecture/system-context.svg')} alt="C4 system context: board owners manage and save in Sketchblock; invited participants join as collaborators or viewers. Sketchblock optionally uses GitHub for OAuth and repository board reads and commits." style={{width: '100%', maxWidth: '100%', height: 'auto', display: 'block'}} />
-</a>
-
-[Open the system context diagram at full size](/img/docs/architecture/system-context.svg).
+<ArchitectureDiagram title="System context" src="/img/docs/architecture/system-context.svg" alt="C4 system context: board owners manage and save in Sketchblock; invited participants join as collaborators or viewers. Sketchblock optionally uses GitHub for OAuth and repository board reads and commits." />
 
 The **board owner** opens a board, creates a session, manages invitations, and saves the result. An **invited participant** joins with a collaborator or viewer role; session participation does not grant repository credentials. **Sketchblock** controls these access and save boundaries. **GitHub** provides linked identity and repository-backed board storage when that provider is used. Instance workspaces and ad-hoc rooms can operate without GitHub.
 
 ## Runtime building blocks · C4 level 2
 
-<a href={useBaseUrl('/img/docs/architecture/building-blocks.svg')} target="_blank" rel="noopener noreferrer" aria-label="Open the runtime building blocks diagram at full size">
-  <img src={useBaseUrl('/img/docs/architecture/building-blocks.svg')} alt="C4 container view: the React Excalidraw and Yjs browser editor calls the Next.js web application over HTTP and the NestJS collaboration server over Socket.IO. Next.js reads application Postgres, calls the collaboration HTTP API, and optionally calls GitHub. NestJS persists snapshots and Yjs state in a separate collaboration Postgres database." style={{width: '100%', maxWidth: '100%', height: 'auto', display: 'block'}} />
-</a>
-
-[Open the runtime building blocks diagram at full size](/img/docs/architecture/building-blocks.svg).
+<ArchitectureDiagram title="Runtime building blocks" src="/img/docs/architecture/building-blocks.svg" alt="C4 container view: the React Excalidraw and Yjs browser editor calls the Next.js web application over HTTP and the NestJS collaboration server over Socket.IO. Next.js reads application Postgres, calls the collaboration HTTP API, and optionally calls GitHub. NestJS persists snapshots and Yjs state in a separate collaboration Postgres database." />
 
 A C4 container is a logical application or data store with a runtime responsibility. It is independent of a Docker container: the two database nodes here share one Postgres service in Compose.
 

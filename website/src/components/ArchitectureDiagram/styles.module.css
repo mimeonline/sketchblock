@@ -1,0 +1,17 @@
+.figure { margin: 1.5rem 0; }
+.preview { display: block; width: 100%; padding: 0; overflow: hidden; border: 1px solid var(--ifm-color-emphasis-300); border-radius: 12px; background: var(--ifm-background-surface-color); cursor: zoom-in; color: var(--ifm-font-color-base); }
+.preview img { display: block; width: 100%; height: auto; }
+.hint { display: block; padding: .65rem 1rem; font-weight: 600; text-align: right; }
+.figure figcaption { margin-top: .5rem; font-size: .85rem; color: var(--ifm-color-content-secondary); }
+.dialog { width: min(1400px, 96vw); max-width: 96vw; height: 90dvh; max-height: 90dvh; padding: 0; border: 1px solid var(--ifm-color-emphasis-300); border-radius: 12px; color: var(--ifm-font-color-base); background: var(--ifm-background-surface-color); }
+.dialog[open] { display: flex; flex-direction: column; }
+.dialog::backdrop { background: rgb(0 0 0 / 65%); }
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; padding: .85rem; border-bottom: 1px solid var(--ifm-color-emphasis-300); }
+.controls { display: flex; align-items: center; gap: .4rem; }
+.controls button { min-width: 44px; min-height: 44px; padding: .35rem .6rem; border: 1px solid var(--ifm-color-emphasis-300); border-radius: 6px; background: var(--ifm-background-color); color: inherit; cursor: pointer; font: inherit; }
+.controls button:disabled { opacity: .4; cursor: default; }
+.controls output { min-width: 3.5rem; text-align: center; }
+.viewport { flex: 1; min-height: 0; overflow: auto; padding: 1rem; overscroll-behavior: contain; }
+.viewport img { display: block; max-width: none; height: auto; }
+.preview:focus-visible, .controls button:focus-visible, .viewport:focus-visible { outline: 3px solid var(--ifm-color-primary); outline-offset: -3px; }
+@media (max-width: 480px) { .toolbar { gap: .4rem; } .viewport { padding: .5rem; } }
