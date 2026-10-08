@@ -1,0 +1,86 @@
+{
+  "meta": {
+    "target": "fit",
+    "detail": "balanced",
+    "audience": "engineer",
+    "notation": "c4",
+    "id": "system-context",
+    "title": "Sketchblock · System context",
+    "description": "Owners manage and save boards; invited participants collaborate. GitHub is optional for repository-backed boards.",
+    "c4Level": "context"
+  },
+  "layout": {
+    "direction": "right",
+    "density": "compact",
+    "columnGap": 144,
+    "rowGap": 32,
+    "clearance": 20,
+    "grid": 8,
+    "padding": 32
+  },
+  "nodes": [
+    {
+      "id": "owner",
+      "label": "Board owner",
+      "c4Type": "person",
+      "description": "Creates rooms and saves boards.",
+      "lane": "owners",
+      "rank": 0,
+      "role": "human",
+      "shape": "box",
+      "height": 144
+    },
+    {
+      "id": "guest",
+      "label": "Invited participant",
+      "c4Type": "person",
+      "description": "Joins as collaborator or viewer.",
+      "lane": "guests",
+      "rank": 0,
+      "role": "human",
+      "shape": "box",
+      "height": 144
+    },
+    {
+      "id": "sketchblock",
+      "label": "Sketchblock",
+      "c4Type": "software-system",
+      "description": "Shared Excalidraw editing and board management.",
+      "lane": "owners",
+      "rank": 1,
+      "role": "system",
+      "height": 144
+    },
+    {
+      "id": "github",
+      "label": "GitHub · optional",
+      "c4Type": "software-system",
+      "description": "OAuth and repository-backed boards.",
+      "lane": "owners",
+      "rank": 2,
+      "role": "system",
+      "height": 144
+    }
+  ],
+  "edges": [
+    {
+      "id": "owner-system",
+      "from": "owner",
+      "to": "sketchblock",
+      "label": "Owns and saves"
+    },
+    {
+      "id": "guest-system",
+      "from": "guest",
+      "to": "sketchblock",
+      "label": "Collaborates"
+    },
+    {
+      "id": "system-github",
+      "from": "sketchblock",
+      "to": "github",
+      "label": "OAuth / files",
+      "technology": "HTTPS"
+    }
+  ]
+}

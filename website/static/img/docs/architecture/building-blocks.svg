@@ -1,0 +1,202 @@
+<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="building-blocks-title building-blocks-desc" viewBox="0 0 1072 840" data-diagram-engine="msys-diagram-engineering/2">
+  <title id="building-blocks-title">Sketchblock · Runtime building blocks</title>
+  <desc id="building-blocks-desc">Browser calls Next.js for access and explicit saves, and NestJS directly for live Yjs synchronization. The services use separate Postgres databases. GitHub is an optional provider.</desc>
+  <style>
+    .de-edge{fill:none;stroke:#65736e;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .de-arrow{fill:#65736e}
+    .de-node{stroke-width:1.5}
+    .de-node-label{fill:#17221f;font:600 14px ui-sans-serif,system-ui,sans-serif;text-anchor:middle}
+    .de-c4-name{fill:#17221f;font:700 15px ui-sans-serif,system-ui,sans-serif;text-anchor:middle}
+    .de-c4-type{fill:#43524d;font:11px ui-sans-serif,system-ui,sans-serif;text-anchor:middle}
+    .de-c4-description{fill:#33413d;font:12px ui-sans-serif,system-ui,sans-serif;text-anchor:middle}
+    .de-c4-detail{fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+    .de-c4-database-body{stroke-width:1.5}
+    .de-c4-title{fill:#17221f;font:700 20px ui-sans-serif,system-ui,sans-serif}
+    .de-c4-boundary{fill:none;stroke:#315E7D;stroke-width:1.5;stroke-dasharray:8 6}
+    .de-c4-boundary-label{fill:#315E7D;font:600 12px ui-sans-serif,system-ui,sans-serif}
+    .de-c4-legend-title{fill:#17221f;font:600 12px ui-sans-serif,system-ui,sans-serif}
+    .de-c4-legend-label{fill:#43524d;font:11px ui-sans-serif,system-ui,sans-serif}
+    .de-flow-name{fill:#17221f;font:700 14px ui-sans-serif,system-ui,sans-serif;text-anchor:middle}
+    .de-flow-description{fill:#43524d;font:11px ui-sans-serif,system-ui,sans-serif;text-anchor:middle}
+    .de-deployment-node{fill:#f8faf9;stroke:#52605b;stroke-width:1.5}
+    .de-deployment-face{fill:#eef2f0;stroke:#52605b;stroke-width:1.5}
+    .de-edge-label{fill:#3d4a46;font:12px ui-sans-serif,system-ui,sans-serif;text-anchor:middle}
+  /* Shared presentation layer. Generated geometry and routing stay untouched. */
+[id$="-canvas"] { fill: #f8fafb; stroke: #dce5e3; stroke-width: 1; }
+.de-c4-title { fill: #183b35; font-weight: 650; letter-spacing: -.45px; }
+.de-node, .de-c4-database-body { fill: #ffffff; stroke: #aabcb7; stroke-width: 1.25; }
+.de-c4-detail { stroke: #aabcb7; }
+.de-c4-name { fill: #183b35; font-weight: 650; }
+.de-c4-type { fill: #566e67; }
+.de-c4-description { fill: #344e46; }
+.de-edge { stroke: #648179; stroke-width: 1.6; }
+.de-arrow { fill: #648179; }
+.de-edge-label { fill: #3d5e53; }
+[data-visual-node="sketchblock"] .de-node,
+[data-visual-node="web"] .de-node,
+[data-visual-node="collab"] .de-node { fill: #123e35; stroke: #123e35; }
+[data-visual-node="sketchblock"] .de-c4-name,
+[data-visual-node="web"] .de-c4-name,
+[data-visual-node="collab"] .de-c4-name { fill: #ffffff; }
+[data-visual-node="sketchblock"] .de-c4-type,
+[data-visual-node="web"] .de-c4-type,
+[data-visual-node="collab"] .de-c4-type { fill: #a9dfcc; }
+[data-visual-node="sketchblock"] .de-c4-description,
+[data-visual-node="web"] .de-c4-description,
+[data-visual-node="collab"] .de-c4-description { fill: #e0eee8; }
+[data-visual-node="github"] .de-node { fill: #f0f3f5; stroke: #9aaab3; stroke-dasharray: 5 4; }
+[data-role="human"] .de-node { fill: #eaf4ef; stroke: #87b5a1; }
+[data-role="data"] .de-node,
+[data-role="data"] .de-c4-database-body { fill: #edf2f5; stroke: #8b9da9; }
+[data-role="data"] .de-c4-detail { stroke: #8b9da9; }
+.de-c4-legend-title, .de-c4-legend-label { fill: #526961; }
+
+  </style>
+  <rect id="building-blocks-canvas" width="1072" height="840" rx="16" fill="#ffffff"/>
+  <text id="building-blocks-visible-title" class="de-c4-title" x="32" y="36">Sketchblock · Runtime building blocks</text>
+  <g id="building-blocks-edges" data-visual-role="edges">
+    <path id="building-blocks-edge-browser-web" class="de-edge" d="M 272 208 H 406" data-from="browser:right" data-to="web:left"/>
+    <polygon id="building-blocks-edge-browser-web-arrow" class="de-arrow" points="406,203 416,208 406,213"/>
+    <path id="building-blocks-edge-web-github" class="de-edge" d="M 656 208 H 790" data-from="web:right" data-to="github:left"/>
+    <polygon id="building-blocks-edge-web-github-arrow" class="de-arrow" points="790,203 800,208 790,213"/>
+    <path id="building-blocks-edge-web-appdb" class="de-edge" d="M 656 272 H 688 V 416 H 790" data-from="web:right" data-to="appdb:left"/>
+    <polygon id="building-blocks-edge-web-appdb-arrow" class="de-arrow" points="790,411 800,416 790,421"/>
+    <path id="building-blocks-edge-browser-collab" class="de-edge" d="M 152 292 V 624 H 406" data-from="browser:bottom" data-to="collab:left"/>
+    <polygon id="building-blocks-edge-browser-collab-arrow" class="de-arrow" points="406,619 416,624 406,629"/>
+    <path id="building-blocks-edge-web-collab" class="de-edge" d="M 536 276 V 538" data-from="web:bottom" data-to="collab:top"/>
+    <polygon id="building-blocks-edge-web-collab-arrow" class="de-arrow" points="531,538 536,548 541,538"/>
+    <path id="building-blocks-edge-collab-db" class="de-edge" d="M 656 624 H 790" data-from="collab:right" data-to="collabdb:left"/>
+    <polygon id="building-blocks-edge-collab-db-arrow" class="de-arrow" points="790,619 800,624 790,629"/>
+  </g>
+  <g id="building-blocks-edge-labels" data-visual-role="edge-labels">
+    <text id="building-blocks-label-browser-web-label" class="de-edge-label" x="344.5" y="175">Access / save<tspan x="344.5" dy="15">[HTTPS]</tspan></text>
+    <text id="building-blocks-label-web-github-label" class="de-edge-label" x="728.5" y="175">OAuth / files<tspan x="728.5" dy="15">[HTTPS]</tspan></text>
+    <text id="building-blocks-label-web-appdb-label" class="de-edge-label" x="744" y="339">Board data<tspan x="744" dy="15">[SQL]</tspan></text>
+    <text id="building-blocks-label-browser-collab-label" class="de-edge-label" x="222" y="453">Yjs / presence<tspan x="222" dy="15">[Socket.IO]</tspan></text>
+    <text id="building-blocks-label-web-collab-label" class="de-edge-label" x="606" y="407">Manage / state<tspan x="606" dy="15">[Signed HTTP]</tspan></text>
+    <text id="building-blocks-label-collab-db-label" class="de-edge-label" x="728.5" y="591">Store state<tspan x="728.5" dy="15">[SQL]</tspan></text>
+  </g>
+  <g id="building-blocks-nodes" data-visual-role="nodes">
+    <g id="building-blocks-node-browser" data-visual-node="browser" data-role="system" data-c4-type="container" data-shape="web-app">
+      <defs><clipPath id="building-blocks-node-browser-content-clip"><rect x="40" y="140" width="224" height="144" rx="6"/></clipPath></defs>
+      <rect class="de-node" x="32" y="132" width="240" height="160" rx="10" fill="#E8F0F7" stroke="#315E7D"/>
+      <path class="de-c4-detail" d="M 32 158 H 272" stroke="#315E7D"/>
+      <circle cx="48" cy="145" r="3" fill="#315E7D"/>
+      <circle cx="60" cy="145" r="3" fill="#315E7D"/>
+      <circle cx="72" cy="145" r="3" fill="#315E7D"/>
+      <g clip-path="url(#building-blocks-node-browser-content-clip)">
+      <text class="de-c4-name" x="152" y="186">
+        <tspan x="152" dy="0">Browser editor</tspan>
+      </text>
+      <text class="de-c4-type" x="152" y="206">
+        <tspan x="152" dy="0">[Container: React · Excalidraw ·</tspan>
+        <tspan x="152" dy="14">Yjs]</tspan>
+      </text>
+      <text class="de-c4-description" x="152" y="244">
+        <tspan x="152" dy="0">Excalidraw canvas; local Yjs</tspan>
+        <tspan x="152" dy="15">document.</tspan>
+      </text>
+      </g>
+    </g>
+    <g id="building-blocks-node-web" data-visual-node="web" data-role="system" data-c4-type="container" data-shape="box">
+      <defs><clipPath id="building-blocks-node-web-content-clip"><rect x="424" y="140" width="224" height="128" rx="6"/></clipPath></defs>
+      <rect class="de-node" x="416" y="132" width="240" height="144" rx="10" fill="#E8F0F7" stroke="#315E7D"/>
+      <g clip-path="url(#building-blocks-node-web-content-clip)">
+      <text class="de-c4-name" x="536" y="166">
+        <tspan x="536" dy="0">Web application</tspan>
+      </text>
+      <text class="de-c4-type" x="536" y="186">
+        <tspan x="536" dy="0">[Container: Next.js]</tspan>
+      </text>
+      <text class="de-c4-description" x="536" y="210">
+        <tspan x="536" dy="0">Authentication, tickets, board</tspan>
+        <tspan x="536" dy="15">providers and owner saves.</tspan>
+      </text>
+      </g>
+    </g>
+    <g id="building-blocks-node-collab" data-visual-node="collab" data-role="system" data-c4-type="container" data-shape="box">
+      <defs><clipPath id="building-blocks-node-collab-content-clip"><rect x="424" y="556" width="224" height="128" rx="6"/></clipPath></defs>
+      <rect class="de-node" x="416" y="548" width="240" height="144" rx="10" fill="#E8F0F7" stroke="#315E7D"/>
+      <g clip-path="url(#building-blocks-node-collab-content-clip)">
+      <text class="de-c4-name" x="536" y="582">
+        <tspan x="536" dy="0">Collaboration server</tspan>
+      </text>
+      <text class="de-c4-type" x="536" y="602">
+        <tspan x="536" dy="0">[Container: NestJS · Socket.IO ·</tspan>
+        <tspan x="536" dy="14">Yjs]</tspan>
+      </text>
+      <text class="de-c4-description" x="536" y="640">
+        <tspan x="536" dy="0">Room access, live Yjs state and</tspan>
+        <tspan x="536" dy="15">presence.</tspan>
+      </text>
+      </g>
+    </g>
+    <g id="building-blocks-node-github" data-visual-node="github" data-role="system" data-c4-type="software-system" data-shape="box">
+      <defs><clipPath id="building-blocks-node-github-content-clip"><rect x="808" y="140" width="224" height="128" rx="6"/></clipPath></defs>
+      <rect class="de-node" x="800" y="132" width="240" height="144" rx="10" fill="#E8F0F7" stroke="#315E7D"/>
+      <g clip-path="url(#building-blocks-node-github-content-clip)">
+      <text class="de-c4-name" x="920" y="166">
+        <tspan x="920" dy="0">GitHub · optional</tspan>
+      </text>
+      <text class="de-c4-type" x="920" y="186">
+        <tspan x="920" dy="0">[Software System]</tspan>
+      </text>
+      <text class="de-c4-description" x="920" y="210">
+        <tspan x="920" dy="0">OAuth and repository-backed files.</tspan>
+      </text>
+      </g>
+    </g>
+    <g id="building-blocks-node-appdb" data-visual-node="appdb" data-role="data" data-c4-type="container" data-shape="database">
+      <defs><clipPath id="building-blocks-node-appdb-content-clip"><rect x="808" y="348" width="224" height="144" rx="6"/></clipPath></defs>
+      <rect class="de-c4-database-body" x="800" y="351" width="240" height="138" fill="#F0ECFA" stroke="#665092"/>
+      <ellipse class="de-node" cx="920" cy="351" rx="120" ry="11" fill="#F0ECFA" stroke="#665092"/>
+      <path class="de-c4-detail" d="M 800 489 A 120 11 0 0 0 1040 489" fill="none" stroke="#665092"/>
+      <g clip-path="url(#building-blocks-node-appdb-content-clip)">
+      <text class="de-c4-name" x="920" y="390">
+        <tspan x="920" dy="0">Application database</tspan>
+      </text>
+      <text class="de-c4-type" x="920" y="410">
+        <tspan x="920" dy="0">[Container: Postgres ·</tspan>
+        <tspan x="920" dy="14">sketchblock_app]</tspan>
+      </text>
+      <text class="de-c4-description" x="920" y="448">
+        <tspan x="920" dy="0">Users, invites, sessions and</tspan>
+        <tspan x="920" dy="15">instance boards.</tspan>
+      </text>
+      </g>
+    </g>
+    <g id="building-blocks-node-collabdb" data-visual-node="collabdb" data-role="data" data-c4-type="container" data-shape="database">
+      <defs><clipPath id="building-blocks-node-collabdb-content-clip"><rect x="808" y="556" width="224" height="144" rx="6"/></clipPath></defs>
+      <rect class="de-c4-database-body" x="800" y="559" width="240" height="138" fill="#F0ECFA" stroke="#665092"/>
+      <ellipse class="de-node" cx="920" cy="559" rx="120" ry="11" fill="#F0ECFA" stroke="#665092"/>
+      <path class="de-c4-detail" d="M 800 697 A 120 11 0 0 0 1040 697" fill="none" stroke="#665092"/>
+      <g clip-path="url(#building-blocks-node-collabdb-content-clip)">
+      <text class="de-c4-name" x="920" y="598">
+        <tspan x="920" dy="0">Collaboration database</tspan>
+      </text>
+      <text class="de-c4-type" x="920" y="618">
+        <tspan x="920" dy="0">[Container: Postgres ·</tspan>
+        <tspan x="920" dy="14">sketchblock_collab]</tspan>
+      </text>
+      <text class="de-c4-description" x="920" y="656">
+        <tspan x="920" dy="0">Session checkpoints and encoded</tspan>
+        <tspan x="920" dy="15">Yjs state.</tspan>
+      </text>
+      </g>
+    </g>
+  </g>
+  <g id="building-blocks-legend" data-visual-role="legend">
+    <text class="de-c4-legend-title" x="32" y="810">Legend</text>
+    <rect x="104" y="794" width="20" height="17" rx="3" fill="#E8F0F7" stroke="#315E7D"/>
+    <path d="M 104 800 H 124" stroke="#315E7D"/>
+    <text class="de-c4-legend-label" x="130" y="810">[Container · Web-App]</text>
+    <rect x="293" y="795" width="18" height="16" rx="3" fill="#E8F0F7" stroke="#315E7D"/>
+    <text class="de-c4-legend-label" x="319" y="810">[Container]</text>
+    <rect x="441" y="795" width="18" height="16" rx="3" fill="#E8F0F7" stroke="#315E7D"/>
+    <text class="de-c4-legend-label" x="467" y="810">[Software System]</text>
+    <rect x="602" y="797" width="20" height="12" fill="#F0ECFA" stroke="#665092"/>
+    <ellipse cx="612" cy="797" rx="10" ry="3" fill="#F0ECFA" stroke="#665092"/>
+    <path d="M 602 809 A 10 3 0 0 0 622 809" fill="none" stroke="#665092"/>
+    <text class="de-c4-legend-label" x="628" y="810">[Container · Database]</text>
+  </g>
+</svg>

@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes target the latest `0.2.x` release. Installations on `0.1.x` should upgrade to `0.2.0` to receive the authentication, session-access and save-conflict fixes described in [CHANGELOG.md](CHANGELOG.md).
+Security fixes target the latest `0.3.x` release. Installations on older releases should follow the [update guide](https://mimeonline.github.io/sketchblock/docs/operations/update) and review the authentication, session-access, guest-revocation, and reconnect fixes described in [CHANGELOG.md](CHANGELOG.md).
 
 ## Report a vulnerability
 

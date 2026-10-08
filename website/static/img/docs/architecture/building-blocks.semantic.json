@@ -1,0 +1,141 @@
+{
+  "meta": {
+    "target": "fit",
+    "detail": "balanced",
+    "audience": "engineer",
+    "notation": "c4",
+    "id": "building-blocks",
+    "title": "Sketchblock · Runtime building blocks",
+    "description": "Browser calls Next.js for access and explicit saves, and NestJS directly for live Yjs synchronization. The services use separate Postgres databases. GitHub is an optional provider.",
+    "c4Level": "container"
+  },
+  "layout": {
+    "direction": "right",
+    "density": "compact",
+    "columnGap": 144,
+    "rowGap": 32,
+    "clearance": 20,
+    "padding": 32,
+    "grid": 8
+  },
+  "nodes": [
+    {
+      "id": "browser",
+      "label": "Browser editor",
+      "c4Type": "container",
+      "description": "Excalidraw canvas; local Yjs document.",
+      "lane": "web",
+      "rank": 0,
+      "role": "system",
+      "technology": "React · Excalidraw · Yjs",
+      "shape": "web-app",
+      "height": 160
+    },
+    {
+      "id": "web",
+      "label": "Web application",
+      "c4Type": "container",
+      "description": "Authentication, tickets, board providers and owner saves.",
+      "lane": "web",
+      "rank": 1,
+      "role": "system",
+      "technology": "Next.js",
+      "shape": "box",
+      "height": 144
+    },
+    {
+      "id": "github",
+      "label": "GitHub · optional",
+      "c4Type": "software-system",
+      "description": "OAuth and repository-backed files.",
+      "lane": "web",
+      "rank": 2,
+      "role": "system",
+      "height": 144
+    },
+    {
+      "id": "appdb",
+      "label": "Application database",
+      "c4Type": "container",
+      "description": "Users, invites, sessions and instance boards.",
+      "lane": "app-data",
+      "rank": 2,
+      "role": "data",
+      "technology": "Postgres · sketchblock_app",
+      "shape": "database",
+      "height": 160
+    },
+    {
+      "id": "collab",
+      "label": "Collaboration server",
+      "c4Type": "container",
+      "description": "Room access, live Yjs state and presence.",
+      "lane": "collab",
+      "rank": 1,
+      "role": "system",
+      "technology": "NestJS · Socket.IO · Yjs",
+      "shape": "box",
+      "height": 144
+    },
+    {
+      "id": "collabdb",
+      "label": "Collaboration database",
+      "c4Type": "container",
+      "description": "Session checkpoints and encoded Yjs state.",
+      "lane": "collab",
+      "rank": 2,
+      "role": "data",
+      "technology": "Postgres · sketchblock_collab",
+      "shape": "database",
+      "height": 160
+    }
+  ],
+  "edges": [
+    {
+      "id": "browser-web",
+      "from": "browser",
+      "to": "web",
+      "label": "Access / save",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "web-github",
+      "from": "web",
+      "to": "github",
+      "label": "OAuth / files",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "web-appdb",
+      "from": "web",
+      "to": "appdb",
+      "label": "Board data",
+      "technology": "SQL"
+    },
+    {
+      "id": "browser-collab",
+      "from": "browser",
+      "to": "collab",
+      "label": "Yjs / presence",
+      "sourceSide": "bottom",
+      "targetSide": "left",
+      "technology": "Socket.IO"
+    },
+    {
+      "id": "web-collab",
+      "from": "web",
+      "to": "collab",
+      "label": "Manage / state",
+      "sourceSide": "bottom",
+      "targetSide": "top",
+      "technology": "Signed HTTP"
+    },
+    {
+      "id": "collab-db",
+      "from": "collab",
+      "to": "collabdb",
+      "label": "Store state",
+      "technology": "SQL"
+    }
+  ]
+}

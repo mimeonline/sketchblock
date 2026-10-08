@@ -5,9 +5,11 @@ description: The story behind Sketchblock and its creator, Michael Meierhoff.
 
 # About Michael
 
-<img src="/sketchblock/img/michael-meierhoff.jpg" alt="Michael Meierhoff" width="720" />
-
 I’m Michael Meierhoff, an independent software architect, systems thinker, and builder based in Hamburg, Germany.
+
+**[Visit Meierhoff Systems →](https://meierhoff-systems.de/)** — my work in software development, architecture, and technical consulting.
+
+<img src="/sketchblock/img/michael-meierhoff.jpg" alt="Michael Meierhoff" width="720" loading="lazy" />
 
 My professional path started close to real systems: electronics, engineering, and software that had to work outside a slide deck. Over more than two decades I moved through software engineering, technical leadership, software architecture, and enterprise architecture. The common thread has always been the same: making complex systems understandable enough that people can make better decisions together.
 
@@ -32,6 +34,12 @@ Sketchblock brings three qualities together:
 It is intentionally self-hosted and open source. Teams should be able to understand where their boards live, how collaboration works, and what happens when a result is saved.
 
 The project also reflects how I like to build software: start with a real problem, keep the architecture inspectable, make the operating model explicit, and create something small enough to understand yet useful enough to put into practice.
+
+## Work with me
+
+At [Meierhoff Systems](https://meierhoff-systems.de/), I connect software development, architectural thinking, and practical technical advice. The website brings together my services, professional background, projects, and writing.
+
+For a project or architecture conversation, start with the [Meierhoff Systems website](https://meierhoff-systems.de/). For Sketchblock product questions and contributions, use the project contact below.
 
 ## Beyond Sketchblock
 

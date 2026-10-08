@@ -1,0 +1,29 @@
+/* Shared presentation layer. Generated geometry and routing stay untouched. */
+[id$="-canvas"] { fill: #f8fafb; stroke: #dce5e3; stroke-width: 1; }
+.de-c4-title { fill: #183b35; font-weight: 650; letter-spacing: -.45px; }
+.de-node, .de-c4-database-body { fill: #ffffff; stroke: #aabcb7; stroke-width: 1.25; }
+.de-c4-detail { stroke: #aabcb7; }
+.de-c4-name { fill: #183b35; font-weight: 650; }
+.de-c4-type { fill: #566e67; }
+.de-c4-description { fill: #344e46; }
+.de-edge { stroke: #648179; stroke-width: 1.6; }
+.de-arrow { fill: #648179; }
+.de-edge-label { fill: #3d5e53; }
+[data-visual-node="sketchblock"] .de-node,
+[data-visual-node="web"] .de-node,
+[data-visual-node="collab"] .de-node { fill: #123e35; stroke: #123e35; }
+[data-visual-node="sketchblock"] .de-c4-name,
+[data-visual-node="web"] .de-c4-name,
+[data-visual-node="collab"] .de-c4-name { fill: #ffffff; }
+[data-visual-node="sketchblock"] .de-c4-type,
+[data-visual-node="web"] .de-c4-type,
+[data-visual-node="collab"] .de-c4-type { fill: #a9dfcc; }
+[data-visual-node="sketchblock"] .de-c4-description,
+[data-visual-node="web"] .de-c4-description,
+[data-visual-node="collab"] .de-c4-description { fill: #e0eee8; }
+[data-visual-node="github"] .de-node { fill: #f0f3f5; stroke: #9aaab3; stroke-dasharray: 5 4; }
+[data-role="human"] .de-node { fill: #eaf4ef; stroke: #87b5a1; }
+[data-role="data"] .de-node,
+[data-role="data"] .de-c4-database-body { fill: #edf2f5; stroke: #8b9da9; }
+[data-role="data"] .de-c4-detail { stroke: #8b9da9; }
+.de-c4-legend-title, .de-c4-legend-label { fill: #526961; }

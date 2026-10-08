@@ -1,0 +1,44 @@
+.reference {
+  margin: 1rem 0;
+}
+
+.reference table {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.reference th:first-child {
+  width: 43%;
+}
+
+.reference td,
+.reference th {
+  overflow-wrap: anywhere;
+}
+
+.reference code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 560px) {
+  .reference td,
+  .reference th {
+    padding: .6rem .5rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .reference {
+    overflow-x: auto;
+  }
+
+  .reference table:has(th:nth-child(3)) {
+    min-width: 36rem;
+  }
+
+  .reference table:has(th:nth-child(3)) th:first-child {
+    width: 30%;
+  }
+}

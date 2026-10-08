@@ -1,14 +1,66 @@
 # Update
 
-Before updating, create a database backup and read the release notes.
+import {GuideFlow} from '@site/src/components/GuideVisuals';
+
+Update the web app and collaboration server together. Keep the previous release and a database backup available until the new installation has passed its checks.
+
+<GuideFlow
+  label="Release update"
+  steps={[
+    {title: 'Prepare', description: 'Read release notes and retain configuration, source revision, image tags, and a backup.'},
+    {title: 'Apply', description: 'Update the selected release and allow both Flyway jobs to complete.'},
+    {title: 'Verify', description: 'Check healthy services, two browser profiles, and a durable save.'},
+    {title: 'Retain recovery', description: 'Keep the matching backup and previous release until acceptance is complete.'},
+  ]}
+/>
+
+## Choose one update path
+
+Before updating, finish active sessions and [create a database backup](./backup.md). Use the same Compose project, environment file, and overrides throughout.
+
+### Build from source
+
+For a checkout that follows its configured branch:
 
 ```bash
 git pull --ff-only
-docker compose pull
 docker compose up --build -d
 ```
 
-Flyway services run before the application services and apply pending migrations. Use explicit image tags in long-running installations when reproducibility matters.
+For a reproducible release installation, select the intended release tag and retain its matching Compose file and migrations before building. Check for local changes before changing revisions.
+
+### Use published images
+
+Set `SKETCHBLOCK_IMAGE_TAG` to the intended published release and use the matching release's Compose file and migration sources:
+
+```bash
+docker compose pull web collab-server
+docker compose up -d --no-build
+```
+
+The supplied Compose file mounts migration SQL from the checkout. Updating only the image tag can leave those migrations behind. `NEXT_PUBLIC_COLLAB_SERVER_URL` is also a web build argument; use an image built for your public collaboration URL, or build it from source.
+
+## Verify the running stack
+
+```bash
+docker compose ps -a
+docker compose logs --tail=120 flyway-app flyway-collab web collab-server
+```
+
+| Check | Expected result |
+| --- | --- |
+| Database | Postgres is healthy. |
+| Migrations | Both Flyway jobs completed with exit code 0. |
+| Services | Web and collaboration server are healthy. |
+| Browser access | Login and the expected board source work through the real public URL. |
+| Live collaboration | Two profiles see edits and participant presence after reconnecting. |
+| Durable save | The owner can verify a new local version or the resulting GitHub file and commit. |
+
+Use the [two-user procedure](../guides/collaboration.md#checking-a-two-user-workflow) for browser acceptance. Container health alone covers only part of this check.
+
+## Recovery
+
+Restore the retained backup with its matching application version in a separate stack. Rehearse that path before treating it as a rollback plan. Starting an older application image against a migrated database is not a verified rollback.
 
 ## Upgrading from 0.1 to 0.2
 
